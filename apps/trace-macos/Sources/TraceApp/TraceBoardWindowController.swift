@@ -1002,6 +1002,7 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         apiKeyRemoveVisible: Bool,
         apiKeyResetTitle: String?,
         apiKeyResetUsesLinkStyle: Bool,
+        errorUsesConstrainedWrapping: Bool,
         blankShortcut: String,
         blankShortcutDetail: String,
         captureShortcut: String,
@@ -1039,6 +1040,7 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
             panelState.apiKeyRemoveVisible,
             panelState.apiKeyResetTitle,
             panelState.apiKeyResetUsesLinkStyle,
+            panelState.errorUsesConstrainedWrapping,
             panelState.blankShortcut,
             panelState.blankShortcutDetail,
             panelState.captureShortcut,
@@ -4966,7 +4968,7 @@ private final class SetupPanelView: NSView {
     private let captureShortcutRow = SetupShortcutRecorderRow(
         action: .captureFrontmostApp
     )
-    private let errorLabel = NSTextField(labelWithString: "")
+    private let errorLabel = NSTextField(wrappingLabelWithString: "")
     private let contentStack = NSStackView()
 
     override init(frame frameRect: NSRect) {
@@ -4993,7 +4995,14 @@ private final class SetupPanelView: NSView {
         }
         errorLabel.font = .systemFont(ofSize: 11)
         errorLabel.textColor = .systemRed
-        errorLabel.maximumNumberOfLines = 3
+        errorLabel.lineBreakMode = .byWordWrapping
+        errorLabel.maximumNumberOfLines = 0
+        errorLabel.preferredMaxLayoutWidth =
+            Self.preferredWidth - Self.horizontalPadding * 2
+        errorLabel.setContentCompressionResistancePriority(
+            .defaultLow,
+            for: .horizontal
+        )
 
         let penHeading = sectionHeading("Pen")
         let voiceHeading = sectionHeading("Voice transcription")
@@ -5189,6 +5198,7 @@ private final class SetupPanelView: NSView {
         apiKeyRemoveVisible: Bool,
         apiKeyResetTitle: String?,
         apiKeyResetUsesLinkStyle: Bool,
+        errorUsesConstrainedWrapping: Bool,
         blankShortcut: String,
         blankShortcutDetail: String,
         captureShortcut: String,
@@ -5212,6 +5222,18 @@ private final class SetupPanelView: NSView {
             openRouterRow.removeVisibleForTesting,
             openRouterRow.removeTitleForTesting,
             openRouterRow.removeUsesLinkStyleForTesting,
+            errorLabel.lineBreakMode == .byWordWrapping
+                && errorLabel.maximumNumberOfLines == 0
+                && abs(
+                    errorLabel.preferredMaxLayoutWidth
+                        - (
+                            Self.preferredWidth
+                                - Self.horizontalPadding * 2
+                        )
+                ) < 0.5
+                && errorLabel.contentCompressionResistancePriority(
+                    for: .horizontal
+                ) == .defaultLow,
             blankShortcutRow.shortcutForTesting,
             blankShortcutRow.detailForTesting,
             captureShortcutRow.shortcutForTesting,

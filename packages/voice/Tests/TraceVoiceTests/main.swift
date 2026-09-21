@@ -1,6 +1,7 @@
 import Darwin
 import AVFoundation
 import Foundation
+import Security
 import TraceVoice
 
 private struct TestFailure: Error, CustomStringConvertible {
@@ -321,6 +322,18 @@ private func waitUntil(
 }
 
 Task {
+    await test("legacy Keychain ownership errors explain recovery") {
+        try expect(
+            OpenRouterAPIKeyStoreError
+                .keychain(errSecInvalidOwnerEdit)
+                .localizedDescription
+                == "Trace cannot reset this key because macOS assigned it "
+                    + "to an older build. Delete the Trace OpenRouter key "
+                    + "in Keychain Access, then add it again.",
+            "legacy Keychain ownership errors were not actionable"
+        )
+    }
+
     await test("rolling transcription chunks every twelve seconds") {
         try expect(
             TraceAudioChunkRecorder.defaultChunkDurationSeconds == 12,

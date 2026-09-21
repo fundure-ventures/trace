@@ -16,6 +16,11 @@ public enum OpenRouterAPIKeyStoreError: LocalizedError, Equatable {
         case .emptyAPIKey:
             return "Enter an OpenRouter API key."
         case let .keychain(status):
+            if status == errSecInvalidOwnerEdit {
+                return "Trace cannot reset this key because macOS assigned "
+                    + "it to an older build. Delete the Trace OpenRouter key "
+                    + "in Keychain Access, then add it again."
+            }
             let detail = SecCopyErrorMessageString(status, nil) as String?
             return detail.map {
                 "Trace could not access the OpenRouter key in Keychain: \($0)"

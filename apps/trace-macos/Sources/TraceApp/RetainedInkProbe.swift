@@ -1987,7 +1987,8 @@ enum TraceRetainedInkProbe {
         microphoneAuthorized: Bool = true,
         transcriptionConfigured: Bool = true,
         apiKeyState: OpenRouterAPIKeyState = .externallySupplied,
-        deviceInfo: PenDeviceInfo? = nil
+        deviceInfo: PenDeviceInfo? = nil,
+        lastError: String? = nil
     ) -> TraceAppSnapshot {
         TraceAppSnapshot(
             phase: .waitingForPen,
@@ -2010,7 +2011,7 @@ enum TraceRetainedInkProbe {
             canRedo: false,
             setupVisible: true,
             currentDocument: nil,
-            lastError: nil
+            lastError: lastError
         )
     }
 
@@ -2089,6 +2090,23 @@ enum TraceRetainedInkProbe {
             throw probeError(
                 "setup did not use native external utility-panel chrome "
                     + "setup=\(setup) chrome=\(setupChrome)"
+            )
+        }
+
+        let wrappingError =
+            "Trace could not access the OpenRouter key in Keychain: "
+            + "Invalid attempt to change the owner of this item."
+        board.prepareOnboardingForPreview(
+            setupPreviewSnapshot(lastError: wrappingError)
+        )
+        let setupWithError = board.setupStateForPreview
+        guard abs(setupWithError.panelFrame.width - 360) < 0.5,
+              setupWithError.panelFrame.height > setup.panelFrame.height,
+              setupWithError.errorUsesConstrainedWrapping,
+              board.setupVisibleTextForPreview.contains(wrappingError)
+        else {
+            throw probeError(
+                "setup errors did not wrap within the fixed panel width"
             )
         }
 
