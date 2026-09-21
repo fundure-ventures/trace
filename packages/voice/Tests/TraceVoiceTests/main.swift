@@ -441,10 +441,10 @@ Task {
         )
     }
 
-    await test("rolling transcription chunks every twelve seconds") {
+    await test("rolling Dictation chunks every twelve seconds") {
         try expect(
             TraceAudioChunkRecorder.defaultChunkDurationSeconds == 12,
-            "rolling transcription chunk duration changed"
+            "rolling Dictation chunk duration changed"
         )
     }
 
@@ -751,7 +751,7 @@ Task {
         }
         try expect(
             json["model"] as? String == "microsoft/mai-transcribe-2",
-            "transcription model changed"
+            "Dictation model changed"
         )
         try expect(
             audio["format"] as? String == "wav"
@@ -1006,7 +1006,7 @@ Task {
                 update?.text == "sketch"
                     && update?.words.first?.startedAtAppClockSeconds
                         == 8_000.25,
-                "completed transcription did not publish aligned words"
+                "completed Dictation did not publish aligned words"
             )
             let result = try await withCheckedThrowingContinuation {
                 continuation in
@@ -1098,7 +1098,7 @@ Task {
         )
     }
 
-    await test("transcription failure stops microphone recording") {
+    await test("Dictation failure stops microphone recording") {
         let recorder = FakeRecorder()
         let controller = TraceVoiceCaptureController(
             recorder: recorder,
@@ -1115,7 +1115,7 @@ Task {
         }
         try expect(
             recorder.pauseCount == 1,
-            "transcription failure left the microphone recording"
+            "Dictation failure left the microphone recording"
         )
     }
 
@@ -1134,7 +1134,7 @@ Task {
         )
     }
 
-    await test("pen-critical mode defers transcription completion") {
+    await test("pen-critical mode defers Dictation completion") {
         let recorder = FakeRecorder()
         let transcriber = SignalingTimedTranscriber()
         let controller = TraceVoiceCaptureController(
@@ -1165,23 +1165,23 @@ Task {
         try expect(
             transcriptUpdate == nil
                 && controller.state == .recording(transcribedChunks: 0),
-            "transcription completion published during pen-down"
+            "Dictation completion published during pen-down"
         )
         controller.setPerformanceCritical(false)
         try expect(
             transcriptUpdate == nil,
-            "pen-up synchronously drained transcription work"
+            "pen-up synchronously drained Dictation work"
         )
         try await waitUntil {
             controller.state == .recording(transcribedChunks: 1)
         }
         try expect(
             transcriptUpdate?.text == "priority",
-            "deferred transcription did not publish after pen-up"
+            "deferred Dictation did not publish after pen-up"
         )
     }
 
-    await test("finishing drains a pen-deferred transcription") {
+    await test("finishing drains a pen-deferred Dictation") {
         let recorder = FakeRecorder()
         let transcriber = SignalingTimedTranscriber()
         let controller = TraceVoiceCaptureController(
@@ -1216,7 +1216,7 @@ Task {
     if let liveIndex = CommandLine.arguments.firstIndex(of: "--live"),
        CommandLine.arguments.indices.contains(liveIndex + 1)
     {
-        await test("live OpenRouter transcription") {
+        await test("live OpenRouter Dictation") {
             let configuration =
                 try OpenRouterTranscriptionConfiguration.load()
             let client = OpenRouterTranscriptionClient(
@@ -1230,19 +1230,19 @@ Task {
             )
             try expect(
                 !result.normalizedText.isEmpty,
-                "live transcription returned no recognized speech"
+                "live Dictation returned no recognized speech"
             )
             try expect(
                 result.segments?.isEmpty == false,
-                "live transcription omitted segments"
+                "live Dictation omitted segments"
             )
             try expect(
                 result.words?.isEmpty == false,
-                "live transcription omitted word timestamps"
+                "live Dictation omitted word timestamps"
             )
             try expect(
                 result.segments?.first?.speaker != nil,
-                "live transcription omitted speaker diarization"
+                "live Dictation omitted speaker diarization"
             )
             print(
                 "LIVE \(result.normalizedText) "

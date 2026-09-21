@@ -102,7 +102,7 @@ enum TraceHoverSyncPolicy {
 struct TraceAppSettings: Equatable {
     var captureScreenshotOnCapOff = true
     var copyTraceAndCloseOnDisconnect = false
-    var autoAnnotateTranscriptions = true
+    var autoAnnotateDictation = true
     var transcriptAnnotationScale: TraceTranscriptAnnotationScale = .medium
 }
 
@@ -111,7 +111,7 @@ enum TraceAppSettingsPreferences {
         "TraceCaptureScreenshotOnCapOff"
     private static let copyOnDisconnectKey =
         "TraceCopyTraceAndCloseOnDisconnect"
-    private static let autoAnnotateTranscriptionsKey =
+    private static let autoAnnotateDictationKey =
         "TraceAutoAnnotateTranscriptions"
     private static let transcriptAnnotationScaleKey =
         "TraceTranscriptAnnotationScale"
@@ -132,8 +132,8 @@ enum TraceAppSettingsPreferences {
                         defaultValue: false,
                         defaults: defaults
                     ),
-            autoAnnotateTranscriptions: bool(
-                forKey: autoAnnotateTranscriptionsKey,
+            autoAnnotateDictation: bool(
+                forKey: autoAnnotateDictationKey,
                 defaultValue: true,
                 defaults: defaults
             ),
@@ -157,8 +157,8 @@ enum TraceAppSettingsPreferences {
             forKey: copyOnDisconnectKey
         )
         defaults.set(
-            settings.autoAnnotateTranscriptions,
-            forKey: autoAnnotateTranscriptionsKey
+            settings.autoAnnotateDictation,
+            forKey: autoAnnotateDictationKey
         )
         defaults.set(
             settings.transcriptAnnotationScale.rawValue,
@@ -231,7 +231,7 @@ struct TraceAppSnapshot {
     let calibrationMessage: String?
     let screenCaptureAuthorized: Bool
     let microphoneAuthorized: Bool
-    let voiceTranscriptionConfigured: Bool
+    let dictationConfigured: Bool
     let openRouterAPIKeyState: OpenRouterAPIKeyState
     let voiceState: TraceVoiceCaptureState
     let penStatus: PenDeviceStatus?
@@ -383,7 +383,7 @@ final class TraceAppModel {
             screenCaptureAuthorized: captureService.hasPermission,
             microphoneAuthorized:
                 voiceController.microphoneAuthorization == .authorized,
-            voiceTranscriptionConfigured: voiceController.isConfigured,
+            dictationConfigured: voiceController.isConfigured,
             openRouterAPIKeyState: voiceController.apiKeyState,
             voiceState: voiceController.state,
             penStatus: penStatus,
@@ -553,9 +553,9 @@ final class TraceAppModel {
             }
             if case let .failed(message) = state {
                 self.lastError =
-                    "Trace voice annotation failed: \(message)"
+                    "Trace Dictation failed: \(message)"
             } else if self.lastError?.hasPrefix(
-                "Trace voice annotation failed"
+                "Trace Dictation failed"
             ) == true {
                 self.lastError = nil
             }
@@ -979,11 +979,11 @@ final class TraceAppModel {
         persistAppSettings()
     }
 
-    func setAutoAnnotateTranscriptions(_ enabled: Bool) {
-        guard appSettings.autoAnnotateTranscriptions != enabled else {
+    func setAutoAnnotateDictation(_ enabled: Bool) {
+        guard appSettings.autoAnnotateDictation != enabled else {
             return
         }
-        appSettings.autoAnnotateTranscriptions = enabled
+        appSettings.autoAnnotateDictation = enabled
         if enabled {
             applyAutomaticTranscriptAnnotations()
         }
@@ -1111,7 +1111,7 @@ final class TraceAppModel {
                     completion(.success(capture?.transcript))
                 }
                 if self.lastError?.hasPrefix(
-                    "Trace could not finish the voice annotation"
+                    "Trace could not finish Dictation"
                 ) == true {
                     self.lastError = nil
                 }
@@ -1119,7 +1119,7 @@ final class TraceAppModel {
             } catch {
                 self.copyFailed()
                 self.lastError =
-                    "Trace could not finish the voice annotation: "
+                    "Trace could not finish Dictation: "
                     + error.localizedDescription
                 self.onStateChange?(self.snapshot)
                 completion(.failure(error))
@@ -1147,7 +1147,7 @@ final class TraceAppModel {
             }
         } catch {
             lastError =
-                "Trace voice annotation failed: "
+                "Trace Dictation failed: "
                 + error.localizedDescription
             onStateChange?(snapshot)
         }
@@ -1696,7 +1696,7 @@ final class TraceAppModel {
 
     @discardableResult
     private func applyAutomaticTranscriptAnnotations() -> Bool {
-        guard appSettings.autoAnnotateTranscriptions,
+        guard appSettings.autoAnnotateDictation,
               let currentDocument,
               let words = currentDocument.manifest.transcriptWords,
               !words.isEmpty

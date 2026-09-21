@@ -35,7 +35,7 @@ enum TraceDrawingStoreError: LocalizedError {
         case .missingScreenshot:
             return "This Trace drawing is missing its captured screenshot."
         case .missingVoiceRecording:
-            return "Trace could not preserve the recorded voice annotation."
+            return "Trace could not preserve the Dictation recording."
         }
     }
 }

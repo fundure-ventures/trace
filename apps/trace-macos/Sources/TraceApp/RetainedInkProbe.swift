@@ -27,7 +27,7 @@ enum TraceRetainedInkProbe {
         if let setupURL {
             board.prepareOnboardingForPreview(
                 setupPreviewSnapshot(
-                    transcriptionConfigured: false,
+                    dictationConfigured: false,
                     apiKeyState: .missing
                 )
             )
@@ -1985,7 +1985,7 @@ enum TraceRetainedInkProbe {
         inputEnabled: Bool = false,
         calibration: CalibratedSurface? = nil,
         microphoneAuthorized: Bool = true,
-        transcriptionConfigured: Bool = true,
+        dictationConfigured: Bool = true,
         apiKeyState: OpenRouterAPIKeyState = .externallySupplied,
         deviceInfo: PenDeviceInfo? = nil,
         lastError: String? = nil
@@ -2000,7 +2000,7 @@ enum TraceRetainedInkProbe {
             calibrationMessage: nil,
             screenCaptureAuthorized: false,
             microphoneAuthorized: microphoneAuthorized,
-            voiceTranscriptionConfigured: transcriptionConfigured,
+            dictationConfigured: dictationConfigured,
             openRouterAPIKeyState: apiKeyState,
             voiceState: .idle,
             penStatus: nil,
@@ -2026,7 +2026,7 @@ enum TraceRetainedInkProbe {
             calibrationMessage: "Touch the top right paper corner.",
             screenCaptureAuthorized: true,
             microphoneAuthorized: true,
-            voiceTranscriptionConfigured: true,
+            dictationConfigured: true,
             openRouterAPIKeyState: .externallySupplied,
             voiceState: .idle,
             penStatus: nil,
@@ -2180,7 +2180,7 @@ enum TraceRetainedInkProbe {
         board.prepareOnboardingForPreview(
             setupPreviewSnapshot(
                 microphoneAuthorized: true,
-                transcriptionConfigured: false,
+                dictationConfigured: false,
                 apiKeyState: .missing
             )
         )
@@ -2196,13 +2196,13 @@ enum TraceRetainedInkProbe {
         board.prepareOnboardingForPreview(
             setupPreviewSnapshot(
                 microphoneAuthorized: false,
-                transcriptionConfigured: false
+                dictationConfigured: false
             )
         )
         let missingVoice = board.setupStateForPreview
         guard missingVoice.voiceAction == "Allow" else {
             throw probeError(
-                "missing transcription configuration hid microphone recovery"
+                "missing Dictation configuration hid microphone recovery"
             )
         }
 
@@ -2831,7 +2831,7 @@ enum TraceRetainedInkProbe {
         }
         let initial = TraceAppSettingsPreferences.load(from: defaults)
         guard initial == TraceAppSettings(),
-              initial.autoAnnotateTranscriptions,
+              initial.autoAnnotateDictation,
               initial.transcriptAnnotationScale == .medium
         else {
             throw probeError("app settings defaults changed")
@@ -2938,7 +2938,7 @@ enum TraceRetainedInkProbe {
         let customized = TraceAppSettings(
             captureScreenshotOnCapOff: false,
             copyTraceAndCloseOnDisconnect: true,
-            autoAnnotateTranscriptions: false,
+            autoAnnotateDictation: false,
             transcriptAnnotationScale: .large
         )
         TraceAppSettingsPreferences.save(customized, to: defaults)
@@ -2977,10 +2977,10 @@ enum TraceRetainedInkProbe {
                 == "When pen is disconnected",
             TraceAppSettingsMenuPresentation.copyTraceAndClose
                 == "Copy trace and close app",
-            TraceAppSettingsMenuPresentation.transcriptionSection
-                == "Transcription",
-            TraceAppSettingsMenuPresentation.autoAnnotateTranscriptions
-                == "Auto annotate transcriptions",
+            TraceAppSettingsMenuPresentation.dictationSection
+                == "Dictation",
+            TraceAppSettingsMenuPresentation.autoAnnotateDictation
+                == "Annotate dictation automatically",
             TraceAppSettingsMenuPresentation.annotationScale
                 == "Annotation scale",
             TraceAppSettingsMenuPresentation.annotationScaleTitle(.small)
@@ -4336,7 +4336,7 @@ enum TraceRetainedInkProbe {
                 points: stroke?.points ?? []
             )
         )
-        model.setAutoAnnotateTranscriptions(false)
+        model.setAutoAnnotateDictation(false)
         model.updateTldrawSnapshot(
             """
             {"document":{"store":{}},"session":{}}
@@ -4377,10 +4377,10 @@ enum TraceRetainedInkProbe {
                 .transcriptAnnotation == nil
         else {
             throw probeError(
-                "disabled auto transcription annotation changed a drawing"
+                "disabled automatic Dictation annotation changed a drawing"
             )
         }
-        model.setAutoAnnotateTranscriptions(true)
+        model.setAutoAnnotateDictation(true)
         guard document.manifest.strokes[1].transcriptAnnotation
             == TraceTranscriptAnnotation(id: 2, wordID: 2),
             document.manifest.timedCanvasShapes?.first?
@@ -4390,7 +4390,7 @@ enum TraceRetainedInkProbe {
                 == "Sketch [1] this point [2] now [3]."
         else {
             throw probeError(
-                "enabling auto transcription annotation did not catch up"
+                "enabling automatic Dictation annotation did not catch up"
             )
         }
         var copiedTranscript: String?
@@ -4722,7 +4722,7 @@ enum TraceRetainedInkProbe {
             copyActions.append($0)
         }
         board.triggerCopyForPreview(.all)
-        board.triggerCopyForPreview(.transcription)
+        board.triggerCopyForPreview(.dictation)
         board.triggerCopyForPreview(.image)
         guard copyControl.title.isEmpty,
               copyControl.hasImage,
@@ -4732,14 +4732,14 @@ enum TraceRetainedInkProbe {
               abs(copyControl.width - 24) < 0.5,
               copyControl.hasChevron,
               copyControl.menuTitles == [
-                  "Copy Transcription",
+                  "Copy Dictation",
                   "Copy Image",
               ],
               copyControl.menuImageCount == 0,
               copyControl.menuOpensBelow,
               abs(copyControl.menuGap - 4) < 0.5,
               copyControl.totalWidth > 34,
-              copyActions == [.all, .transcription, .image]
+              copyActions == [.all, .dictation, .image]
         else {
             throw probeError(
                 "copy control is not an icon with its shortcut tooltip "
@@ -4859,19 +4859,19 @@ enum TraceRetainedInkProbe {
         }
         guard let item = TraceClipboardPayload.makeItem(
             image: composite,
-            transcript: "Voice annotation"
+            transcript: "Dictation"
         ),
         let png = item.data(forType: .png),
         let tiff = item.data(forType: .tiff),
         TraceClipboardPayload.transcriptMetadata(from: png)
-            == "Voice annotation",
+            == "Dictation",
         TraceClipboardPayload.transcriptMetadata(from: tiff)
-            == "Voice annotation",
+            == "Dictation",
         let encodedImage = NSImage(data: png),
         let encodedRepresentation = NSBitmapImageRep(data: png),
         encodedRepresentation.pixelsWide == pixelWidth,
         encodedRepresentation.pixelsHigh == pixelHeight,
-        item.string(forType: .string) == "Voice annotation"
+        item.string(forType: .string) == "Dictation"
         else {
             throw probeError(
                 "clipboard image did not retain transcript metadata"
@@ -4889,11 +4889,11 @@ enum TraceRetainedInkProbe {
             )
         )
         guard TraceClipboardPayload.writeTranscript(
-                  "Voice annotation",
+                  "Dictation",
                   to: isolatedPasteboard
               ),
               isolatedPasteboard.string(forType: .string)
-                  == "Voice annotation",
+                  == "Dictation",
               isolatedPasteboard.data(forType: .png) == nil,
               TraceClipboardPayload.writeImage(
                   composite,

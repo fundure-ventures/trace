@@ -407,11 +407,11 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
 
     func updateVoiceState(
         _ state: TraceVoiceCaptureState,
-        transcriptionConfigured: Bool = true
+        dictationConfigured: Bool = true
     ) {
         annotationToolbar.setVoiceState(
             state,
-            transcriptionConfigured: transcriptionConfigured
+            dictationConfigured: dictationConfigured
         )
     }
 
@@ -3266,7 +3266,7 @@ private final class FloatingAnnotationToolbar:
     private var toolState = TraceToolState()
     private var temporaryCanvasTool: TraceCanvasTool?
     private var currentVoiceState: TraceVoiceCaptureState?
-    private var voiceTranscriptionConfigured = true
+    private var dictationConfigured = true
     private var voicePresentationSuppressed = false
     private var currentVoiceToggleSymbol = ""
 #if DEBUG
@@ -3510,7 +3510,7 @@ private final class FloatingAnnotationToolbar:
             controls: [voiceToggleButton]
         )
         voiceGroup.addArrangedSubview(voiceActionHover)
-        voiceGroup.setAccessibilityLabel("Voice annotation status")
+        voiceGroup.setAccessibilityLabel("Dictation status")
         setVoiceState(.idle)
 
         copyButton.image = symbolImage(
@@ -3552,13 +3552,13 @@ private final class FloatingAnnotationToolbar:
         copyOptionsButton.heightAnchor.constraint(equalToConstant: 24)
             .isActive = true
 
-        let copyTranscriptionItem = NSMenuItem(
-            title: "Copy Transcription",
-            action: #selector(copyTranscription),
+        let copyDictationItem = NSMenuItem(
+            title: "Copy Dictation",
+            action: #selector(copyDictation),
             keyEquivalent: ""
         )
-        copyTranscriptionItem.target = self
-        copyOptionsMenu.addItem(copyTranscriptionItem)
+        copyDictationItem.target = self
+        copyOptionsMenu.addItem(copyDictationItem)
         let copyImageItem = NSMenuItem(
             title: "Copy Image",
             action: #selector(copyImage),
@@ -3718,16 +3718,16 @@ private final class FloatingAnnotationToolbar:
 
     func setVoiceState(
         _ state: TraceVoiceCaptureState,
-        transcriptionConfigured: Bool = true
+        dictationConfigured: Bool = true
     ) {
         guard state != currentVoiceState
-                || transcriptionConfigured
-                    != voiceTranscriptionConfigured
+                || dictationConfigured
+                    != self.dictationConfigured
         else {
             return
         }
         currentVoiceState = state
-        voiceTranscriptionConfigured = transcriptionConfigured
+        self.dictationConfigured = dictationConfigured
         guard !voicePresentationSuppressed else {
             return
         }
@@ -3766,12 +3766,12 @@ private final class FloatingAnnotationToolbar:
             voiceLabel.isHidden = true
             voiceWaveform.setMode(.idle)
             toggleSymbol = "mic.circle.fill"
-            toggleLabel = voiceTranscriptionConfigured
+            toggleLabel = dictationConfigured
                 ? "Start recording"
-                : "Set up voice transcription"
-            accessibilityValue = voiceTranscriptionConfigured
+                : "Set up Dictation"
+            accessibilityValue = dictationConfigured
                 ? "No voice recording"
-                : "Voice transcription setup required"
+                : "Dictation setup required"
             voiceToggleButton.contentTintColor =
                 NSColor.white.withAlphaComponent(0.68)
             voiceToggleButton.isEnabled = true
@@ -3823,12 +3823,12 @@ private final class FloatingAnnotationToolbar:
             voiceLabel.toolTip = message
             voiceWaveform.setMode(.failed)
             toggleSymbol = "arrow.counterclockwise"
-            toggleLabel = voiceTranscriptionConfigured
+            toggleLabel = dictationConfigured
                 ? "Start a new recording"
-                : "Set up voice transcription"
-            accessibilityValue = voiceTranscriptionConfigured
+                : "Set up Dictation"
+            accessibilityValue = dictationConfigured
                 ? "Voice recording error"
-                : "Voice transcription setup required"
+                : "Dictation setup required"
             voiceToggleButton.contentTintColor = .systemOrange
             voiceToggleButton.isEnabled = true
             setCopyControlsEnabled(true)
@@ -4463,8 +4463,8 @@ private final class FloatingAnnotationToolbar:
         switch content {
         case .all:
             copyDrawing()
-        case .transcription:
-            copyTranscription()
+        case .dictation:
+            copyDictation()
         case .image:
             copyImage()
         }
@@ -4651,8 +4651,8 @@ private final class FloatingAnnotationToolbar:
         NSPoint(x: 0, y: sender.bounds.maxY + 4)
     }
 
-    @objc private func copyTranscription() {
-        onCopy?(.transcription)
+    @objc private func copyDictation() {
+        onCopy?(.dictation)
     }
 
     @objc private func copyImage() {
@@ -5005,7 +5005,7 @@ private final class SetupPanelView: NSView {
         )
 
         let penHeading = sectionHeading("Pen")
-        let voiceHeading = sectionHeading("Voice transcription")
+        let dictationHeading = sectionHeading("Dictation")
         let captureHeading = sectionHeading("Screen capture")
         let shortcutHeading = sectionHeading("Keyboard shortcuts")
         let divider = NSBox()
@@ -5013,7 +5013,7 @@ private final class SetupPanelView: NSView {
         [
             penHeading,
             penRow,
-            voiceHeading,
+            dictationHeading,
             voiceRow,
             openRouterRow,
             captureHeading,
@@ -5031,7 +5031,7 @@ private final class SetupPanelView: NSView {
         [
             penHeading,
             penRow,
-            voiceHeading,
+            dictationHeading,
             voiceRow,
             openRouterRow,
             captureHeading,
@@ -5047,7 +5047,7 @@ private final class SetupPanelView: NSView {
         }
         contentStack.setCustomSpacing(8, after: penHeading)
         contentStack.setCustomSpacing(18, after: penRow)
-        contentStack.setCustomSpacing(8, after: voiceHeading)
+        contentStack.setCustomSpacing(8, after: dictationHeading)
         contentStack.setCustomSpacing(8, after: voiceRow)
         contentStack.setCustomSpacing(18, after: openRouterRow)
         contentStack.setCustomSpacing(8, after: captureHeading)
@@ -5076,7 +5076,8 @@ private final class SetupPanelView: NSView {
         ])
         setAccessibilityLabel("Set up Trace")
         setAccessibilityHelp(
-            "Pen, screen capture, voice, OpenRouter, and global shortcut setup."
+            "Pen, screen capture, Dictation, OpenRouter, "
+                + "and global shortcut setup."
         )
     }
 
@@ -5384,7 +5385,7 @@ private final class OpenRouterSetupRow: NSView {
         case .missing:
             isHidden = false
             detailLabel.stringValue =
-                "Add your own key to enable voice transcription"
+                "Add your own key to enable Dictation"
             apiKeyField.placeholderString = "Enter OpenRouter API key"
             apiKeyField.isHidden = false
             saveButton.title = "Add"
@@ -5407,7 +5408,8 @@ private final class OpenRouterSetupRow: NSView {
         removeButton.isEnabled = allowsMutation
         if !allowsMutation, !isHidden {
             detailLabel.stringValue =
-                "Finish or cancel the current voice capture to change the key"
+                "Finish or cancel the current Dictation recording "
+                + "to change the key"
         }
         saveButton.setAccessibilityLabel(
             "\(saveButton.title) OpenRouter API key"
@@ -5419,7 +5421,7 @@ private final class OpenRouterSetupRow: NSView {
         setAccessibilityHelp(
             allowsMutation
                 ? "The key is stored only in macOS Keychain."
-                : "Credential changes are disabled during voice capture."
+                : "Credential changes are disabled during Dictation."
         )
     }
 

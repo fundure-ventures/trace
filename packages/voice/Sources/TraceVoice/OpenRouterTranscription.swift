@@ -328,11 +328,11 @@ public enum TraceTranscriptionError: LocalizedError, Equatable {
         case .missingAPIKey:
             return "Trace could not find an OpenRouter API key in the environment, an .env file, or Keychain."
         case .emptyAudio:
-            return "Trace did not record enough audio to transcribe."
+            return "Trace did not record enough audio for Dictation."
         case .invalidResponse:
-            return "OpenRouter returned an unreadable transcription response."
+            return "OpenRouter returned an unreadable Dictation response."
         case let .requestFailed(statusCode, message):
-            return "OpenRouter transcription failed (\(statusCode)): \(message)"
+            return "OpenRouter Dictation failed (\(statusCode)): \(message)"
         }
     }
 }

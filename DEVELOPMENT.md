@@ -32,7 +32,7 @@ Reset onboarding, calibration, window state, and Trace privacy grants:
 ./tools/trace --clear
 ```
 
-Voice transcription accepts `OPEN_ROUTER_API_KEY` or `OPENROUTER_API_KEY`.
+Dictation accepts `OPEN_ROUTER_API_KEY` or `OPENROUTER_API_KEY`.
 Keys may also be supplied through `TRACE_ENV_FILE` or an untracked repository
 root `.env`. The same root file supplies `VITE_TLDRAW_LICENSE_KEY` to the web
 renderer. Never commit keys.

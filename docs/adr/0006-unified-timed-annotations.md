@@ -5,7 +5,7 @@
 ## Context
 
 Trace can receive paths from the Neo pen and from tldraw Draw or Rectangle
-gestures. Voice transcription needs one chronological annotation vocabulary
+gestures. Dictation needs one chronological annotation vocabulary
 regardless of the drawing source. Rectangle also has to remain active after
 tldraw automatically selects a newly created shape.
 

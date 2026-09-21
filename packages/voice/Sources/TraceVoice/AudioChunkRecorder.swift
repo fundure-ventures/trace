@@ -38,7 +38,7 @@ public enum TraceAudioRecordingError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .microphonePermissionRequired:
-            return "Trace needs Microphone access to record a voice annotation."
+            return "Trace needs Microphone access to use Dictation."
         case .couldNotPrepare:
             return "Trace could not prepare a microphone recording."
         case .couldNotStart:

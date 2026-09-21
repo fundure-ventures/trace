@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 enum TraceCopyContent: Equatable {
     case all
-    case transcription
+    case dictation
     case image
 }
 

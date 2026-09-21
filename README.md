@@ -32,7 +32,7 @@ Complete Trace's four-corner calibration before drawing with the pen.
 Custom builds use one untracked repository-root `.env`:
 
 ```dotenv
-# Optional: enables voice transcription.
+# Optional: enables Dictation.
 OPEN_ROUTER_API_KEY=your-openrouter-api-key
 
 # Required for production builds of the bundled canvas.
@@ -67,7 +67,7 @@ To repeat onboarding without deleting saved `.traceboard` documents:
 1. Create a screenshot trace with `Cmd+N`, create a blank trace with
    `Shift+Cmd+N`, or open one or more images from Finder.
 2. Draw with the Neo pen or the Select, Pen, Highlighter, and Rectangle tools.
-3. Use Voice when a spoken explanation helps.
+3. Use Dictation when a spoken explanation helps.
 4. Press `Cmd+C` to copy the annotated image and transcript, save the trace,
    and close the board.
 
@@ -81,7 +81,7 @@ one blank canvas.
 - [Architecture decision records](docs/adr/README.md) — current durable
   implementation decisions
 
-Without an externally supplied key, voice transcription can use a personal
+Without an externally supplied key, Dictation can use a personal
 OpenRouter API key saved from Trace's Setup panel. Trace stores it only in
 macOS Keychain; Setup supports replacing or removing it.
 

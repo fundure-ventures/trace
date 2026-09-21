@@ -31,7 +31,7 @@ public enum TraceVoiceConfigurationError: LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .captureInProgress:
-            return "Finish or cancel the current voice capture before "
+            return "Finish or cancel the current Dictation recording before "
                 + "changing the OpenRouter API key."
         }
     }

@@ -112,8 +112,8 @@ enum TraceAppSettingsMenuPresentation {
     static let captureScreenshot = "Capture screenshot"
     static let disconnectedSection = "When pen is disconnected"
     static let copyTraceAndClose = "Copy trace and close app"
-    static let transcriptionSection = "Transcription"
-    static let autoAnnotateTranscriptions = "Auto annotate transcriptions"
+    static let dictationSection = "Dictation"
+    static let autoAnnotateDictation = "Annotate dictation automatically"
     static let annotationScale = "Annotation scale"
 
     static func annotationScaleTitle(
@@ -283,7 +283,7 @@ final class TraceAppDelegate:
     private var penSensitivityItems: [NSMenuItem] = []
     private var captureOnCapOffItem: NSMenuItem?
     private var copyOnDisconnectItem: NSMenuItem?
-    private var autoAnnotateTranscriptionsItem: NSMenuItem?
+    private var autoAnnotateDictationItem: NSMenuItem?
     private var transcriptAnnotationScaleItems:
         [TraceTranscriptAnnotationScale: NSMenuItem] = [:]
     private var copyProgress = TraceDocumentCopyProgress()
@@ -874,20 +874,20 @@ final class TraceAppDelegate:
         )
         appSettingsMenu.addItem(copyOnDisconnect)
         appSettingsMenu.addItem(.separator())
-        let transcriptionSection = NSMenuItem(
-            title: TraceAppSettingsMenuPresentation.transcriptionSection,
+        let dictationSection = NSMenuItem(
+            title: TraceAppSettingsMenuPresentation.dictationSection,
             action: nil,
             keyEquivalent: ""
         )
-        transcriptionSection.isEnabled = false
-        appSettingsMenu.addItem(transcriptionSection)
-        let autoAnnotateTranscriptions = penToggleItem(
+        dictationSection.isEnabled = false
+        appSettingsMenu.addItem(dictationSection)
+        let autoAnnotateDictation = penToggleItem(
             title:
                 TraceAppSettingsMenuPresentation
-                    .autoAnnotateTranscriptions,
-            action: #selector(toggleAutoAnnotateTranscriptions(_:))
+                    .autoAnnotateDictation,
+            action: #selector(toggleAutoAnnotateDictation(_:))
         )
-        appSettingsMenu.addItem(autoAnnotateTranscriptions)
+        appSettingsMenu.addItem(autoAnnotateDictation)
         let annotationScale = NSMenuItem(
             title: TraceAppSettingsMenuPresentation.annotationScale,
             action: nil,
@@ -915,7 +915,7 @@ final class TraceAppDelegate:
         menu.addItem(appSettings)
         captureOnCapOffItem = captureOnCapOff
         copyOnDisconnectItem = copyOnDisconnect
-        autoAnnotateTranscriptionsItem = autoAnnotateTranscriptions
+        autoAnnotateDictationItem = autoAnnotateDictation
         let projectionAnchor = NSMenuItem.separator()
         menu.addItem(projectionAnchor)
         projectionMenuAnchor = projectionAnchor
@@ -1030,8 +1030,8 @@ final class TraceAppDelegate:
     private func update(_ snapshot: TraceAppSnapshot) {
         board.updateVoiceState(
             snapshot.voiceState,
-            transcriptionConfigured:
-                snapshot.voiceTranscriptionConfigured
+            dictationConfigured:
+                snapshot.dictationConfigured
         )
         updatePenSettings(
             snapshot.penStatus,
@@ -1097,13 +1097,13 @@ final class TraceAppDelegate:
         case .annotating:
             switch snapshot.voiceState {
             case .transcribing:
-                return "Trace — Transcribing voice"
+                return "Trace — Preparing dictation"
             case .recording:
                 return "Trace — Annotating · Recording"
             case .paused:
                 return "Trace — Voice recording stopped"
             case .failed:
-                return "Trace — Voice transcription needs retry"
+                return "Trace — Dictation needs retry"
             default:
                 return "Trace — Annotating"
             }
@@ -1188,8 +1188,8 @@ final class TraceAppDelegate:
             settings.captureScreenshotOnCapOff ? .on : .off
         copyOnDisconnectItem?.state =
             settings.copyTraceAndCloseOnDisconnect ? .on : .off
-        autoAnnotateTranscriptionsItem?.state =
-            settings.autoAnnotateTranscriptions ? .on : .off
+        autoAnnotateDictationItem?.state =
+            settings.autoAnnotateDictation ? .on : .off
         for (scale, item) in transcriptAnnotationScaleItems {
             item.state = settings.transcriptAnnotationScale == scale
                 ? .on
@@ -1286,10 +1286,10 @@ final class TraceAppDelegate:
         model.setCopyTraceAndCloseOnDisconnect(sender.state != .on)
     }
 
-    @objc private func toggleAutoAnnotateTranscriptions(
+    @objc private func toggleAutoAnnotateDictation(
         _ sender: NSMenuItem
     ) {
-        model.setAutoAnnotateTranscriptions(sender.state != .on)
+        model.setAutoAnnotateDictation(sender.state != .on)
     }
 
     @objc private func changeTranscriptAnnotationScale(
@@ -1621,7 +1621,7 @@ final class TraceAppDelegate:
                 )
             }
             return
-        case .transcription:
+        case .dictation:
             guard let transcript else {
                 failCopy(for: documentID)
                 return
