@@ -30,19 +30,62 @@ public enum OpenRouterAPIKeyStoreError: LocalizedError, Equatable {
 }
 
 public final class OpenRouterKeychainStore: OpenRouterAPIKeyStoring {
+    private static let resetMarker = Data("reset".utf8)
+
     private let service: String
-    private let account: String
+    private let legacyAccount: String
+    private let activeAccount: String
+    private let resetMarkerAccount: String
 
     public init(
         service: String = "com.traceproject.app.openrouter",
         account: String = "api-key"
     ) {
         self.service = service
-        self.account = account
+        legacyAccount = account
+        activeAccount = "\(account).v2"
+        resetMarkerAccount = "\(account).v2-reset"
     }
 
     public func loadAPIKey() throws -> String? {
-        var query = baseQuery
+        if try itemData(account: resetMarkerAccount) != nil {
+            return nil
+        }
+        if let data = try itemData(account: activeAccount) {
+            return try decodeAPIKey(data)
+        }
+        guard let data = try itemData(account: legacyAccount) else {
+            return nil
+        }
+        return try decodeAPIKey(data)
+    }
+
+    public func saveAPIKey(_ apiKey: String) throws {
+        let trimmed = apiKey.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !trimmed.isEmpty else {
+            throw OpenRouterAPIKeyStoreError.emptyAPIKey
+        }
+        try upsert(
+            Data(trimmed.utf8),
+            account: activeAccount
+        )
+        try removeItem(account: resetMarkerAccount)
+        try removeLegacyItem()
+    }
+
+    public func removeAPIKey() throws {
+        try upsert(
+            Self.resetMarker,
+            account: resetMarkerAccount
+        )
+        try removeItem(account: activeAccount)
+        try removeLegacyItem()
+    }
+
+    private func itemData(account: String) throws -> Data? {
+        var query = query(account: account)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
@@ -56,30 +99,23 @@ public final class OpenRouterKeychainStore: OpenRouterAPIKeyStoring {
         guard status == errSecSuccess else {
             throw OpenRouterAPIKeyStoreError.keychain(status)
         }
-        guard let data = result as? Data,
-              let apiKey = String(data: data, encoding: .utf8)
-        else {
+        guard let data = result as? Data else {
+            throw OpenRouterAPIKeyStoreError.keychain(errSecDecode)
+        }
+        return data
+    }
+
+    private func decodeAPIKey(_ data: Data) throws -> String {
+        guard let apiKey = String(data: data, encoding: .utf8) else {
             throw OpenRouterAPIKeyStoreError.keychain(errSecDecode)
         }
         return apiKey
     }
 
-    public func saveAPIKey(_ apiKey: String) throws {
-        let trimmed = apiKey.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        guard !trimmed.isEmpty else {
-            throw OpenRouterAPIKeyStoreError.emptyAPIKey
-        }
-        let data = Data(trimmed.utf8)
-        let attributes = [
-            kSecValueData as String: data,
-            kSecAttrAccessible as String:
-                kSecAttrAccessibleAfterFirstUnlock,
-        ] as [String: Any]
+    private func upsert(_ data: Data, account: String) throws {
         let updateStatus = SecItemUpdate(
-            baseQuery as CFDictionary,
-            attributes as CFDictionary
+            query(account: account) as CFDictionary,
+            [kSecValueData as String: data] as CFDictionary
         )
         if updateStatus == errSecSuccess {
             return
@@ -87,22 +123,35 @@ public final class OpenRouterKeychainStore: OpenRouterAPIKeyStoring {
         guard updateStatus == errSecItemNotFound else {
             throw OpenRouterAPIKeyStoreError.keychain(updateStatus)
         }
-        var item = baseQuery
-        attributes.forEach { item[$0.key] = $0.value }
+        var item = query(account: account)
+        item[kSecValueData as String] = data
+        item[kSecAttrAccessible as String] =
+            kSecAttrAccessibleAfterFirstUnlock
         let addStatus = SecItemAdd(item as CFDictionary, nil)
         guard addStatus == errSecSuccess else {
             throw OpenRouterAPIKeyStoreError.keychain(addStatus)
         }
     }
 
-    public func removeAPIKey() throws {
-        let status = SecItemDelete(baseQuery as CFDictionary)
+    private func removeItem(account: String) throws {
+        let status = SecItemDelete(
+            query(account: account) as CFDictionary
+        )
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw OpenRouterAPIKeyStoreError.keychain(status)
         }
     }
 
-    private var baseQuery: [String: Any] {
+    private func removeLegacyItem() throws {
+        do {
+            try removeItem(account: legacyAccount)
+        } catch OpenRouterAPIKeyStoreError.keychain(let status)
+            where status == errSecInvalidOwnerEdit {
+            return
+        }
+    }
+
+    private func query(account: String) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

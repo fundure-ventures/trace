@@ -8,6 +8,65 @@ private struct TestFailure: Error, CustomStringConvertible {
     let description: String
 }
 
+private func addKeychainItem(
+    service: String,
+    account: String,
+    value: String
+) throws {
+    let status = SecItemAdd(
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecValueData as String: Data(value.utf8),
+        ] as CFDictionary,
+        nil
+    )
+    guard status == errSecSuccess else {
+        throw TestFailure(
+            description: "could not seed Keychain item: \(status)"
+        )
+    }
+}
+
+private func keychainItemValue(
+    service: String,
+    account: String
+) throws -> String? {
+    var result: CFTypeRef?
+    let status = SecItemCopyMatching(
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ] as CFDictionary,
+        &result
+    )
+    if status == errSecItemNotFound {
+        return nil
+    }
+    guard status == errSecSuccess,
+          let data = result as? Data,
+          let value = String(data: data, encoding: .utf8)
+    else {
+        throw TestFailure(
+            description: "could not read Keychain item: \(status)"
+        )
+    }
+    return value
+}
+
+private func deleteKeychainItems(service: String) {
+    SecItemDelete(
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+        ] as CFDictionary
+    )
+}
+
 private final class FakeOpenRouterAPIKeyStore: OpenRouterAPIKeyStoring {
     var apiKey: String?
 
@@ -322,6 +381,54 @@ private func waitUntil(
 }
 
 Task {
+    await test("reset ignores an undeletable legacy key and accepts a replacement") {
+        let service = "com.traceproject.tests.\(UUID().uuidString)"
+        let account = "api-key"
+        defer { deleteKeychainItems(service: service) }
+
+        try addKeychainItem(
+            service: service,
+            account: account,
+            value: "legacy-key"
+        )
+        let store = OpenRouterKeychainStore(
+            service: service,
+            account: account
+        )
+        let discoveredLegacyKey = try store.loadAPIKey()
+        try expect(
+            discoveredLegacyKey == "legacy-key",
+            "the legacy key was not discovered"
+        )
+
+        try store.removeAPIKey()
+        try addKeychainItem(
+            service: service,
+            account: account,
+            value: "undeletable-legacy-key"
+        )
+        let keyAfterReset = try store.loadAPIKey()
+        try expect(
+            keyAfterReset == nil,
+            "Reset did not keep the legacy key out of the UI"
+        )
+
+        try store.saveAPIKey("replacement-key")
+        let replacementKey = try store.loadAPIKey()
+        let replacementSlotKey = try keychainItemValue(
+            service: service,
+            account: "\(account).v2"
+        )
+        try expect(
+            replacementKey == "replacement-key",
+            "the replacement key was not loaded"
+        )
+        try expect(
+            replacementSlotKey == "replacement-key",
+            "the replacement key was not saved in the current slot"
+        )
+    }
+
     await test("legacy Keychain ownership errors explain recovery") {
         try expect(
             OpenRouterAPIKeyStoreError
