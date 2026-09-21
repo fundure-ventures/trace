@@ -1,0 +1,87 @@
+Trace Personal Use Source License
+Copyright (c) 2026 Fundure Ventures S.L. All rights reserved.
+
+This license applies to the Trace source code, documentation, and other
+materials in this repository that are owned by Fundure Ventures S.L. (the
+"Software"). "You" means the individual exercising rights under this license.
+"Personal Use" means use by You solely for Your own private, noncommercial
+purposes, with no benefit to a business, employer, client, organization, or
+other person.
+
+1. Personal-use grant
+
+Subject to these terms, Fundure Ventures S.L. grants You a limited,
+non-exclusive, non-transferable license to view, download, clone, modify, and
+build the Software solely for Personal Use. You may run builds made under this
+grant only for Your own Personal Use.
+
+2. Restrictions
+
+Except where applicable law gives You a right that cannot be restricted, You
+may not:
+
+- use the Software or any build, modification, or derivative work for a
+  commercial, professional, organizational, or revenue-generating purpose;
+- redistribute, republish, sublicense, sell, rent, lease, lend, host, or
+  otherwise provide or make available to anyone else any part of the Software,
+  a modified version or fork, or a compiled binary;
+- operate the Software as a service for anyone else or include it in a product
+  or service provided to anyone else;
+- remove or obscure copyright, license, or attribution notices; or
+- use Fundure Ventures S.L.'s or Trace's names, marks, or branding to suggest an
+  official, endorsed, or authorized release.
+
+Fundure Ventures S.L. alone distributes the official Trace application,
+including through the App Store. No distribution right is granted by this
+license.
+
+3. Ownership and reserved rights
+
+The Software is licensed, not sold. Fundure Ventures S.L. retains all right,
+title, and interest in the Software. All rights not expressly granted here are
+reserved. Commercial-use and distribution rights require a separate written
+license from Fundure Ventures S.L.
+
+4. Contributions and third-party materials
+
+Contributions submitted to this repository are governed by CONTRIBUTING.md and
+do not expand the rights granted to users of the Software.
+
+Third-party components remain subject to their own license terms. This license
+does not replace, limit, or extend a third party's license, and it applies only
+to material owned by Fundure Ventures S.L.
+
+5. Termination
+
+This license terminates automatically if You breach its terms. Upon
+termination, You must stop using the Software and delete copies and builds in
+Your possession or control, except to the extent retention is required by law.
+Sections concerning restrictions, ownership, third-party materials,
+disclaimers, and liability continue after termination.
+
+6. Statutory rights
+
+Nothing in this license limits fair use, fair dealing, or any other right that
+applicable law grants You regardless of permission from the copyright owner.
+
+7. Disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
+NONINFRINGEMENT, TO THE MAXIMUM EXTENT PERMITTED BY LAW.
+
+8. Limitation of liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, FUNDURE VENTURES S.L. WILL NOT BE
+LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR
+PUNITIVE DAMAGES, OR FOR ANY LOSS OF DATA, PROFITS, REVENUE, BUSINESS, OR
+GOODWILL, ARISING FROM OR RELATED TO THE SOFTWARE OR THIS LICENSE, UNDER ANY
+THEORY OF LIABILITY, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+9. Questions and alternative licenses
+
+For questions or to request commercial-use or distribution rights, contact
+Fundure Ventures S.L. through the repository owner's GitHub organization
+profile. Professional legal review of these terms is recommended before public
+release.

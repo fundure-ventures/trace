@@ -1,0 +1,38 @@
+#!/bin/bash
+set -eu
+
+if (($# != 1)); then
+    echo "usage: tools/sign-app /path/to/Application.app" >&2
+    exit 64
+fi
+
+APP=$1
+INFO_PLIST="$APP/Contents/Info.plist"
+
+if [[ ! -f "$INFO_PLIST" ]]; then
+    echo "error: missing app Info.plist: $INFO_PLIST" >&2
+    exit 66
+fi
+
+BUNDLE_IDENTIFIER=$(
+    plutil -extract CFBundleIdentifier raw -o - "$INFO_PLIST"
+)
+if [[ ! "$BUNDLE_IDENTIFIER" =~ ^[A-Za-z0-9.-]+$ ]]; then
+    echo "error: invalid app bundle identifier: $BUNDLE_IDENTIFIER" >&2
+    exit 65
+fi
+
+if [[ -n "${TRACE_CODE_SIGN_IDENTITY:-}" ]]; then
+    codesign \
+        --force \
+        --sign "$TRACE_CODE_SIGN_IDENTITY" \
+        "$APP" >/dev/null
+else
+    # The default ad-hoc requirement is cdhash-based, so TCC forgets rebuilt apps.
+    REQUIREMENT="=designated => identifier \"$BUNDLE_IDENTIFIER\""
+    codesign \
+        --force \
+        --sign - \
+        --requirements "$REQUIREMENT" \
+        "$APP" >/dev/null
+fi

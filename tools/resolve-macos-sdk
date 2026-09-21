@@ -1,0 +1,30 @@
+#!/bin/bash
+set -eu
+
+HISTORICAL_SDK_VERSION=26.5
+COMMAND_LINE_TOOLS_DIR=${TRACE_COMMAND_LINE_TOOLS_DIR:-/Library/Developer/CommandLineTools}
+SDK_PATH=${TRACE_MACOS_SDK_PATH:-"$COMMAND_LINE_TOOLS_DIR/SDKs/MacOSX$HISTORICAL_SDK_VERSION.sdk"}
+
+if [[ ! -d "$SDK_PATH" || ! -f "$SDK_PATH/SDKSettings.plist" ]]; then
+    cat >&2 <<EOF
+error: Trace requires the macOS $HISTORICAL_SDK_VERSION SDK at:
+  $SDK_PATH
+
+The SDK is supplied by the matching Command Line Tools installation. Override
+the location for this command with TRACE_MACOS_SDK_PATH.
+EOF
+    exit 1
+fi
+
+SDK_VERSION=$(
+    plutil -extract Version raw -o - "$SDK_PATH/SDKSettings.plist"
+)
+if [[ "$SDK_VERSION" != "$HISTORICAL_SDK_VERSION" ]]; then
+    cat >&2 <<EOF
+error: Trace requires the macOS $HISTORICAL_SDK_VERSION SDK, but found:
+  $SDK_PATH (macOS $SDK_VERSION)
+EOF
+    exit 1
+fi
+
+printf '%s\n' "$SDK_PATH"

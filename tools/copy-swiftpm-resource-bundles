@@ -1,0 +1,23 @@
+#!/bin/bash
+set -eu
+
+if (($# != 2)); then
+    echo "usage: $0 SWIFT_BIN_DIRECTORY APP_RESOURCES_DIRECTORY" >&2
+    exit 64
+fi
+
+SOURCE_DIRECTORY=$1
+DESTINATION_DIRECTORY=$2
+
+if [[ ! -d "$SOURCE_DIRECTORY" ]]; then
+    echo "error: missing Swift build products directory: $SOURCE_DIRECTORY" >&2
+    exit 66
+fi
+
+mkdir -p "$DESTINATION_DIRECTORY"
+for bundle in "$SOURCE_DIRECTORY"/*.bundle; do
+    [[ -d "$bundle" ]] || continue
+    destination="$DESTINATION_DIRECTORY/${bundle##*/}"
+    rm -rf -- "$destination"
+    cp -R "$bundle" "$destination"
+done

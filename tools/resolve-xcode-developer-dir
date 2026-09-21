@@ -1,0 +1,51 @@
+#!/bin/bash
+set -eu
+
+APPLICATIONS_DIR=${TRACE_XCODE_APPLICATIONS_DIR:-/Applications}
+
+is_full_xcode() {
+    local developer_dir=$1
+    DEVELOPER_DIR="$developer_dir" xcrun --find xcodebuild >/dev/null 2>&1
+}
+
+if [[ -n "${DEVELOPER_DIR:-}" ]]; then
+    if is_full_xcode "$DEVELOPER_DIR"; then
+        printf '%s\n' "$DEVELOPER_DIR"
+        exit 0
+    fi
+
+    echo "error: DEVELOPER_DIR does not point to a usable full Xcode installation:" >&2
+    echo "  $DEVELOPER_DIR" >&2
+    echo "KeyboardShortcuts requires Xcode's Swift macro plugins; Command Line Tools alone are insufficient." >&2
+    exit 1
+fi
+
+SELECTED_DEVELOPER_DIR=$(xcode-select -p 2>/dev/null || true)
+if [[ -n "$SELECTED_DEVELOPER_DIR" ]] &&
+    is_full_xcode "$SELECTED_DEVELOPER_DIR"; then
+    printf '%s\n' "$SELECTED_DEVELOPER_DIR"
+    exit 0
+fi
+
+for xcode_app in \
+    "$APPLICATIONS_DIR/Xcode.app" \
+    "$APPLICATIONS_DIR/Xcode-beta.app" \
+    "$APPLICATIONS_DIR"/Xcode*.app; do
+    candidate="$xcode_app/Contents/Developer"
+    if [[ -d "$candidate" ]] && is_full_xcode "$candidate"; then
+        printf '%s\n' "$candidate"
+        exit 0
+    fi
+done
+
+cat >&2 <<'EOF'
+error: Trace requires a full Xcode installation.
+KeyboardShortcuts 3.1.0 uses SwiftUI macro plugins that are not included with
+the standalone Command Line Tools. Install Xcode, or select an existing copy
+for this command with:
+
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./tools/trace
+
+The launcher does not change the global xcode-select setting.
+EOF
+exit 1

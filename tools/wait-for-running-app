@@ -1,0 +1,69 @@
+#!/bin/bash
+set -eu
+
+if (($# != 1)); then
+    echo "usage: $0 BUNDLE_IDENTIFIER" >&2
+    exit 64
+fi
+
+BUNDLE_IDENTIFIER=$1
+WAIT_ATTEMPTS=${TRACE_LAUNCH_WAIT_ATTEMPTS:-50}
+WAIT_INTERVAL=${TRACE_LAUNCH_WAIT_INTERVAL:-0.1}
+STABLE_ATTEMPTS=${TRACE_LAUNCH_STABLE_ATTEMPTS:-10}
+STABLE_PID=""
+STABLE_COUNT=0
+LAST_PID_OUTPUT=""
+
+running_app_pids() {
+    osascript -l JavaScript - "$BUNDLE_IDENTIFIER" <<'EOF'
+ObjC.import("AppKit")
+
+function run(argv) {
+    return $.NSRunningApplication
+        .runningApplicationsWithBundleIdentifier(argv[0]).js
+        .filter(application => !application.terminated)
+        .map(application => Number(application.processIdentifier))
+        .join("\n")
+}
+EOF
+}
+
+for ((attempt = 0; attempt < WAIT_ATTEMPTS; attempt += 1)); do
+    PID_OUTPUT=$(running_app_pids)
+    PID_COUNT=0
+    CURRENT_PID=""
+    while IFS= read -r pid; do
+        if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+            ((PID_COUNT += 1))
+            CURRENT_PID=$pid
+        elif [[ -n "$pid" ]]; then
+            echo "error: unexpected process identifier for $BUNDLE_IDENTIFIER: $pid" >&2
+            exit 1
+        fi
+    done <<< "$PID_OUTPUT"
+    LAST_PID_OUTPUT=$PID_OUTPUT
+
+    if ((PID_COUNT == 1)); then
+        if [[ "$CURRENT_PID" == "$STABLE_PID" ]]; then
+            ((STABLE_COUNT += 1))
+        else
+            STABLE_PID=$CURRENT_PID
+            STABLE_COUNT=1
+        fi
+        if ((STABLE_COUNT >= STABLE_ATTEMPTS)); then
+            exit 0
+        fi
+    else
+        STABLE_PID=""
+        STABLE_COUNT=0
+    fi
+
+    sleep "$WAIT_INTERVAL"
+done
+
+if [[ "$LAST_PID_OUTPUT" == *$'\n'* ]]; then
+    echo "error: $BUNDLE_IDENTIFIER has multiple running processes: ${LAST_PID_OUTPUT//$'\n'/, }" >&2
+else
+    echo "error: $BUNDLE_IDENTIFIER did not stay running after launch." >&2
+fi
+exit 1

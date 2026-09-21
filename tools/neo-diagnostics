@@ -1,0 +1,96 @@
+#!/bin/bash
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+CONFIGURATION=${TRACE_BUILD_CONFIGURATION:-debug}
+APP="$ROOT/.build/Trace Neo Diagnostics.app"
+CONTENTS="$APP/Contents"
+PID_FILE="$ROOT/.build/trace-neo-diagnostics.pid"
+LOG_FILE=""
+SHOW_HELP=false
+ARGS=()
+
+while (($#)); do
+    case "$1" in
+        --help|-h)
+            SHOW_HELP=true
+            ARGS+=("$1")
+            shift
+            ;;
+        --log-file)
+            if (($# < 2)); then
+                echo "error: --log-file requires a path" >&2
+                exit 64
+            fi
+            LOG_FILE=$2
+            shift 2
+            ;;
+        --stdout-only)
+            echo "note: --stdout-only is ignored by the app-bundle runner" >&2
+            shift
+            ;;
+        *)
+            ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+cd "$ROOT"
+swift build -c "$CONFIGURATION" --product trace-neo-diagnostics
+BIN_DIRECTORY=$(swift build -c "$CONFIGURATION" --show-bin-path)
+
+mkdir -p "$CONTENTS/MacOS" "$ROOT/logs"
+cp "$BIN_DIRECTORY/trace-neo-diagnostics" "$CONTENTS/MacOS/trace-neo-diagnostics"
+cp "$ROOT/apps/diagnostics/Info.plist" "$CONTENTS/Info.plist"
+"$ROOT/tools/sign-app" "$APP"
+
+if [[ "${TRACE_BUILD_ONLY:-0}" == "1" ]]; then
+    exit 0
+fi
+
+if $SHOW_HELP; then
+    exec "$CONTENTS/MacOS/trace-neo-diagnostics" "${ARGS[@]}"
+fi
+
+if [[ -z "$LOG_FILE" ]]; then
+    LOG_FILE="$ROOT/logs/neo-diagnostics-$(date +%Y%m%d-%H%M%S).log"
+elif [[ "$LOG_FILE" != /* ]]; then
+    LOG_FILE="$ROOT/$LOG_FILE"
+fi
+
+mkdir -p "$(dirname -- "$LOG_FILE")"
+touch "$LOG_FILE"
+rm -f "$PID_FILE"
+
+tail -n 0 -F "$LOG_FILE" &
+TAIL_PID=$!
+
+stop_app() {
+    if [[ -s "$PID_FILE" ]]; then
+        read -r APP_PID < "$PID_FILE"
+        if [[ "$APP_PID" =~ ^[0-9]+$ ]]; then
+            kill -INT "$APP_PID" 2>/dev/null || true
+        fi
+    fi
+}
+
+cleanup() {
+    kill "$TAIL_PID" 2>/dev/null || true
+    wait "$TAIL_PID" 2>/dev/null || true
+    rm -f "$PID_FILE"
+}
+
+interrupt() {
+    stop_app
+    sleep 1
+    cleanup
+    exit 130
+}
+
+trap interrupt INT TERM
+trap cleanup EXIT
+
+open -W -n "$APP" --args "${ARGS[@]}" \
+    --log-file "$LOG_FILE" \
+    --pid-file "$PID_FILE"

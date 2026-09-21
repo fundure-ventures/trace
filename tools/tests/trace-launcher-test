@@ -1,0 +1,281 @@
+#!/bin/bash
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+RESOLVER="$ROOT/tools/resolve-xcode-developer-dir"
+SDK_RESOLVER="$ROOT/tools/resolve-macos-sdk"
+QUIT_APP="$ROOT/tools/quit-running-app"
+WAIT_APP="$ROOT/tools/wait-for-running-app"
+COPY_RESOURCE_BUNDLES="$ROOT/tools/copy-swiftpm-resource-bundles"
+LAUNCHER="$ROOT/tools/trace"
+TEMP_ROOT=$(mktemp -d)
+APP_PID=""
+
+cleanup() {
+    if [[ -n "$APP_PID" ]] && kill -0 "$APP_PID" 2>/dev/null; then
+        kill "$APP_PID" 2>/dev/null || true
+        wait "$APP_PID" 2>/dev/null || true
+    fi
+    rm -rf "$TEMP_ROOT"
+}
+trap cleanup EXIT
+
+assert_equal() {
+    local expected=$1
+    local actual=$2
+    if [[ "$actual" != "$expected" ]]; then
+        echo "expected: $expected" >&2
+        echo "actual:   $actual" >&2
+        exit 1
+    fi
+}
+
+FAKE_BIN="$TEMP_ROOT/bin"
+APPLICATIONS_DIR="$TEMP_ROOT/Applications"
+SELECTED_XCODE="$TEMP_ROOT/SelectedXcode.app/Contents/Developer"
+EXPLICIT_XCODE="$TEMP_ROOT/ExplicitXcode.app/Contents/Developer"
+STANDARD_XCODE="$APPLICATIONS_DIR/Xcode.app/Contents/Developer"
+CLT="$TEMP_ROOT/CommandLineTools"
+HISTORICAL_SDK="$CLT/SDKs/MacOSX26.5.sdk"
+WRONG_SDK="$CLT/SDKs/MacOSX27.0.sdk"
+OSASCRIPT_LOG="$TEMP_ROOT/osascript.log"
+RUNNING_APP_RESPONSES="$TEMP_ROOT/running-app-responses"
+
+mkdir -p \
+    "$FAKE_BIN" \
+    "$SELECTED_XCODE/usr/bin" \
+    "$EXPLICIT_XCODE/usr/bin" \
+    "$STANDARD_XCODE/usr/bin" \
+    "$HISTORICAL_SDK" \
+    "$WRONG_SDK"
+touch \
+    "$SELECTED_XCODE/usr/bin/xcodebuild" \
+    "$EXPLICIT_XCODE/usr/bin/xcodebuild" \
+    "$STANDARD_XCODE/usr/bin/xcodebuild"
+chmod +x \
+    "$SELECTED_XCODE/usr/bin/xcodebuild" \
+    "$EXPLICIT_XCODE/usr/bin/xcodebuild" \
+    "$STANDARD_XCODE/usr/bin/xcodebuild"
+
+cat > "$FAKE_BIN/xcode-select" <<'EOF'
+#!/bin/bash
+set -eu
+[[ "$*" == "-p" ]]
+printf '%s\n' "$TRACE_TEST_SELECTED_DEVELOPER_DIR"
+EOF
+cat > "$FAKE_BIN/xcrun" <<'EOF'
+#!/bin/bash
+set -eu
+[[ "$*" == "--find xcodebuild" ]]
+if [[ ! -x "${DEVELOPER_DIR:?}/usr/bin/xcodebuild" ]]; then
+    exit 1
+fi
+printf '%s\n' "$DEVELOPER_DIR/usr/bin/xcodebuild"
+EOF
+cat > "$FAKE_BIN/osascript" <<'EOF'
+#!/bin/bash
+set -eu
+printf '%s\n' "$*" >> "$TRACE_TEST_OSASCRIPT_LOG"
+SCRIPT=$(cat)
+if [[ "$SCRIPT" == *"application.terminate"* &&
+    -n "${TRACE_TEST_APP_PID:-}" ]]; then
+    kill -TERM "$TRACE_TEST_APP_PID"
+    printf '%s\n' "$TRACE_TEST_APP_PID"
+elif [[ -n "${TRACE_TEST_RUNNING_APP_RESPONSES:-}" &&
+    -s "$TRACE_TEST_RUNNING_APP_RESPONSES" ]]; then
+    RESPONSE=$(head -n 1 "$TRACE_TEST_RUNNING_APP_RESPONSES")
+    if [[ "$RESPONSE" != "-" ]]; then
+        printf '%s\n' "$RESPONSE" | tr ',' '\n'
+    fi
+    sed '1d' "$TRACE_TEST_RUNNING_APP_RESPONSES" \
+        > "$TRACE_TEST_RUNNING_APP_RESPONSES.next"
+    mv \
+        "$TRACE_TEST_RUNNING_APP_RESPONSES.next" \
+        "$TRACE_TEST_RUNNING_APP_RESPONSES"
+fi
+EOF
+chmod +x "$FAKE_BIN/xcode-select" "$FAKE_BIN/xcrun" "$FAKE_BIN/osascript"
+
+cat > "$HISTORICAL_SDK/SDKSettings.plist" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Version</key>
+    <string>26.5</string>
+</dict>
+</plist>
+EOF
+cat > "$WRONG_SDK/SDKSettings.plist" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Version</key>
+    <string>27.0</string>
+</dict>
+</plist>
+EOF
+
+export PATH="$FAKE_BIN:$PATH"
+export TRACE_XCODE_APPLICATIONS_DIR="$APPLICATIONS_DIR"
+export TRACE_TEST_OSASCRIPT_LOG="$OSASCRIPT_LOG"
+
+actual=$(
+    DEVELOPER_DIR="$EXPLICIT_XCODE" \
+        TRACE_TEST_SELECTED_DEVELOPER_DIR="$SELECTED_XCODE" \
+        "$RESOLVER"
+)
+assert_equal "$EXPLICIT_XCODE" "$actual"
+
+actual=$(
+    env -u DEVELOPER_DIR \
+        TRACE_TEST_SELECTED_DEVELOPER_DIR="$SELECTED_XCODE" \
+        "$RESOLVER"
+)
+assert_equal "$SELECTED_XCODE" "$actual"
+
+actual=$(
+    env -u DEVELOPER_DIR \
+        TRACE_TEST_SELECTED_DEVELOPER_DIR="$CLT" \
+        "$RESOLVER"
+)
+assert_equal "$STANDARD_XCODE" "$actual"
+
+mv "$STANDARD_XCODE/usr/bin/xcodebuild" "$TEMP_ROOT/xcodebuild"
+if env -u DEVELOPER_DIR \
+    TRACE_TEST_SELECTED_DEVELOPER_DIR="$CLT" \
+    "$RESOLVER" >"$TEMP_ROOT/missing.out" 2>"$TEMP_ROOT/missing.err"; then
+    echo "expected missing Xcode to fail" >&2
+    exit 1
+fi
+grep -Fq "Install Xcode" "$TEMP_ROOT/missing.err"
+grep -Fq "xcode-select" "$TEMP_ROOT/missing.err"
+mv "$TEMP_ROOT/xcodebuild" "$STANDARD_XCODE/usr/bin/xcodebuild"
+
+if DEVELOPER_DIR="$CLT" \
+    TRACE_TEST_SELECTED_DEVELOPER_DIR="$SELECTED_XCODE" \
+    "$RESOLVER" >"$TEMP_ROOT/explicit.out" 2>"$TEMP_ROOT/explicit.err"; then
+    echo "expected explicit Command Line Tools path to fail" >&2
+    exit 1
+fi
+grep -Fq "DEVELOPER_DIR" "$TEMP_ROOT/explicit.err"
+grep -Fq "$CLT" "$TEMP_ROOT/explicit.err"
+
+actual=$(
+    TRACE_COMMAND_LINE_TOOLS_DIR="$CLT" \
+        "$SDK_RESOLVER"
+)
+assert_equal "$HISTORICAL_SDK" "$actual"
+
+actual=$(
+    TRACE_MACOS_SDK_PATH="$HISTORICAL_SDK" \
+        TRACE_COMMAND_LINE_TOOLS_DIR="$TEMP_ROOT/missing-clt" \
+        "$SDK_RESOLVER"
+)
+assert_equal "$HISTORICAL_SDK" "$actual"
+
+if TRACE_MACOS_SDK_PATH="$WRONG_SDK" \
+    "$SDK_RESOLVER" >"$TEMP_ROOT/wrong-sdk.out" 2>"$TEMP_ROOT/wrong-sdk.err"; then
+    echo "expected wrong macOS SDK version to fail" >&2
+    exit 1
+fi
+grep -Fq "macOS 26.5 SDK" "$TEMP_ROOT/wrong-sdk.err"
+
+bash -c 'trap "exit 0" TERM; while :; do sleep 1; done' &
+APP_PID=$!
+TRACE_TEST_APP_PID="$APP_PID" "$QUIT_APP" com.traceproject.app
+wait "$APP_PID" 2>/dev/null || true
+! kill -0 "$APP_PID" 2>/dev/null
+APP_PID=""
+grep -Fq -- "-l JavaScript - com.traceproject.app" "$OSASCRIPT_LOG"
+
+printf '%s\n' - 4242 4242 > "$RUNNING_APP_RESPONSES"
+TRACE_TEST_RUNNING_APP_RESPONSES="$RUNNING_APP_RESPONSES" \
+    TRACE_LAUNCH_WAIT_ATTEMPTS=4 \
+    TRACE_LAUNCH_WAIT_INTERVAL=0 \
+    TRACE_LAUNCH_STABLE_ATTEMPTS=2 \
+    "$WAIT_APP" com.traceproject.app
+
+printf '%s\n' 4242 4242 4242 - > "$RUNNING_APP_RESPONSES"
+if TRACE_TEST_RUNNING_APP_RESPONSES="$RUNNING_APP_RESPONSES" \
+    TRACE_LAUNCH_WAIT_ATTEMPTS=4 \
+    TRACE_LAUNCH_WAIT_INTERVAL=0 \
+    "$WAIT_APP" com.traceproject.app \
+        >"$TEMP_ROOT/wait-transient.out" \
+        2>"$TEMP_ROOT/wait-transient.err"; then
+    echo "expected transient launched app to fail" >&2
+    exit 1
+fi
+grep -Fq "did not stay running" "$TEMP_ROOT/wait-transient.err"
+
+printf '%s\n' - - > "$RUNNING_APP_RESPONSES"
+if TRACE_TEST_RUNNING_APP_RESPONSES="$RUNNING_APP_RESPONSES" \
+    TRACE_LAUNCH_WAIT_ATTEMPTS=2 \
+    TRACE_LAUNCH_WAIT_INTERVAL=0 \
+    "$WAIT_APP" com.traceproject.app \
+        >"$TEMP_ROOT/wait-missing.out" \
+        2>"$TEMP_ROOT/wait-missing.err"; then
+    echo "expected missing launched app to fail" >&2
+    exit 1
+fi
+grep -Fq "did not stay running" "$TEMP_ROOT/wait-missing.err"
+
+printf '%s\n' 111,222 111,222 > "$RUNNING_APP_RESPONSES"
+if TRACE_TEST_RUNNING_APP_RESPONSES="$RUNNING_APP_RESPONSES" \
+    TRACE_LAUNCH_WAIT_ATTEMPTS=2 \
+    TRACE_LAUNCH_WAIT_INTERVAL=0 \
+    "$WAIT_APP" com.traceproject.app \
+        >"$TEMP_ROOT/wait-multiple.out" \
+        2>"$TEMP_ROOT/wait-multiple.err"; then
+    echo "expected multiple launched apps to fail" >&2
+    exit 1
+fi
+grep -Fq "multiple running processes" "$TEMP_ROOT/wait-multiple.err"
+
+RESOURCE_PRODUCTS="$TEMP_ROOT/resource-products"
+APP_RESOURCES="$TEMP_ROOT/app-resources"
+mkdir -p \
+    "$RESOURCE_PRODUCTS/KeyboardShortcuts_KeyboardShortcuts.bundle" \
+    "$APP_RESOURCES/KeyboardShortcuts_KeyboardShortcuts.bundle"
+printf 'current\n' \
+    > "$RESOURCE_PRODUCTS/KeyboardShortcuts_KeyboardShortcuts.bundle/current.txt"
+printf 'stale\n' \
+    > "$APP_RESOURCES/KeyboardShortcuts_KeyboardShortcuts.bundle/stale.txt"
+printf 'ignore\n' > "$RESOURCE_PRODUCTS/not-a-bundle.txt"
+"$COPY_RESOURCE_BUNDLES" "$RESOURCE_PRODUCTS" "$APP_RESOURCES"
+grep -Fq "current" \
+    "$APP_RESOURCES/KeyboardShortcuts_KeyboardShortcuts.bundle/current.txt"
+if [[ -e "$APP_RESOURCES/KeyboardShortcuts_KeyboardShortcuts.bundle/stale.txt" ]]; then
+    echo "expected copied resource bundle to replace stale contents" >&2
+    exit 1
+fi
+if [[ -e "$APP_RESOURCES/not-a-bundle.txt" ]]; then
+    echo "expected non-bundle product to be ignored" >&2
+    exit 1
+fi
+
+resolver_line=$(grep -nF 'resolve-xcode-developer-dir' "$LAUNCHER" | head -n 1 | cut -d: -f1)
+build_only_line=$(grep -nF 'if [[ "${TRACE_BUILD_ONLY:-0}" == "1" ]]' "$LAUNCHER" | tail -n 1 | cut -d: -f1)
+resources_line=$(grep -nF 'copy-swiftpm-resource-bundles' "$LAUNCHER" | head -n 1 | cut -d: -f1)
+sign_line=$(grep -nF 'sign-app' "$LAUNCHER" | head -n 1 | cut -d: -f1)
+quit_line=$(grep -nF 'quit-running-app' "$LAUNCHER" | head -n 1 | cut -d: -f1)
+open_line=$(grep -nF 'open "$APP"' "$LAUNCHER" | tail -n 1 | cut -d: -f1)
+wait_line=$(grep -nF 'wait-for-running-app' "$LAUNCHER" | head -n 1 | cut -d: -f1)
+
+if ! [[ "$resolver_line" -lt "$resources_line" &&
+    "$resources_line" -lt "$sign_line" &&
+    "$sign_line" -lt "$build_only_line" &&
+    "$build_only_line" -lt "$quit_line" &&
+    "$quit_line" -lt "$open_line" &&
+    "$open_line" -lt "$wait_line" ]]; then
+    echo "expected resource copy, sign, build-only, quit, open, and wait ordering" >&2
+    exit 1
+fi
+grep -Fq 'xcrun --find swift' "$LAUNCHER"
+grep -Fq 'resolve-macos-sdk' "$LAUNCHER"
+grep -Fq -- '--sdk "$MACOS_SDK"' "$LAUNCHER"
+grep -Fq -- '-platform_version' "$LAUNCHER"
+grep -Fq -- '"$MACOS_SDK_VERSION"' "$LAUNCHER"
+
+echo "trace launcher tests passed"

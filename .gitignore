@@ -1,0 +1,11 @@
+.build/
+.swiftpm/
+logs/
+.DS_Store
+.mimo/
+.impeccable/
+.env
+
+# Proprietary hardware materials kept only in private local checkouts.
+/docs/poc/neo-m1-manual.pdf
+/printables/*.pdf

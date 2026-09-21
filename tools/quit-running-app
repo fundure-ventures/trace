@@ -1,0 +1,80 @@
+#!/bin/bash
+set -eu
+
+if (($# != 1)); then
+    echo "usage: $0 BUNDLE_IDENTIFIER" >&2
+    exit 64
+fi
+
+BUNDLE_IDENTIFIER=$1
+WAIT_ATTEMPTS=${TRACE_QUIT_WAIT_ATTEMPTS:-50}
+WAIT_INTERVAL=${TRACE_QUIT_WAIT_INTERVAL:-0.1}
+
+PID_OUTPUT=$(
+    osascript -l JavaScript - "$BUNDLE_IDENTIFIER" <<'EOF'
+ObjC.import("AppKit")
+
+function run(argv) {
+    const applications = $.NSRunningApplication
+        .runningApplicationsWithBundleIdentifier(argv[0]).js
+    const processIdentifiers = []
+
+    for (const application of applications) {
+        if (!application.terminated) {
+            processIdentifiers.push(Number(application.processIdentifier))
+            application.terminate
+        }
+    }
+
+    return processIdentifiers.join("\n")
+}
+EOF
+)
+
+PIDS=()
+while IFS= read -r pid; do
+    if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+        PIDS+=("$pid")
+    elif [[ -n "$pid" ]]; then
+        echo "error: unexpected process identifier for $BUNDLE_IDENTIFIER: $pid" >&2
+        exit 1
+    fi
+done <<< "$PID_OUTPUT"
+
+((${#PIDS[@]} > 0)) || exit 0
+
+remaining_pids() {
+    local pid
+    for pid in "${PIDS[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+            printf '%s\n' "$pid"
+        fi
+    done
+}
+
+wait_for_exit() {
+    local attempt
+    for ((attempt = 0; attempt < WAIT_ATTEMPTS; attempt += 1)); do
+        [[ -z "$(remaining_pids)" ]] && return 0
+        sleep "$WAIT_INTERVAL"
+    done
+    [[ -z "$(remaining_pids)" ]]
+}
+
+if wait_for_exit; then
+    exit 0
+fi
+
+STILL_RUNNING=$(remaining_pids)
+echo "Trace did not quit in time; terminating resolved PID(s): ${STILL_RUNNING//$'\n'/, }" >&2
+while IFS= read -r pid; do
+    kill -TERM "$pid" 2>/dev/null || true
+done <<< "$STILL_RUNNING"
+
+if wait_for_exit; then
+    exit 0
+fi
+
+STILL_RUNNING=$(remaining_pids)
+echo "error: Trace is still running with PID(s): ${STILL_RUNNING//$'\n'/, }" >&2
+exit 1

@@ -1,0 +1,13 @@
+scripts:
+  - name: Build Trace
+    command: cd "$COPILOT_WORKSPACE_PATH" && TRACE_BUILD_ONLY=1 ./tools/trace
+  - name: Launch Trace
+    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/trace
+  - name: Build Drawing Lab
+    command: cd "$COPILOT_WORKSPACE_PATH" && TRACE_BUILD_ONLY=1 ./tools/trace-input-lab
+  - name: Launch Drawing Lab
+    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/trace-input-lab
+  - name: Build Diagnostics
+    command: cd "$COPILOT_WORKSPACE_PATH" && TRACE_BUILD_ONLY=1 ./tools/neo-diagnostics
+  - name: Launch Diagnostics
+    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/neo-diagnostics
