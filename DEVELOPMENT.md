@@ -47,7 +47,7 @@ swift build
 Build the web renderer:
 
 ```sh
-cd apps/trace-macos/RendererLabWeb
+cd apps/trace-macos/WebCanvas
 bun install --frozen-lockfile
 bun run build
 ```

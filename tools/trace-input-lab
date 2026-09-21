@@ -11,8 +11,8 @@ INTERPOLATION_ALGORITHM=${TRACE_INTERPOLATION_ALGORITHM:-circular-arc}
 STROKE_REFINEMENT=${TRACE_STROKE_REFINEMENT:-smooth-path}
 PREDICTION_ALGORITHM=${TRACE_PREDICTION_ALGORITHM:-velocity}
 RENDERER_MODE=${TRACE_RENDERER_MODE:-trace}
-WEB_ROOT="$ROOT/apps/trace-macos/RendererLabWeb"
-WEB_RESOURCES="$CONTENTS/Resources/RendererLabWeb"
+WEB_ROOT="$ROOT/apps/trace-macos/WebCanvas"
+WEB_RESOURCES="$CONTENTS/Resources/WebCanvas"
 
 case "$PROCESSING_MODE" in
     raw|interpolate|predict) ;;
@@ -80,9 +80,9 @@ cd "$ROOT"
 swift build -c "$CONFIGURATION" --product trace-input-lab
 BIN_DIRECTORY=$(swift build -c "$CONFIGURATION" --show-bin-path)
 
-"$ROOT/tools/build-renderer-web" \
+"$ROOT/tools/build-web-canvas" \
     "$WEB_ROOT" \
-    "$ROOT/.build/renderer-web" \
+    "$ROOT/.build/web-canvas" \
     "$ROOT"
 
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$ROOT/logs"

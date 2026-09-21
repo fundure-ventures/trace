@@ -1,9 +1,9 @@
 {
-  "name": "trace-renderer-lab-web",
+  "name": "trace-web-canvas",
   "version": "0.0.0",
   "private": true,
   "packageManager": "bun@1.4.2",
-  "description": "Development-only tldraw renderer comparison POC for Trace Input Lab.",
+  "description": "Bundled tldraw web canvas for Trace.",
   "type": "module",
   "scripts": {
     "dev": "vite",

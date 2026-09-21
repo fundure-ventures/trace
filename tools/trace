@@ -5,8 +5,8 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 CONFIGURATION=${TRACE_BUILD_CONFIGURATION:-debug}
 APP="$ROOT/.build/Trace.app"
 CONTENTS="$APP/Contents"
-WEB_ROOT="$ROOT/apps/trace-macos/RendererLabWeb"
-WEB_RESOURCES="$CONTENTS/Resources/RendererLabWeb"
+WEB_ROOT="$ROOT/apps/trace-macos/WebCanvas"
+WEB_RESOURCES="$CONTENTS/Resources/WebCanvas"
 BUNDLE_IDENTIFIER=$(
     plutil -extract CFBundleIdentifier raw -o - \
         "$ROOT/apps/trace-macos/Trace-Info.plist"
@@ -107,9 +107,9 @@ BUILD_ARGS=(
 "$SWIFT" build "${BUILD_ARGS[@]}" --product trace
 BIN_DIRECTORY=$("$SWIFT" build "${BUILD_ARGS[@]}" --show-bin-path)
 
-"$ROOT/tools/build-renderer-web" \
+"$ROOT/tools/build-web-canvas" \
     "$WEB_ROOT" \
-    "$ROOT/.build/renderer-web" \
+    "$ROOT/.build/web-canvas" \
     "$ROOT"
 
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"

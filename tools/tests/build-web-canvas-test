@@ -2,11 +2,11 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-HELPER="$ROOT/tools/build-renderer-web"
+HELPER="$ROOT/tools/build-web-canvas"
 TEMP_ROOT=$(mktemp -d)
 trap 'rm -rf "$TEMP_ROOT"' EXIT
 
-WEB_ROOT="$TEMP_ROOT/RendererLabWeb"
+WEB_ROOT="$TEMP_ROOT/WebCanvas"
 CACHE_ROOT="$TEMP_ROOT/cache"
 FAKE_BIN="$TEMP_ROOT/bin"
 BUN_LOG="$TEMP_ROOT/bun.log"
@@ -90,13 +90,13 @@ run_helper() {
 
 : > "$BUN_LOG"
 output=$(run_helper)
-[[ "$output" == "Rebuilding RendererLabWeb (cache miss)." ]]
+[[ "$output" == "Rebuilding WebCanvas (cache miss)." ]]
 assert_log "install --frozen-lockfile
 run build"
 
 : > "$BUN_LOG"
 output=$(run_helper)
-[[ "$output" == "Reusing cached RendererLabWeb dist." ]]
+[[ "$output" == "Reusing cached WebCanvas dist." ]]
 assert_log ""
 
 printf 'tampered\n' >> "$WEB_ROOT/dist/index.html"
@@ -107,7 +107,7 @@ assert_log "run build"
 printf 'export const added = true\n' > "$WEB_ROOT/src/untracked.ts"
 : > "$BUN_LOG"
 output=$(run_helper)
-[[ "$output" == "Rebuilding RendererLabWeb (cache miss)." ]]
+[[ "$output" == "Rebuilding WebCanvas (cache miss)." ]]
 assert_log "run build"
 
 printf '\n// config changed\n' >> "$WEB_ROOT/vite.config.ts"
@@ -134,7 +134,7 @@ run build"
 
 : > "$BUN_LOG"
 output=$(TRACE_FORCE_WEB_BUILD=1 run_helper)
-[[ "$output" == "Rebuilding RendererLabWeb (forced)." ]]
+[[ "$output" == "Rebuilding WebCanvas (forced)." ]]
 assert_log "run build"
 
 marker_before=$(cat "$CACHE_ROOT/build-fingerprint")
@@ -153,11 +153,11 @@ assert_log "run build"
 [[ "$(cat "$CACHE_ROOT/build-fingerprint")" != "$marker_before" ]]
 
 for launcher in "$ROOT/tools/trace" "$ROOT/tools/trace-input-lab"; do
-    grep -Fq '"$ROOT/tools/build-renderer-web" \' "$launcher"
-    grep -Fq '"$ROOT/.build/renderer-web" \' "$launcher"
+    grep -Fq '"$ROOT/tools/build-web-canvas" \' "$launcher"
+    grep -Fq '"$ROOT/.build/web-canvas" \' "$launcher"
     grep -Fq '    "$ROOT"' "$launcher"
 done
 ! grep -Fq 'bun --cwd "$WEB_ROOT"' "$ROOT/tools/trace"
 ! grep -Fq 'bun --cwd "$WEB_ROOT"' "$ROOT/tools/trace-input-lab"
 
-echo "build-renderer-web tests passed"
+echo "build-web-canvas tests passed"

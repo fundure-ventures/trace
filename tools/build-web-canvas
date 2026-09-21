@@ -2,7 +2,7 @@
 set -eu
 
 if (($# != 3)); then
-    echo "usage: tools/build-renderer-web WEB_ROOT CACHE_ROOT REPOSITORY_ROOT" >&2
+    echo "usage: tools/build-web-canvas WEB_ROOT CACHE_ROOT REPOSITORY_ROOT" >&2
     exit 64
 fi
 
@@ -96,19 +96,19 @@ if [[ "${TRACE_FORCE_WEB_BUILD:-0}" != "1"
     && "$CACHED_INPUT_FINGERPRINT" == "$BUILD_INPUT_FINGERPRINT"
     && -n "$CACHED_DIST_FINGERPRINT"
     && "$CACHED_DIST_FINGERPRINT" == "$CURRENT_DIST_FINGERPRINT" ]]; then
-    echo "Reusing cached RendererLabWeb dist."
+    echo "Reusing cached WebCanvas dist."
     exit 0
 fi
 
 if [[ "${TRACE_FORCE_WEB_BUILD:-0}" == "1" ]]; then
-    echo "Rebuilding RendererLabWeb (forced)."
+    echo "Rebuilding WebCanvas (forced)."
 else
-    echo "Rebuilding RendererLabWeb (cache miss)."
+    echo "Rebuilding WebCanvas (cache miss)."
 fi
 
 (cd "$WEB_ROOT" && bun run build)
 if ! dist_is_complete; then
-    echo "error: RendererLabWeb build did not produce the expected output." >&2
+    echo "error: WebCanvas build did not produce the expected output." >&2
     exit 1
 fi
 CURRENT_DIST_FINGERPRINT=$(dist_fingerprint)
