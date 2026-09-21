@@ -14,25 +14,41 @@ one action.
 - Screen Recording permission for screenshot capture
 - Microphone permission for voice annotation
 
-## Proprietary materials
+## Pen and paper support
 
-Trace does not distribute proprietary printable patterns or vendor manuals.
-Obtain compatible Neo/Ncode paper and hardware documentation from authorized
-vendor or reseller sources. Keep local copies only in the ignored paths listed
-in `.gitignore`.
+Trace is developed and physically tested with the **Neo Smartpen M1
+(`NWP-F50`)** over Bluetooth. Other Neo models have not been validated.
 
-## Launch
+Pen coordinates require compatible **Neo Ncode paper**; ordinary paper cannot
+provide spatial input. Trace does not distribute proprietary Ncode patterns.
+Use authorized Neo paper when possible. For local print testing, only the
+B-source pattern printed at its original 100% scale has produced usable
+coordinates; scaled and A-source variants are not supported.
 
-Before building a production copy, create the untracked file
+Complete Trace's four-corner calibration before drawing with the pen.
+
+## Custom build configuration
+
+Voice transcription is optional. Custom builds can provide an OpenRouter API
+key in the repository-root `.env`:
+
+```dotenv
+OPEN_ROUTER_API_KEY=your-openrouter-api-key
+```
+
+`OPENROUTER_API_KEY`, `TRACE_ENV_FILE`, the process environment, and the
+bundle-relative `.env` lookup are also supported. Externally supplied keys take
+precedence over the personal key stored from Trace's Setup panel. Never commit
+credentials.
+
+Production builds also require the untracked file
 `apps/trace-macos/RendererLabWeb/.env` with your tldraw production license:
 
 ```dotenv
 VITE_TLDRAW_LICENSE_KEY=your-tldraw-license-key
 ```
 
-The repository ignores this file. Do not commit the license key. Vite embeds
-the value in the bundled web canvas, so use a key whose tldraw license
-restrictions match the distributed app.
+## Launch
 
 From the repository root:
 
@@ -68,19 +84,10 @@ one blank canvas.
   diagnostics, and troubleshooting
 - [Architecture decision records](docs/adr/README.md) — current durable
   implementation decisions
-- [POC and investigation archive](docs/poc/README.md) — product drafts,
-  hardware findings, experiments, and historical plans
-- [Design system](DESIGN.md) and [product definition](PRODUCT.md)
 
-Voice transcription can use a personal OpenRouter API key saved from Trace's
-Setup panel. Trace stores that key only in macOS Keychain and never displays it
-again after saving; Setup supports replacing or removing it.
-
-Custom builds can instead supply `OPEN_ROUTER_API_KEY` or
-`OPENROUTER_API_KEY` through the process environment, `TRACE_ENV_FILE`, the
-repository-root `.env`, or the existing bundle-relative `.env` lookup. These
-sources take precedence over Keychain and hide the personal-key controls.
-Never commit credentials.
+Without an externally supplied key, voice transcription can use a personal
+OpenRouter API key saved from Trace's Setup panel. Trace stores it only in
+macOS Keychain; Setup supports replacing or removing it.
 
 ## License and contributing
 
