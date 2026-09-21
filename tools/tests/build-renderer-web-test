@@ -1,0 +1,154 @@
+#!/bin/bash
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+HELPER="$ROOT/tools/build-renderer-web"
+TEMP_ROOT=$(mktemp -d)
+trap 'rm -rf "$TEMP_ROOT"' EXIT
+
+WEB_ROOT="$TEMP_ROOT/RendererLabWeb"
+CACHE_ROOT="$TEMP_ROOT/cache"
+FAKE_BIN="$TEMP_ROOT/bin"
+BUN_LOG="$TEMP_ROOT/bun.log"
+
+mkdir -p "$WEB_ROOT/src" "$FAKE_BIN"
+cat > "$WEB_ROOT/src/main.tsx" <<'EOF'
+console.log("initial")
+EOF
+cat > "$WEB_ROOT/index.html" <<'EOF'
+<main></main>
+EOF
+cat > "$WEB_ROOT/package.json" <<'EOF'
+{"scripts":{"build":"tsc --noEmit && vite build"}}
+EOF
+cat > "$WEB_ROOT/bun.lock" <<'EOF'
+{"lockfileVersion":1}
+EOF
+cat > "$WEB_ROOT/tsconfig.json" <<'EOF'
+{"compilerOptions":{"strict":true}}
+EOF
+cat > "$WEB_ROOT/vite.config.ts" <<'EOF'
+export default {}
+EOF
+
+cat > "$FAKE_BIN/bun" <<'EOF'
+#!/bin/bash
+set -eu
+
+if [[ "$*" == "--version" ]]; then
+    echo "${TRACE_TEST_BUN_VERSION:-test-bun}"
+    exit 0
+fi
+
+printf '%s\n' "$*" >> "$TRACE_TEST_BUN_LOG"
+if [[ " $* " == *" install "* ]]; then
+    mkdir -p node_modules
+    exit 0
+fi
+if [[ " $* " == *" run build "* ]]; then
+    if [[ "${TRACE_TEST_FAIL_BUILD:-0}" == "1" ]]; then
+        exit 9
+    fi
+    rm -rf dist
+    mkdir -p dist
+    printf '<main>built</main>\n' > dist/index.html
+    printf '<svg></svg>\n' > dist/icon-sprite.svg
+    exit 0
+fi
+echo "unexpected bun invocation: $*" >&2
+exit 64
+EOF
+cat > "$FAKE_BIN/npm" <<'EOF'
+#!/bin/bash
+echo "npm must not be used" >&2
+exit 97
+EOF
+chmod +x "$FAKE_BIN/bun" "$FAKE_BIN/npm"
+
+export PATH="$FAKE_BIN:$PATH"
+export TRACE_TEST_BUN_LOG="$BUN_LOG"
+
+assert_log() {
+    local expected=$1
+    local actual
+    actual=$(cat "$BUN_LOG" 2>/dev/null || true)
+    if [[ "$actual" != "$expected" ]]; then
+        echo "expected bun log:" >&2
+        printf '%s\n' "$expected" >&2
+        echo "actual bun log:" >&2
+        printf '%s\n' "$actual" >&2
+        exit 1
+    fi
+}
+
+run_helper() {
+    "$HELPER" "$WEB_ROOT" "$CACHE_ROOT"
+}
+
+: > "$BUN_LOG"
+output=$(run_helper)
+[[ "$output" == "Rebuilding RendererLabWeb (cache miss)." ]]
+assert_log "install --frozen-lockfile
+run build"
+
+: > "$BUN_LOG"
+output=$(run_helper)
+[[ "$output" == "Reusing cached RendererLabWeb dist." ]]
+assert_log ""
+
+printf 'tampered\n' >> "$WEB_ROOT/dist/index.html"
+: > "$BUN_LOG"
+run_helper >/dev/null
+assert_log "run build"
+
+printf 'export const added = true\n' > "$WEB_ROOT/src/untracked.ts"
+: > "$BUN_LOG"
+output=$(run_helper)
+[[ "$output" == "Rebuilding RendererLabWeb (cache miss)." ]]
+assert_log "run build"
+
+printf '\n// config changed\n' >> "$WEB_ROOT/vite.config.ts"
+: > "$BUN_LOG"
+run_helper >/dev/null
+assert_log "run build"
+
+printf '\n' >> "$WEB_ROOT/bun.lock"
+: > "$BUN_LOG"
+run_helper >/dev/null
+assert_log "install --frozen-lockfile
+run build"
+
+export TRACE_TEST_BUN_VERSION="test-bun-2"
+: > "$BUN_LOG"
+run_helper >/dev/null
+assert_log "install --frozen-lockfile
+run build"
+
+: > "$BUN_LOG"
+output=$(TRACE_FORCE_WEB_BUILD=1 run_helper)
+[[ "$output" == "Rebuilding RendererLabWeb (forced)." ]]
+assert_log "run build"
+
+marker_before=$(cat "$CACHE_ROOT/build-fingerprint")
+printf '\nconsole.log("failure path")\n' >> "$WEB_ROOT/src/main.tsx"
+: > "$BUN_LOG"
+if TRACE_TEST_FAIL_BUILD=1 run_helper >/dev/null 2>&1; then
+    echo "expected failed web build" >&2
+    exit 1
+fi
+[[ "$(cat "$CACHE_ROOT/build-fingerprint")" == "$marker_before" ]]
+assert_log "run build"
+
+: > "$BUN_LOG"
+run_helper >/dev/null
+assert_log "run build"
+[[ "$(cat "$CACHE_ROOT/build-fingerprint")" != "$marker_before" ]]
+
+grep -Fq '"$ROOT/tools/build-renderer-web" "$WEB_ROOT" "$ROOT/.build/renderer-web"' \
+    "$ROOT/tools/trace"
+grep -Fq '"$ROOT/tools/build-renderer-web" "$WEB_ROOT" "$ROOT/.build/renderer-web"' \
+    "$ROOT/tools/trace-input-lab"
+! grep -Fq 'bun --cwd "$WEB_ROOT"' "$ROOT/tools/trace"
+! grep -Fq 'bun --cwd "$WEB_ROOT"' "$ROOT/tools/trace-input-lab"
+
+echo "build-renderer-web tests passed"

@@ -4,7 +4,7 @@
 
 - macOS 13+
 - Full Xcode with Swift 5.10 support
-- Node.js and npm
+- Bun 1.4+
 - Bluetooth for Neo input
 - Screen Recording and Microphone permissions
 
@@ -46,8 +46,9 @@ swift build
 Build the web renderer:
 
 ```sh
-npm --prefix apps/trace-macos/RendererLabWeb ci --no-audit --no-fund
-npm --prefix apps/trace-macos/RendererLabWeb run build
+cd apps/trace-macos/RendererLabWeb
+bun install --frozen-lockfile
+bun run build
 ```
 
 ## Test

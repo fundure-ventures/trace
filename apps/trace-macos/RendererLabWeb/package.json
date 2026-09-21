@@ -1,0 +1,29 @@
+{
+  "name": "trace-renderer-lab-web",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "bun@1.4.2",
+  "description": "Development-only tldraw renderer comparison POC for Trace Input Lab.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "test": "node --test tests/*.test.ts",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tldraw/assets": "4.5.12",
+    "@tldraw/tlschema": "4.5.12",
+    "react": "19.2.1",
+    "react-dom": "19.2.1",
+    "tldraw": "4.5.12"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "5.1.1",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vite-plugin-singlefile": "2.3.3"
+  }
+}

@@ -1,0 +1,117 @@
+#!/bin/bash
+set -eu
+
+if (($# != 2)); then
+    echo "usage: tools/build-renderer-web WEB_ROOT CACHE_ROOT" >&2
+    exit 64
+fi
+
+WEB_ROOT=$1
+CACHE_ROOT=$2
+DEPENDENCY_MARKER="$WEB_ROOT/node_modules/.trace-dependencies.sha256"
+BUILD_MARKER="$CACHE_ROOT/build-fingerprint"
+
+hash_lines() {
+    shasum -a 256 | awk '{print $1}'
+}
+
+hash_file_set() {
+    local base=$1
+    shift
+
+    (
+        cd "$base"
+        while IFS= read -r path; do
+            printf 'path:%s\n' "$path"
+            shasum -a 256 "$path" | awk '{print "content:" $1}'
+        done < <("$@" | LC_ALL=C sort)
+    ) | hash_lines
+}
+
+dependency_fingerprint() {
+    {
+        printf 'bun:%s\n' "$(bun --version)"
+        hash_file_set "$WEB_ROOT" find \
+            . -maxdepth 1 -type f \
+            \( -name package.json \
+            -o -name bun.lock \
+            -o -name bunfig.toml \
+            -o -name .npmrc \) \
+            -print
+    } | hash_lines
+}
+
+build_input_fingerprint() {
+    {
+        printf 'helper:'
+        shasum -a 256 "$0" | awk '{print $1}'
+        printf 'dependencies:%s\n' "$1"
+        printf 'node-env:%s\n' "${NODE_ENV:-}"
+        env | LC_ALL=C sort | grep '^VITE_' || true
+        hash_file_set "$WEB_ROOT" find . -type f \
+            ! -path './node_modules/*' \
+            ! -path './dist/*' \
+            -print
+    } | hash_lines
+}
+
+dist_fingerprint() {
+    hash_file_set "$WEB_ROOT/dist" find . -type f -print
+}
+
+dist_is_complete() {
+    [[ -f "$WEB_ROOT/dist/index.html"
+        && -f "$WEB_ROOT/dist/icon-sprite.svg" ]]
+}
+
+DEPENDENCY_FINGERPRINT=$(dependency_fingerprint)
+if [[ ! -d "$WEB_ROOT/node_modules"
+    || ! -f "$DEPENDENCY_MARKER"
+    || "$(cat "$DEPENDENCY_MARKER")" != "$DEPENDENCY_FINGERPRINT" ]]; then
+    (cd "$WEB_ROOT" && bun install --frozen-lockfile)
+    printf '%s\n' "$DEPENDENCY_FINGERPRINT" > "$DEPENDENCY_MARKER"
+fi
+
+BUILD_INPUT_FINGERPRINT=$(build_input_fingerprint "$DEPENDENCY_FINGERPRINT")
+CACHED_INPUT_FINGERPRINT=""
+CACHED_DIST_FINGERPRINT=""
+if [[ -f "$BUILD_MARKER" ]]; then
+    {
+        IFS= read -r CACHED_INPUT_FINGERPRINT || true
+        IFS= read -r CACHED_DIST_FINGERPRINT || true
+    } < "$BUILD_MARKER"
+fi
+
+CURRENT_DIST_FINGERPRINT=""
+if dist_is_complete; then
+    CURRENT_DIST_FINGERPRINT=$(dist_fingerprint)
+fi
+
+if [[ "${TRACE_FORCE_WEB_BUILD:-0}" != "1"
+    && "$CACHED_INPUT_FINGERPRINT" == "$BUILD_INPUT_FINGERPRINT"
+    && -n "$CACHED_DIST_FINGERPRINT"
+    && "$CACHED_DIST_FINGERPRINT" == "$CURRENT_DIST_FINGERPRINT" ]]; then
+    echo "Reusing cached RendererLabWeb dist."
+    exit 0
+fi
+
+if [[ "${TRACE_FORCE_WEB_BUILD:-0}" == "1" ]]; then
+    echo "Rebuilding RendererLabWeb (forced)."
+else
+    echo "Rebuilding RendererLabWeb (cache miss)."
+fi
+
+(cd "$WEB_ROOT" && bun run build)
+if ! dist_is_complete; then
+    echo "error: RendererLabWeb build did not produce the expected output." >&2
+    exit 1
+fi
+CURRENT_DIST_FINGERPRINT=$(dist_fingerprint)
+mkdir -p "$CACHE_ROOT"
+TEMP_MARKER=$(mktemp "$CACHE_ROOT/build-fingerprint.XXXXXX")
+trap 'rm -f "$TEMP_MARKER"' EXIT
+printf '%s\n%s\n' \
+    "$BUILD_INPUT_FINGERPRINT" \
+    "$CURRENT_DIST_FINGERPRINT" > "$TEMP_MARKER"
+mv "$TEMP_MARKER" "$BUILD_MARKER"
+trap - EXIT
