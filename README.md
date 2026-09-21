@@ -29,24 +29,20 @@ Complete Trace's four-corner calibration before drawing with the pen.
 
 ## Custom build configuration
 
-Voice transcription is optional. Custom builds can provide an OpenRouter API
-key in the repository-root `.env`:
+Custom builds use one untracked repository-root `.env`:
 
 ```dotenv
+# Optional: enables voice transcription.
 OPEN_ROUTER_API_KEY=your-openrouter-api-key
+
+# Required for production builds of the bundled canvas.
+VITE_TLDRAW_LICENSE_KEY=your-tldraw-license-key
 ```
 
 `OPENROUTER_API_KEY`, `TRACE_ENV_FILE`, the process environment, and the
 bundle-relative `.env` lookup are also supported. Externally supplied keys take
 precedence over the personal key stored from Trace's Setup panel. Never commit
 credentials.
-
-Production builds also require the untracked file
-`apps/trace-macos/RendererLabWeb/.env` with your tldraw production license:
-
-```dotenv
-VITE_TLDRAW_LICENSE_KEY=your-tldraw-license-key
-```
 
 ## Launch
 

@@ -30,6 +30,9 @@ EOF
 cat > "$WEB_ROOT/vite.config.ts" <<'EOF'
 export default {}
 EOF
+cat > "$TEMP_ROOT/.env" <<'EOF'
+VITE_TLDRAW_LICENSE_KEY=initial-license
+EOF
 
 cat > "$FAKE_BIN/bun" <<'EOF'
 #!/bin/bash
@@ -82,7 +85,7 @@ assert_log() {
 }
 
 run_helper() {
-    "$HELPER" "$WEB_ROOT" "$CACHE_ROOT"
+    "$HELPER" "$WEB_ROOT" "$CACHE_ROOT" "$TEMP_ROOT"
 }
 
 : > "$BUN_LOG"
@@ -108,6 +111,11 @@ output=$(run_helper)
 assert_log "run build"
 
 printf '\n// config changed\n' >> "$WEB_ROOT/vite.config.ts"
+: > "$BUN_LOG"
+run_helper >/dev/null
+assert_log "run build"
+
+printf '\nVITE_TLDRAW_LICENSE_KEY=changed-license\n' >> "$TEMP_ROOT/.env"
 : > "$BUN_LOG"
 run_helper >/dev/null
 assert_log "run build"
@@ -144,10 +152,11 @@ run_helper >/dev/null
 assert_log "run build"
 [[ "$(cat "$CACHE_ROOT/build-fingerprint")" != "$marker_before" ]]
 
-grep -Fq '"$ROOT/tools/build-renderer-web" "$WEB_ROOT" "$ROOT/.build/renderer-web"' \
-    "$ROOT/tools/trace"
-grep -Fq '"$ROOT/tools/build-renderer-web" "$WEB_ROOT" "$ROOT/.build/renderer-web"' \
-    "$ROOT/tools/trace-input-lab"
+for launcher in "$ROOT/tools/trace" "$ROOT/tools/trace-input-lab"; do
+    grep -Fq '"$ROOT/tools/build-renderer-web" \' "$launcher"
+    grep -Fq '"$ROOT/.build/renderer-web" \' "$launcher"
+    grep -Fq '    "$ROOT"' "$launcher"
+done
 ! grep -Fq 'bun --cwd "$WEB_ROOT"' "$ROOT/tools/trace"
 ! grep -Fq 'bun --cwd "$WEB_ROOT"' "$ROOT/tools/trace-input-lab"
 

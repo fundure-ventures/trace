@@ -1,13 +1,14 @@
 #!/bin/bash
 set -eu
 
-if (($# != 2)); then
-    echo "usage: tools/build-renderer-web WEB_ROOT CACHE_ROOT" >&2
+if (($# != 3)); then
+    echo "usage: tools/build-renderer-web WEB_ROOT CACHE_ROOT REPOSITORY_ROOT" >&2
     exit 64
 fi
 
 WEB_ROOT=$1
 CACHE_ROOT=$2
+REPOSITORY_ROOT=$3
 DEPENDENCY_MARKER="$WEB_ROOT/node_modules/.trace-dependencies.sha256"
 BUILD_MARKER="$CACHE_ROOT/build-fingerprint"
 
@@ -48,6 +49,10 @@ build_input_fingerprint() {
         printf 'dependencies:%s\n' "$1"
         printf 'node-env:%s\n' "${NODE_ENV:-}"
         env | LC_ALL=C sort | grep '^VITE_' || true
+        if [[ -f "$REPOSITORY_ROOT/.env" ]]; then
+            printf 'repository-env:'
+            shasum -a 256 "$REPOSITORY_ROOT/.env" | awk '{print $1}'
+        fi
         hash_file_set "$WEB_ROOT" find . -type f \
             ! -path './node_modules/*' \
             ! -path './dist/*' \

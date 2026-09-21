@@ -1,0 +1,131 @@
+#!/bin/bash
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+CONFIGURATION=${TRACE_BUILD_CONFIGURATION:-debug}
+APP="$ROOT/.build/Trace.app"
+CONTENTS="$APP/Contents"
+WEB_ROOT="$ROOT/apps/trace-macos/RendererLabWeb"
+WEB_RESOURCES="$CONTENTS/Resources/RendererLabWeb"
+BUNDLE_IDENTIFIER=$(
+    plutil -extract CFBundleIdentifier raw -o - \
+        "$ROOT/apps/trace-macos/Trace-Info.plist"
+)
+CLEAR_STATE=false
+
+show_help() {
+    cat <<'EOF'
+usage: ./tools/trace [--clear]
+
+  --clear  Reset Trace onboarding, calibration, window state, and macOS
+           permissions before launching. Saved .traceboard drawings remain.
+EOF
+}
+
+while (($#)); do
+    case "$1" in
+        --clear)
+            CLEAR_STATE=true
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "error: unknown option: $1" >&2
+            show_help >&2
+            exit 64
+            ;;
+    esac
+    shift
+done
+
+running_trace_pids() {
+    ps -ax -o pid=,command= |
+        awk -v executable="$CONTENTS/MacOS/trace" '
+            {
+                pid = $1
+                sub(/^[[:space:]]*[0-9]+[[:space:]]+/, "", $0)
+                if (index($0, executable) == 1) {
+                    print pid
+                }
+            }
+        '
+}
+
+clear_trace_state() {
+    local pids
+    pids=$(running_trace_pids)
+    if [[ -n "$pids" ]]; then
+        while IFS= read -r pid; do
+            if [[ "$pid" =~ ^[0-9]+$ ]]; then
+                kill "$pid" 2>/dev/null || true
+            fi
+        done <<< "$pids"
+
+        for ((attempt = 0; attempt < 50; attempt += 1)); do
+            [[ -z "$(running_trace_pids)" ]] && break
+            sleep 0.1
+        done
+        if [[ -n "$(running_trace_pids)" ]]; then
+            echo "error: Trace is still running; quit it and retry." >&2
+            exit 1
+        fi
+    fi
+
+    defaults delete "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+    rm -rf -- \
+        "${HOME:?}/Library/Application Support/Trace/InputLab/calibrations" \
+        "$HOME/Library/Saved Application State/$BUNDLE_IDENTIFIER.savedState"
+    tccutil reset All "$BUNDLE_IDENTIFIER"
+
+    echo "Cleared Trace onboarding, calibrations, window state, and permissions."
+    echo "Saved drawings under ~/Documents/Trace were preserved."
+}
+
+cd "$ROOT"
+if $CLEAR_STATE; then
+    clear_trace_state
+fi
+
+DEVELOPER_DIR=$("$ROOT/tools/resolve-xcode-developer-dir")
+export DEVELOPER_DIR
+SWIFT=$(xcrun --find swift)
+MACOS_SDK=$("$ROOT/tools/resolve-macos-sdk")
+MACOS_SDK_VERSION=$(
+    plutil -extract Version raw -o - "$MACOS_SDK/SDKSettings.plist"
+)
+BUILD_ARGS=(
+    --sdk "$MACOS_SDK"
+    -c "$CONFIGURATION"
+    -Xlinker -platform_version
+    -Xlinker macos
+    -Xlinker 13.0
+    -Xlinker "$MACOS_SDK_VERSION"
+)
+
+"$SWIFT" build "${BUILD_ARGS[@]}" --product trace
+BIN_DIRECTORY=$("$SWIFT" build "${BUILD_ARGS[@]}" --show-bin-path)
+
+"$ROOT/tools/build-renderer-web" \
+    "$WEB_ROOT" \
+    "$ROOT/.build/renderer-web" \
+    "$ROOT"
+
+mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
+cp "$BIN_DIRECTORY/trace" "$CONTENTS/MacOS/trace"
+cp "$ROOT/apps/trace-macos/Trace-Info.plist" "$CONTENTS/Info.plist"
+rm -rf "$WEB_RESOURCES"
+cp -R "$WEB_ROOT/dist" "$WEB_RESOURCES"
+"$ROOT/tools/copy-swiftpm-resource-bundles" \
+    "$BIN_DIRECTORY" \
+    "$CONTENTS/Resources"
+"$ROOT/tools/sign-app" "$APP"
+
+if [[ "${TRACE_BUILD_ONLY:-0}" == "1" ]]; then
+    exit 0
+fi
+
+"$ROOT/tools/quit-running-app" "$BUNDLE_IDENTIFIER"
+open "$APP"
+"$ROOT/tools/wait-for-running-app" "$BUNDLE_IDENTIFIER"

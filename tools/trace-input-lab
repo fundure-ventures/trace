@@ -1,0 +1,124 @@
+#!/bin/bash
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+CONFIGURATION=${TRACE_BUILD_CONFIGURATION:-debug}
+APP="$ROOT/.build/Trace Input Lab.app"
+CONTENTS="$APP/Contents"
+PAPER_PROFILE=${TRACE_PAPER_PROFILE:-b-native-100}
+PROCESSING_MODE=${TRACE_PROCESSING_MODE:-predict}
+INTERPOLATION_ALGORITHM=${TRACE_INTERPOLATION_ALGORITHM:-circular-arc}
+STROKE_REFINEMENT=${TRACE_STROKE_REFINEMENT:-smooth-path}
+PREDICTION_ALGORITHM=${TRACE_PREDICTION_ALGORITHM:-velocity}
+RENDERER_MODE=${TRACE_RENDERER_MODE:-trace}
+WEB_ROOT="$ROOT/apps/trace-macos/RendererLabWeb"
+WEB_RESOURCES="$CONTENTS/Resources/RendererLabWeb"
+
+case "$PROCESSING_MODE" in
+    raw|interpolate|predict) ;;
+    *)
+        echo "Invalid TRACE_PROCESSING_MODE: $PROCESSING_MODE" >&2
+        exit 2
+        ;;
+esac
+case "$PREDICTION_ALGORITHM" in
+    safe|velocity|curve) ;;
+    *)
+        echo "Invalid TRACE_PREDICTION_ALGORITHM: $PREDICTION_ALGORITHM" >&2
+        exit 2
+        ;;
+esac
+case "$STROKE_REFINEMENT" in
+    none|smooth-path) ;;
+    *)
+        echo "Invalid TRACE_STROKE_REFINEMENT: $STROKE_REFINEMENT" >&2
+        exit 2
+        ;;
+esac
+case "$INTERPOLATION_ALGORITHM" in
+    linear|circular-arc|cubic-bezier) ;;
+    *)
+        echo "Invalid TRACE_INTERPOLATION_ALGORITHM: $INTERPOLATION_ALGORITHM" >&2
+        exit 2
+        ;;
+esac
+case "$RENDERER_MODE" in
+    trace|paperkit|tldraw) ;;
+    *)
+        echo "Invalid TRACE_RENDERER_MODE: $RENDERER_MODE" >&2
+        exit 2
+        ;;
+esac
+if [[ "${TRACE_QUIT_AFTER_REPLAY:-0}" == "1"
+    && -z "${TRACE_REPLAY_LOG:-}" ]]; then
+    echo "TRACE_QUIT_AFTER_REPLAY requires TRACE_REPLAY_LOG." >&2
+    exit 2
+fi
+if [[ "${TRACE_BUILD_ONLY:-0}" != "1"
+    && -z "${TRACE_REPLAY_LOG:-}" ]]; then
+    RUNNING_LIVE_PID=$(
+        ps -ax -o pid=,command= |
+            awk -v executable="$CONTENTS/MacOS/trace-input-lab" '
+                {
+                    pid = $1
+                    sub(/^[[:space:]]*[0-9]+[[:space:]]+/, "", $0)
+                    if (index($0, executable) == 1 && index($0, " --replay ") == 0) {
+                        print pid
+                        exit
+                    }
+                }
+            '
+    )
+    if [[ -n "$RUNNING_LIVE_PID" ]]; then
+        echo "Trace Input Lab is already running (PID $RUNNING_LIVE_PID)." >&2
+        echo "Close its window before launching another live session." >&2
+        exit 2
+    fi
+fi
+
+cd "$ROOT"
+swift build -c "$CONFIGURATION" --product trace-input-lab
+BIN_DIRECTORY=$(swift build -c "$CONFIGURATION" --show-bin-path)
+
+"$ROOT/tools/build-renderer-web" \
+    "$WEB_ROOT" \
+    "$ROOT/.build/renderer-web" \
+    "$ROOT"
+
+mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$ROOT/logs"
+cp "$BIN_DIRECTORY/trace-input-lab" "$CONTENTS/MacOS/trace-input-lab"
+cp "$ROOT/apps/trace-macos/Info.plist" "$CONTENTS/Info.plist"
+rm -rf "$WEB_RESOURCES"
+cp -R "$WEB_ROOT/dist" "$WEB_RESOURCES"
+"$ROOT/tools/sign-app" "$APP"
+
+if [[ "${TRACE_BUILD_ONLY:-0}" == "1" ]]; then
+    exit 0
+fi
+
+IMPLEMENTATION=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
+if ! git diff --quiet -- . || ! git diff --cached --quiet -- .; then
+    IMPLEMENTATION="${IMPLEMENTATION}-dirty"
+fi
+
+ARGS=(
+    --log-directory "$ROOT/logs"
+    --implementation "$IMPLEMENTATION"
+    --paper-profile "$PAPER_PROFILE"
+    --processing-mode "$PROCESSING_MODE"
+    --interpolation-algorithm "$INTERPOLATION_ALGORITHM"
+    --stroke-refinement "$STROKE_REFINEMENT"
+    --prediction-algorithm "$PREDICTION_ALGORITHM"
+    --renderer "$RENDERER_MODE"
+)
+
+if [[ -n "${TRACE_REPLAY_LOG:-}" ]]; then
+    ARGS+=(--replay "$TRACE_REPLAY_LOG")
+    ARGS+=(--replay-speed "${TRACE_REPLAY_SPEED:-1}")
+fi
+if [[ "${TRACE_QUIT_AFTER_REPLAY:-0}" == "1" ]]; then
+    ARGS+=(--quit-after-replay)
+    open -W -n "$APP" --args "${ARGS[@]}"
+else
+    open -n "$APP" --args "${ARGS[@]}"
+fi
