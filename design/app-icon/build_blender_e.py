@@ -1,6 +1,7 @@
-"""Build concept E in a new scene without modifying existing Blender scenes.
+"""Build concept E and four lighting studies without modifying existing scenes.
 
-Run in Blender's Scripting workspace. Rendering/saving is intentionally separate.
+Run in Blender's Scripting workspace. The studies share artwork and camera, not
+lights or worlds. Rendering/saving is intentionally separate.
 """
 
 import math
@@ -64,6 +65,85 @@ def rounded_panel(name, width, height, radius, z, collection, mat, center=(0, 0)
     return obj
 
 
+def mac_window(collection, silver, white, header):
+    width, height, radius = 6.8*1.12, 7.05*1.08*1.065, 0.27
+    cx, cy = -0.10, 0.55
+    divider = (3.17-0.30)*1.08*1.065 + cy
+
+    def outline(inset, z):
+        w, h, r = width-2*inset, height-2*inset, radius-inset
+        points = []
+        for x, y, start in (
+            (w/2-r, h/2-r, 0), (-w/2+r, h/2-r, 90),
+            (-w/2+r, -h/2+r, 180), (w/2-r, -h/2+r, 270),
+        ):
+            for step in range(17):
+                angle = math.radians(start + step*90/16)
+                points.append((cx+x+r*math.cos(angle), cy+y+r*math.sin(angle), z))
+        split = []
+        for a, b in zip(points, points[1:]+points[:1]):
+            split.append(a)
+            if (a[1]-divider)*(b[1]-divider) < 0:
+                t = (divider-a[1])/(b[1]-a[1])
+                split.append((a[0]+t*(b[0]-a[0]), divider, z))
+        return split
+
+    # Header and document share one coplanar face boundary; only the outside is beveled.
+    profiles = [(0.04, -0.035), (0, 0.005), (0, 0.075), (0.022, 0.105), (0.055, 0.130)]
+    rings = [outline(inset, z) for inset, z in profiles]
+    count = len(rings[0])
+    assert all(len(ring) == count for ring in rings)
+    vertices = [point for ring in rings for point in ring]
+    faces = [tuple(reversed(range(count)))]
+    for j in range(len(rings)-1):
+        for i in range(count):
+            a, b = j*count+i, j*count+(i+1) % count
+            faces.append((a, b, b+count, a+count))
+    offset = (len(rings)-1)*count
+    faces.append(tuple(offset+i for i, p in enumerate(rings[-1]) if p[1] <= divider))
+    faces.append(tuple(offset+i for i, p in enumerate(rings[-1]) if p[1] >= divider))
+    shell = mesh_object("Unified beveled Mac window", vertices, faces, collection, silver)
+    shell.data.materials.append(white)
+    shell.data.materials.append(header)
+    for polygon in shell.data.polygons[1:-2]:
+        polygon.use_smooth = True
+    shell.data.polygons[-2].material_index = 1
+    shell.data.polygons[-1].material_index = 2
+
+    for index, (name, color) in enumerate((
+        ("close", (0.90, 0.052, 0.036)),
+        ("minimize", (1.0, 0.51, 0.018)),
+        ("zoom", (0.028, 0.52, 0.06)),
+    )):
+        lens = material("E - Aqua " + name, color, 0.22)
+        shader = lens.node_tree.nodes.get("Principled BSDF")
+        shader.inputs["Coat Weight"].default_value = 0.4
+        shader.inputs["Coat Roughness"].default_value = 0.12
+        rim = material("E - Aqua rim " + name, tuple(c*0.46 for c in color), 0.30)
+        x = (-3.43+index*0.34+0.45)*1.12-0.10
+        y = (3.48-0.30)*1.08*1.065+0.55
+        profile = [(0.123, 0.134), (0.123, 0.145), (0.114, 0.153),
+                   (0.102, 0.175), (0.070, 0.195), (0.035, 0.202), (0.002, 0.205)]
+        vertices, faces = [], []
+        segments = 64
+        for r, z in profile:
+            for i in range(segments):
+                angle = math.tau*i/segments
+                vertices.append((x+r*math.cos(angle), y+r*math.sin(angle), z))
+        faces.append(tuple(reversed(range(segments))))
+        for j in range(len(profile)-1):
+            for i in range(segments):
+                a, b = j*segments+i, j*segments+(i+1) % segments
+                faces.append((a, b, b+segments, a+segments))
+        faces.append(tuple((len(profile)-1)*segments+i for i in range(segments)))
+        button = mesh_object("Aqua " + name, vertices, faces, collection, rim)
+        button.data.materials.append(lens)
+        for polygon in button.data.polygons:
+            polygon.use_smooth = len(polygon.vertices) == 4
+            if polygon.index > 2*segments:
+                polygon.material_index = 1
+
+
 def paper_position(x, y):
     # Bend only the diagonal lower-left corner; preserve surface arc length.
     distance = max(0, 2.7 - ((x + 2.95) + (y + 3.45))) / math.sqrt(2)
@@ -90,7 +170,8 @@ def build_scene():
         groups[name] = group
 
     white = material("E - porcelain white", (0.88, 0.88, 0.865), 0.65)
-    silver = material("E - satin window edge", (0.43, 0.47, 0.53), 0.34)
+    silver = material("E - satin window edge", (0.68, 0.70, 0.73), 0.28)
+    silver.node_tree.nodes.get("Principled BSDF").inputs["Metallic"].default_value = 0.10
     header = material("E - macOS title bar", (0.63, 0.66, 0.71), 0.52)
     black = material("E - charcoal wax wrapper", (0.005, 0.006, 0.007), 0.48, 0.012)
     black.node_tree.nodes.get("Principled BSDF").inputs["Specular IOR Level"].default_value = 0.4
@@ -120,21 +201,7 @@ def build_scene():
            for name, color in zip(("red", "yellow", "green", "blue"), colors)]
 
     window = groups["01 Mac window"]
-    rounded_panel("Window silver boundary", 6.8, 7.05, 0.24, 0.08, window, silver, (-0.45, 0.30))
-    rounded_panel("Blank document", 6.75, 7.0, 0.22, 0.105, window, white, (-0.45, 0.30))
-    rounded_panel("Compact title bar", 6.74, 0.62, 0.18, 0.13, window, header, (-0.45, 3.48))
-    rounded_panel("Title bar hairline", 6.71, 0.012, 0.004, 0.14, window, silver, (-0.45, 3.17))
-    for index, mat in enumerate(wax[:3]):
-        cx, cy, r = -3.43 + index * 0.34, 3.48, 0.105
-        vertices = [(cx + r * math.cos(i * math.tau / 64),
-                     cy + r * math.sin(i * math.tau / 64), 0.165) for i in range(64)]
-        dot = mesh_object("Traffic light " + str(index + 1), vertices, [tuple(range(64))], window, mat)
-        solid = dot.modifiers.new("Button depth", "SOLIDIFY")
-        solid.thickness = 0.015
-    for obj in window.objects:
-        for vertex in obj.data.vertices:
-            vertex.co.x = (vertex.co.x + 0.45) * 1.12 - 0.10
-            vertex.co.y = (vertex.co.y - 0.30) * 1.08 * 1.065 + 0.55
+    mac_window(window, silver, white, header)
 
     vertices, faces = [], []
     nx, ny = 100, 116
@@ -276,10 +343,10 @@ def build_scene():
     camera_data.ortho_scale = 9.7
     scene.camera = camera
     for name, location, power, size in (
-        ("Key softbox", (-5, -3, 10), 1100, 5),
-        ("Fill softbox", (5, 0, 8), 350, 6),
-        ("Rim softbox", (0, 7, 9), 500, 5),
-        ("Curl bounce", (-3.5, -4, 2.8), 15, 3),
+        ("Key softbox", (-5, 4, 10), 700, 7),
+        ("Fill softbox", (5, -3, 8), 600, 8),
+        ("Rim softbox", (0, 7, 9), 200, 6),
+        ("Curl bounce", (-3.5, -4, 2.8), 80, 5),
     ):
         data = bpy.data.lights.new(name, "AREA")
         data.energy, data.shape, data.size = power, "DISK", size
@@ -301,10 +368,66 @@ def build_scene():
     scene.render.film_transparent = True
     scene.render.filepath = "//trace-e.png"
     scene.view_settings.view_transform = "Standard"
+    scene.view_settings.exposure = 0.2
     scene["design_reference"] = "Approved generated E: a3ed518d-c235-4671-a18b-1a57c10963ae.png"
     scene["delivery_status"] = "Editable material study; not integrated or platform-mask verified"
     return scene
 
 
+def lighting_variants(baseline):
+    # Geometry, camera, and materials are shared; every rig and world is independent.
+    neutral = (1, 1, 1)
+    rigs = {
+        "01-soft-daylight": [
+            ("Key softbox", (-6, 3, 12), 900, 9, neutral),
+            ("Fill softbox", (5, -4, 8), 700, 10, neutral),
+            ("Rim softbox", (0, 8, 10), 150, 8, neutral),
+            ("Curl bounce", (-3.5, -4, 2.8), 80, 5, neutral),
+        ],
+        "02-warm-cool": [
+            ("Key softbox", (-5, 2, 9), 648, 6, (1, 0.84, 0.67)),
+            ("Fill softbox", (5, -3, 8), 576, 8, (0.68, 0.83, 1)),
+            ("Rim softbox", (0, 7, 9), 144, 5, neutral),
+            ("Curl bounce", (-3.5, -4, 2.8), 57.6, 5, neutral),
+        ],
+        "03-rainbow-rim": [
+            ("Key softbox", (-5, 4, 10), 364, 7, neutral),
+            ("Fill softbox", (5, -3, 8), 308, 8, neutral),
+            ("Rim softbox", (4, 5, 6), 235.2, 4, (0.30, 0.56, 1)),
+            ("Curl bounce", (-3.5, -4, 2.8), 39.2, 5, neutral),
+            ("Red reflection", (-4, 1, 5), 145.6, 3, (1, 0.25, 0.20)),
+            ("Yellow reflection", (-4, -4, 4), 56, 4, (1, 0.75, 0.25)),
+            ("Green reflection", (3, -3, 5), 100.8, 4, (0.24, 1, 0.46)),
+        ],
+        "04-overcast": [
+            ("Key softbox", (0, 1, 13), 1000, 12, neutral),
+            ("Fill softbox", (-5, -4, 7), 500, 10, neutral),
+            ("Rim softbox", (5, 3, 7), 180, 10, neutral),
+            ("Curl bounce", (-3.5, -4, 2.8), 60, 6, neutral),
+        ],
+    }
+    scenes = []
+    for slug, lights in rigs.items():
+        scene = baseline.copy()
+        scene.name = "Trace E - " + slug
+        scene.world = baseline.world.copy()
+        scene.collection.children.unlink(baseline.collection.children["Studio"])
+        studio = bpy.data.collections.new(slug + " lighting")
+        scene.collection.children.link(studio)
+        studio.objects.link(baseline.camera)
+        for name, location, power, size, color in lights:
+            data = bpy.data.lights.new(slug + " " + name, "AREA")
+            data.energy, data.shape, data.size, data.color = power, "DISK", size, color
+            obj = bpy.data.objects.new(slug + " " + name, data)
+            studio.objects.link(obj)
+            obj.location = location
+            target = Vector((-1.6, -2.4, 0.35)) if name == "Curl bounce" else Vector((0, 0, 0))
+            obj.rotation_euler = (target-obj.location).to_track_quat("-Z", "Y").to_euler()
+        scene.render.filepath = "//trace-e-" + slug + ".png"
+        scene["lighting_variant"] = slug
+        scenes.append(scene)
+    return scenes
+
+
 if __name__ == "__main__":
-    build_scene()
+    lighting_variants(build_scene())
