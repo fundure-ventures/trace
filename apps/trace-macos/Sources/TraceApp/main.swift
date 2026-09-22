@@ -63,6 +63,21 @@ if ProcessInfo.processInfo.environment[
     }
 }
 if ProcessInfo.processInfo.environment[
+    "TRACE_OPEN_FILE_PROBE"
+] == "1" {
+    _ = NSApplication.shared
+    do {
+        try MainActor.assumeIsolated {
+            try TraceRetainedInkProbe.runOpenFileChecks()
+        }
+        print("open-file probe passed")
+        exit(0)
+    } catch {
+        fputs("open-file probe failed: \(error)\n", stderr)
+        exit(1)
+    }
+}
+if ProcessInfo.processInfo.environment[
     "TRACE_HARDWARE_FREE_PROBE"
 ] == "1" {
     _ = NSApplication.shared

@@ -64,6 +64,7 @@ enum TraceRetainedInkProbe {
         try verifyDocumentPresentationDefaults()
         try verifyDrawingFolderMigration()
         try verifyOpenWithImagePolicy()
+        try verifyOpenFileLifecycle()
         try verifyPasteboardImageDecoding()
         try verifyTldrawSnapshotPersistence()
         try verifyDrawingHistoryIntegration()
@@ -84,6 +85,12 @@ enum TraceRetainedInkProbe {
         try verifyGlobalShortcuts()
         try verifyGlobalShortcutMenuPresentation()
         try verifyGlobalShortcutSetupUI()
+    }
+
+    static func runOpenFileChecks() throws {
+        try verifyOpenWithImagePolicy()
+        try verifyOpenFileLifecycle()
+        try verifyOpenWithRegistration()
     }
 
     static func runGridSpacingBaselineCheck() throws {
@@ -263,6 +270,7 @@ enum TraceRetainedInkProbe {
         try verifyGlobalShortcuts()
         try verifyDrawingFolderMigration()
         try verifyOpenWithImagePolicy()
+        try verifyOpenFileLifecycle()
         try verifyOpenWithRegistration()
         try verifyPasteboardImageDecoding()
         try verifyTldrawSnapshotPersistence()
@@ -3435,6 +3443,51 @@ enum TraceRetainedInkProbe {
         else {
             throw probeError(
                 "Open With accepted a mixed selection or lost traceboards"
+            )
+        }
+    }
+
+    private static func verifyOpenFileLifecycle() throws {
+        let first = "/tmp/First.traceboard"
+        let second = "/tmp/Second.traceboard"
+        let lifecycle = TraceOpenFileLifecycle()
+        var delivered: [[String]] = []
+
+        lifecycle.receive([first])
+        guard delivered.isEmpty else {
+            throw probeError(
+                "Open files were delivered before app launch completed"
+            )
+        }
+
+        lifecycle.activate { filenames, completion in
+            delivered.append(filenames)
+            completion(true)
+        }
+        guard delivered == [[first]] else {
+            throw probeError(
+                "Queued open files were not delivered after app launch"
+            )
+        }
+
+        lifecycle.receive([second])
+        guard delivered == [[first], [second]] else {
+            throw probeError(
+                "Open files were not delivered while the app was ready"
+            )
+        }
+
+        let payload = TraceOpenFileForwarding.payload(
+            for: [first, second]
+        )
+        guard TraceOpenFileForwarding.filenames(from: payload)
+                == [first, second],
+              TraceOpenFileForwarding.filenames(
+                  from: ["filenames": [first, 42]]
+              ) == nil
+        else {
+            throw probeError(
+                "Forwarded open files were not validated"
             )
         }
     }
