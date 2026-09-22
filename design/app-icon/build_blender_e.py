@@ -78,8 +78,8 @@ def mac_window(collection, silver, white, header):
             (w/2-r, h/2-r, 0), (-w/2+r, h/2-r, 90),
             (-w/2+r, -h/2+r, 180), (w/2-r, -h/2+r, 270),
         ):
-            for step in range(17):
-                angle = math.radians(start + step*90/16)
+            for step in range(33):
+                angle = math.radians(start + step*90/32)
                 points.append((cx+x+r*math.cos(angle), cy+y+r*math.sin(angle), z))
         split = []
         for a, b in zip(points, points[1:]+points[:1]):
@@ -90,7 +90,9 @@ def mac_window(collection, silver, white, header):
         return split
 
     # Header and document share one coplanar face boundary; only the outside is beveled.
-    profiles = [(0.04, -0.035), (0, 0.005), (0, 0.075), (0.022, 0.105), (0.055, 0.130)]
+    profiles = [(0.04, -0.035), (0.012, -0.025), (0, 0.005), (0, 0.055)]
+    profiles += [(0.06*(1-math.cos(a)), 0.055+0.075*math.sin(a))
+                 for a in (math.pi*step/16 for step in range(1, 9))]
     rings = [outline(inset, z) for inset, z in profiles]
     count = len(rings[0])
     assert all(len(ring) == count for ring in rings)
@@ -187,8 +189,8 @@ def build_scene():
         groups[name] = group
 
     white = material("E - porcelain white", (0.88, 0.88, 0.865), 0.65)
-    silver = material("E - satin window edge", (0.68, 0.70, 0.73), 0.28)
-    silver.node_tree.nodes.get("Principled BSDF").inputs["Metallic"].default_value = 0.10
+    silver = material("E - satin window edge", (0.68, 0.70, 0.73), 0.24)
+    silver.node_tree.nodes.get("Principled BSDF").inputs["Metallic"].default_value = 0.38
     header = material("E - macOS title bar", (0.63, 0.66, 0.71), 0.52)
     black = material("E - charcoal wax wrapper", (0.005, 0.006, 0.007), 0.48, 0.012)
     black.node_tree.nodes.get("Principled BSDF").inputs["Specular IOR Level"].default_value = 0.4
@@ -277,23 +279,45 @@ def build_scene():
         if t > 0.5:
             width *= 1 + 0.16 * math.sin(math.pi * (t-0.5)/0.5)**2
         width *= 1 + 0.09*math.sin(t*math.tau*3.4+0.6) + 0.04*math.sin(t*math.tau*7.3)
-        width *= 1 + 0.04*math.sin(i*2.39) + 0.02*math.sin(i*7.13)
+        width *= 1 + 0.015*math.sin(i*2.39) + 0.007*math.sin(i*7.13)
         point = point + normal * (0.014 * math.sin(t*math.tau*6) * math.sin(math.pi*t))
         for left, right in zip(stops, stops[1:]):
             if left[0] <= t <= right[0]:
                 blend = (t-left[0])/(right[0]-left[0])
+                blend = blend*blend*(3-2*blend)
                 color = tuple(left[1][k]*(1-blend) + right[1][k]*blend for k in range(3))
                 break
         for sign in (-1, 1):
             xy = point + sign * width * normal
             position = paper_position(xy.x, xy.y)
-            position.z += 0.008
+            position.z += 0.003
             vertices.append(position)
             vertex_colors.append((*color, 1))
         if i:
             k = i * 2
             faces.append((k-2, k, k+1, k-1))
-    ink = material("E - gradient wax stroke", (1, 1, 1), 0.75, 0.01)
+    # Round the contact patch under the nib instead of ending with a cut edge.
+    left, right = len(vertices)-2, len(vertices)-1
+    center_index = len(vertices)
+    endpoint = paper_position(*centers[-1])
+    endpoint.z += 0.003
+    vertices.append(endpoint)
+    vertex_colors.append((*color, 1))
+    faces[-1] = (left-2, left, center_index, right, right-2)
+    tangent = (centers[-1]-centers[-2]).normalized()
+    normal = Vector((-tangent.y, tangent.x))
+    arc = [left]
+    for step in range(1, 16):
+        angle = -math.pi/2 + math.pi*step/16
+        xy = centers[-1] + width*(math.cos(angle)*tangent + math.sin(angle)*normal)
+        position = paper_position(*xy)
+        position.z += 0.003
+        arc.append(len(vertices))
+        vertices.append(position)
+        vertex_colors.append((*color, 1))
+    arc.append(right)
+    faces.extend((center_index, a, b) for a, b in zip(arc, arc[1:]))
+    ink = material("E - gradient wax stroke", (1, 1, 1), 0.75, 0.003)
     stroke = mesh_object("Two-pulse pressure ribbon", vertices, faces, groups["03 Voice ink"], ink)
     attribute = stroke.data.color_attributes.new(name="Wax gradient", type="FLOAT_COLOR", domain="POINT")
     for datum, color in zip(attribute.data, vertex_colors):
@@ -304,10 +328,10 @@ def build_scene():
     noise.inputs["Scale"].default_value = 260
     ramp = ink.node_tree.nodes.new("ShaderNodeValToRGB")
     ramp.name = "Wax grain breakup"
-    ramp.color_ramp.elements[0].position = 0.49
+    ramp.color_ramp.elements[0].position = 0.51
     ramp.color_ramp.elements[0].color = (0, 0, 0, 1)
-    ramp.color_ramp.elements[1].position = 0.70
-    ramp.color_ramp.elements[1].color = (0.65, 0.65, 0.65, 1)
+    ramp.color_ramp.elements[1].position = 0.74
+    ramp.color_ramp.elements[1].color = (0.42, 0.42, 0.42, 1)
     mix = ink.node_tree.nodes.new("ShaderNodeMixRGB")
     mix.blend_type = "MIX"
     mix.inputs["Color2"].default_value = (0.83, 0.82, 0.77, 1)
@@ -317,17 +341,17 @@ def build_scene():
     ink.node_tree.links.new(mix.outputs["Color"], ink.node_tree.nodes.get("Principled BSDF").inputs["Base Color"])
 
     tip = paper_position(*controls[-1][-1])
-    tip.z += 0.008
+    tip.z += 0.003
     axis = Vector((2.05, 3.50, 5.0))
     rotation = axis.to_track_quat("Z", "Y")
     length = axis.length
     crayon = groups["04 Crayon"]
     # Lathed barrel with rolled edges and a closed, softly rounded end.
-    profile = [(0.90, 0.44), (0.94, 0.50), (0.99, 0.52),
-               (length-0.18, 0.58), (length-0.09, 0.565), (length, 0.50),
-               (length+0.045, 0.37), (length+0.065, 0.18), (length+0.07, 0.015)]
+    profile = [(0.90, 0.44), (0.94, 0.50), (0.99, 0.52), (length-0.18, 0.58)]
+    profile += [(length-0.18+0.25*math.sin(a), 0.58*math.cos(a))
+                for a in ((math.pi/2-0.003)*step/16 for step in range(1, 17))]
     vertices, faces = [], []
-    segments = 96
+    segments = 144
     for height, radius in profile:
         for i in range(segments):
             angle = math.tau * i / segments
@@ -389,7 +413,7 @@ def build_scene():
     world.color = (0.55, 0.55, 0.55)
     scene.world = world
     scene.render.engine = "CYCLES"
-    scene.cycles.samples = 128
+    scene.cycles.samples = 256
     scene.cycles.use_denoising = True
     scene.render.resolution_x = scene.render.resolution_y = 1536
     scene.render.resolution_percentage = 100
@@ -400,6 +424,7 @@ def build_scene():
     scene.view_settings.view_transform = "Standard"
     scene.view_settings.exposure = 0.2
     scene["design_reference"] = "Approved generated E: a3ed518d-c235-4671-a18b-1a57c10963ae.png"
+    scene["craft_reference_ids"] = "028-018, 064-010, 039-012, 062-005, 066-016"
     scene["delivery_status"] = "Editable material study; not integrated or platform-mask verified"
     return scene
 
@@ -424,9 +449,9 @@ def lighting_variants(baseline):
             ("Key softbox", (-5, 4, 10), 364, 7, neutral),
             ("Fill softbox", (5, -3, 8), 308, 8, neutral),
             ("Rim softbox", (4, 5, 6), 235.2, 4, (0.30, 0.56, 1)),
-            ("Curl bounce", (-3.5, -4, 2.8), 39.2, 5, neutral),
+            ("Curl bounce", (-3.5, -4, 2.8), 35, 5, neutral),
             ("Red reflection", (-4, 1, 5), 145.6, 3, (1, 0.25, 0.20)),
-            ("Yellow reflection", (-4, -4, 4), 56, 4, (1, 0.75, 0.25)),
+            ("Yellow reflection", (-4, -4, 4), 28, 4, (1, 0.75, 0.25)),
             ("Green reflection", (3, -3, 5), 100.8, 4, (0.24, 1, 0.46)),
         ],
         "04-overcast": [
