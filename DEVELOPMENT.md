@@ -37,6 +37,8 @@ and layer exporter live alongside it. Generated `trace-e.png` previews and
 `layers/` exports are ignored. The assets inside `trace.icon` remain tracked
 and are the inputs used by every packaged Trace build.
 
+For known issues and fixes, see [Troubleshooting](TROUBLESHOOTING.md).
+
 Reset onboarding, calibration, window state, and Trace privacy grants:
 
 ```sh
@@ -82,6 +84,7 @@ Hardware-free checks:
 ```sh
 swift build --product trace
 TRACE_GLOBAL_SHORTCUTS_PROBE=1 .build/debug/trace
+TRACE_OPEN_FILE_PROBE=1 .build/debug/trace
 TRACE_HARDWARE_FREE_PROBE=1 .build/debug/trace
 TRACE_BUILD_ONLY=1 ./tools/trace
 TRACE_PRODUCT_TLDRAW_PROBE=1 ".build/Trace.app/Contents/MacOS/trace"

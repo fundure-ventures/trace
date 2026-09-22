@@ -73,7 +73,8 @@ one blank canvas.
 ## More detail
 
 - [Development guide](DEVELOPMENT.md) — setup, commands, architecture,
-  diagnostics, and troubleshooting
+  and diagnostics
+- [Troubleshooting](TROUBLESHOOTING.md) — known issues and fixes
 - [Architecture decision records](docs/adr/README.md) — current durable
   implementation decisions
 

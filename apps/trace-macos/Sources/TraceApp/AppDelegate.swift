@@ -72,6 +72,66 @@ enum TraceOpenFileCoordinator {
     }
 }
 
+@MainActor
+final class TraceOpenFileLifecycle {
+    typealias Completion = (Bool) -> Void
+    typealias Handler = ([String], @escaping Completion) -> Void
+
+    private struct Delivery {
+        let filenames: [String]
+        let completion: Completion
+    }
+
+    private var pending: [Delivery] = []
+    private var handler: Handler?
+
+    func receive(
+        _ filenames: [String],
+        completion: @escaping Completion = { _ in }
+    ) {
+        let delivery = Delivery(
+            filenames: filenames,
+            completion: completion
+        )
+        guard let handler else {
+            pending.append(delivery)
+            return
+        }
+        handler(delivery.filenames, delivery.completion)
+    }
+
+    func activate(_ handler: @escaping Handler) {
+        precondition(self.handler == nil)
+        self.handler = handler
+        let deliveries = pending
+        pending.removeAll()
+        for delivery in deliveries {
+            handler(delivery.filenames, delivery.completion)
+        }
+    }
+}
+
+enum TraceOpenFileForwarding {
+    static let notificationName = Notification.Name(
+        "com.traceproject.app.open-files"
+    )
+    private static let filenamesKey = "filenames"
+
+    static func payload(for filenames: [String]) -> [String: Any] {
+        [filenamesKey: filenames]
+    }
+
+    static func filenames(from payload: [AnyHashable: Any]?) -> [String]? {
+        guard let filenames = payload?[filenamesKey] as? [String],
+              !filenames.isEmpty,
+              filenames.allSatisfy({ !$0.isEmpty })
+        else {
+            return nil
+        }
+        return filenames
+    }
+}
+
 enum TracePenMenuPresentation {
     static func title(
         deviceInfo: PenDeviceInfo?,
@@ -292,6 +352,10 @@ final class TraceAppDelegate:
     private var terminationFlushInProgress = false
     private var terminationReady = false
     private var liveSessionLock: TracePenSessionLock?
+    private let openFileLifecycle = TraceOpenFileLifecycle()
+    private var openFileForwardingObserver: NSObjectProtocol?
+    private var startupErrorWorkItem: DispatchWorkItem?
+    private var forwardedOpenFiles = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
 #if DEBUG
@@ -308,10 +372,10 @@ final class TraceAppDelegate:
             do {
                 liveSessionLock = try TracePenSessionLock()
             } catch {
-                showStartupError(error)
-                NSApp.terminate(nil)
+                becomeOpenFileForwarder(startupError: error)
                 return
             }
+            startOpenFileForwardingListener()
         }
 #if DEBUG
         if environment["TRACE_PRODUCT_TLDRAW_PROBE"] == "1" {
@@ -427,6 +491,9 @@ final class TraceAppDelegate:
         model.onVoiceLevelChange = { [weak self] level in
             self?.board.updateVoiceLevel(level)
         }
+        openFileLifecycle.activate { [weak self] filenames, completion in
+            self?.handleOpenFiles(filenames, completion: completion)
+        }
         if !isUIPreview {
             configureGlobalShortcuts()
             model.start()
@@ -537,6 +604,11 @@ final class TraceAppDelegate:
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        if let openFileForwardingObserver {
+            DistributedNotificationCenter.default().removeObserver(
+                openFileForwardingObserver
+            )
+        }
         globalShortcuts.stop()
         projection.stop()
         model.stop()
@@ -586,15 +658,27 @@ final class TraceAppDelegate:
         _ sender: NSApplication,
         openFiles filenames: [String]
     ) {
+        openFileLifecycle.receive(filenames) { [weak sender] opened in
+            sender?.reply(
+                toOpenOrPrint: opened ? .success : .failure
+            )
+        }
+    }
+
+    private func handleOpenFiles(
+        _ filenames: [String],
+        completion: @escaping (Bool) -> Void
+    ) {
         guard let request = TraceOpenFilePolicy.request(
                   for: filenames
               )
         else {
-            sender.reply(toOpenOrPrint: .failure)
+            completion(false)
             return
         }
-        withFlushedTldrawSnapshot { [weak self, weak sender] in
-            guard let self, let sender else {
+        withFlushedTldrawSnapshot { [weak self] in
+            guard let self else {
+                completion(false)
                 return
             }
             let opened = TraceOpenFileCoordinator.handle(
@@ -602,10 +686,57 @@ final class TraceAppDelegate:
                 openDrawing: self.model.openDrawing(from:),
                 openImages: self.openImageSelection
             )
-            sender.reply(
-                toOpenOrPrint: opened ? .success : .failure
-            )
+            completion(opened)
         }
+    }
+
+    private func startOpenFileForwardingListener() {
+        openFileForwardingObserver = DistributedNotificationCenter.default()
+            .addObserver(
+                forName: TraceOpenFileForwarding.notificationName,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let filenames = TraceOpenFileForwarding.filenames(
+                          from: notification.userInfo
+                      )
+                else {
+                    return
+                }
+                MainActor.assumeIsolated {
+                    self?.openFileLifecycle.receive(filenames)
+                }
+            }
+    }
+
+    private func becomeOpenFileForwarder(startupError: Error) {
+        openFileLifecycle.activate { [weak self] filenames, completion in
+            DistributedNotificationCenter.default().postNotificationName(
+                TraceOpenFileForwarding.notificationName,
+                object: nil,
+                userInfo: TraceOpenFileForwarding.payload(
+                    for: filenames
+                ),
+                deliverImmediately: true
+            )
+            self?.forwardedOpenFiles = true
+            self?.startupErrorWorkItem?.cancel()
+            completion(true)
+            NSApp.terminate(nil)
+        }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, !self.forwardedOpenFiles else {
+                return
+            }
+            self.showStartupError(startupError)
+            NSApp.terminate(nil)
+        }
+        startupErrorWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + 0.5,
+            execute: workItem
+        )
     }
 
     private func configureBoard() {

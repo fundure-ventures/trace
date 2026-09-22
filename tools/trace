@@ -11,6 +11,7 @@ BUNDLE_IDENTIFIER=$(
     plutil -extract CFBundleIdentifier raw -o - \
         "$ROOT/apps/trace-macos/Trace-Info.plist"
 )
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 CLEAR_STATE=false
 
 show_help() {
@@ -51,6 +52,46 @@ running_trace_pids() {
                 }
             }
         '
+}
+
+registered_trace_apps() {
+    "$LSREGISTER" -dump 2>/dev/null |
+        awk -v bundle_id="$BUNDLE_IDENTIFIER" '
+            function emit() {
+                if (identifier == bundle_id && path != "") {
+                    print path
+                }
+                path = ""
+                identifier = ""
+            }
+            /^--------------------------------------------------------------------------------$/ {
+                emit()
+                next
+            }
+            /^path:[[:space:]]+/ {
+                path = $0
+                sub(/^path:[[:space:]]+/, "", path)
+                sub(/[[:space:]]+\(0x[[:xdigit:]]+\)$/, "", path)
+                next
+            }
+            /^identifier:[[:space:]]+/ {
+                identifier = $0
+                sub(/^identifier:[[:space:]]+/, "", identifier)
+            }
+            END {
+                emit()
+            }
+        '
+}
+
+register_current_app() {
+    local registered_app
+    while IFS= read -r registered_app; do
+        if [[ -n "$registered_app" && "$registered_app" != "$APP" ]]; then
+            "$LSREGISTER" -u "$registered_app" >/dev/null 2>&1 || true
+        fi
+    done < <(registered_trace_apps)
+    "$LSREGISTER" -f "$APP"
 }
 
 clear_trace_state() {
@@ -136,5 +177,6 @@ if [[ "${TRACE_BUILD_ONLY:-0}" == "1" ]]; then
 fi
 
 "$ROOT/tools/quit-running-app" "$BUNDLE_IDENTIFIER"
+register_current_app
 open "$APP"
 "$ROOT/tools/wait-for-running-app" "$BUNDLE_IDENTIFIER"

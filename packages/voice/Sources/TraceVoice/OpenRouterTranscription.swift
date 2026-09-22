@@ -550,14 +550,28 @@ private struct OpenRouterTranscriptionRequest: Encodable {
                 struct EnhancedMode: Encodable {
                     struct ModelOptions: Encodable {
                         let transcribeStyle: String
+
+                        enum CodingKeys: String, CodingKey {
+                            case transcribeStyle = "transcribe_style"
+                        }
                     }
 
                     let modelOptions: ModelOptions
+
+                    enum CodingKeys: String, CodingKey {
+                        case modelOptions = "model_options"
+                    }
                 }
 
                 let diarization: Diarization
                 let phraseList: PhraseList
                 let enhancedMode: EnhancedMode
+
+                enum CodingKeys: String, CodingKey {
+                    case diarization
+                    case phraseList = "phrase_list"
+                    case enhancedMode = "enhanced_mode"
+                }
             }
 
             let azure: Azure
