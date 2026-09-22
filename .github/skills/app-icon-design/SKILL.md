@@ -167,6 +167,13 @@ Keep original source artwork separate from export files.
 
 For reference-analysis work, retain provenance, native crop dimensions,
 timestamps, and uncertainty. Uniform comparison canvases do not recover detail
-from low-resolution references. Do not treat photographed colors as exact
+from low-resolution references. For photographed square tiles, correct the
+projected quadrilateral before normalizing size: fit straight side segments,
+ignore the rounded corners, and map their intersections to a square. A square
+output canvas or a stretched bounding box is not perspective correction.
+Keep the untouched crop and distinguish measured edges from estimated corners.
+Flag clipped or ambiguous boundaries rather than manufacturing a complete tile;
+do not flatten intentional perspective inside the artwork.
+Do not treat photographed colors as exact
 design tokens or an illustrated book's historical exports as current platform
 requirements.
