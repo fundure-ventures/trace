@@ -743,9 +743,10 @@ Task {
               let options = provider["options"] as? [String: Any],
               let azure = options["azure"] as? [String: Any],
               let diarization = azure["diarization"] as? [String: Any],
-              let enhancedMode = azure["enhancedMode"] as? [String: Any],
+              let phraseList = azure["phrase_list"] as? [String: Any],
+              let enhancedMode = azure["enhanced_mode"] as? [String: Any],
               let modelOptions =
-                  enhancedMode["modelOptions"] as? [String: Any]
+                  enhancedMode["model_options"] as? [String: Any]
         else {
             throw TestFailure(description: "request JSON shape changed")
         }
@@ -767,8 +768,15 @@ Task {
         )
         try expect(
             diarization["enabled"] as? Bool == true
-                && modelOptions["transcribeStyle"] as? String == "clean",
-            "Azure diarization or clean transcript options changed"
+                && phraseList["phrases"] as? [String]
+                    == [
+                        "Trace",
+                        "OpenRouter",
+                        "MAI-Transcribe",
+                        "Neo Smartpen",
+                    ]
+                && modelOptions["transcribe_style"] as? String == "clean",
+            "Azure Dictation option encoding changed"
         )
     }
 
