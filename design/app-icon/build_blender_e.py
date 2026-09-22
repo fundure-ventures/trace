@@ -110,20 +110,29 @@ def mac_window(collection, silver, white, header):
     shell.data.polygons[-2].material_index = 1
     shell.data.polygons[-1].material_index = 2
 
-    for index, (name, color) in enumerate((
-        ("close", (0.90, 0.052, 0.036)),
-        ("minimize", (1.0, 0.51, 0.018)),
-        ("zoom", (0.028, 0.52, 0.06)),
+    def linear_rgb(rgb):
+        return tuple(c/255/12.92 if c/255 <= 0.04045 else ((c/255+0.055)/1.055)**2 for c in rgb)
+
+    # Sampled from the supplied golden reference after converting its ICC profile to sRGB.
+    for index, (name, top_rgb, bottom_rgb, neutral_gain) in enumerate((
+        ("close", (252, 110, 101), (246, 142, 134), (1.04, 0.81, 0.79)),
+        ("minimize", (252, 188, 45), (254, 211, 73), (1.06, 0.97, 0.59)),
+        ("zoom", (103, 208, 57), (156, 221, 127), (0.82, 0.98, 0.70)),
     )):
-        lens = material("E - Aqua " + name, color, 0.22)
+        top, bottom = linear_rgb(top_rgb), linear_rgb(bottom_rgb)
+        # Extend the interior samples to the rim, then compensate measured neutral-rig albedo gain.
+        top, bottom = (
+            tuple(max(0, t-0.3*(b-t))*0.84*g for t, b, g in zip(top, bottom, neutral_gain)),
+            tuple(min(1, b+0.3*(b-t))*0.84*g for t, b, g in zip(top, bottom, neutral_gain)),
+        )
+        lens = material("E - Aqua " + name, top, 0.60)
         shader = lens.node_tree.nodes.get("Principled BSDF")
-        shader.inputs["Coat Weight"].default_value = 0.4
-        shader.inputs["Coat Roughness"].default_value = 0.12
-        rim = material("E - Aqua rim " + name, tuple(c*0.46 for c in color), 0.30)
-        x = (-3.43+index*0.34+0.45)*1.12-0.10
+        shader.inputs["Specular IOR Level"].default_value = 0.008
+        rim = material("E - Aqua rim " + name, tuple(c*0.76 for c in top), 0.55)
+        x = (-3.43+index*0.36+0.45)*1.12-0.10
         y = (3.48-0.30)*1.08*1.065+0.55
-        profile = [(0.123, 0.134), (0.123, 0.145), (0.114, 0.153),
-                   (0.102, 0.175), (0.070, 0.195), (0.035, 0.202), (0.002, 0.205)]
+        profile = [(0.123, 0.134), (0.123, 0.141), (0.114, 0.146),
+                   (0.102, 0.151), (0.070, 0.157), (0.035, 0.159), (0.002, 0.160)]
         vertices, faces = [], []
         segments = 64
         for r, z in profile:
@@ -138,6 +147,13 @@ def mac_window(collection, silver, white, header):
         faces.append(tuple((len(profile)-1)*segments+i for i in range(segments)))
         button = mesh_object("Aqua " + name, vertices, faces, collection, rim)
         button.data.materials.append(lens)
+        attribute = button.data.color_attributes.new(name="Control gradient", type="FLOAT_COLOR", domain="POINT")
+        for vertex, datum in zip(button.data.vertices, attribute.data):
+            t = max(0, min(1, (1-(vertex.co.y-y)/0.114)/2))
+            datum.color = (*(top[k]*(1-t)+bottom[k]*t for k in range(3)), 1)
+        color_node = lens.node_tree.nodes.new("ShaderNodeVertexColor")
+        color_node.layer_name = "Control gradient"
+        lens.node_tree.links.new(color_node.outputs["Color"], shader.inputs["Base Color"])
         for polygon in button.data.polygons:
             polygon.use_smooth = len(polygon.vertices) == 4
             if polygon.index > 2*segments:
