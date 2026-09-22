@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1454" height="1454" viewBox="0 0 1454 1454">
+  <title>Trace — tracing vellum and four-color wax, composition 17</title>
+  <desc>Editable material concept. A portrait translucent tracing sheet curls over a glass Mac window. A black wax crayon extends beyond the sheet and draws a pressure-varying red, yellow, green and blue waveform. Native Icon Composer rendering is not represented by this illustration.</desc>
+  <defs>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#f6fcff" stop-opacity=".95"/>
+      <stop offset=".24" stop-color="#d3e4ec" stop-opacity=".73"/>
+      <stop offset=".58" stop-color="#eef5fa" stop-opacity=".84"/>
+      <stop offset="1" stop-color="#b7c7d4" stop-opacity=".91"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffffff"/><stop offset=".48" stop-color="#ffffff" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#8c9fac" stop-opacity=".75"/>
+    </linearGradient>
+    <linearGradient id="vellum" x1="0" y1="0" x2="1" y2=".6">
+      <stop stop-color="#fffef7" stop-opacity=".82"/>
+      <stop offset=".5" stop-color="#fffef9" stop-opacity=".73"/>
+      <stop offset="1" stop-color="#f9f8ed" stop-opacity=".85"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#d2d3ca"/><stop offset=".38" stop-color="#eeeee4"/>
+      <stop offset=".7" stop-color="#fffff9"/><stop offset="1" stop-color="#cacdc4"/>
+    </linearGradient>
+    <linearGradient id="ink" gradientUnits="userSpaceOnUse" x1="350" y1="910" x2="940" y2="860">
+      <stop stop-color="#e5434d"/><stop offset=".22" stop-color="#f05b3c"/>
+      <stop offset=".43" stop-color="#edbe31"/><stop offset=".64" stop-color="#39ae68"/>
+      <stop offset=".83" stop-color="#298fd5"/><stop offset="1" stop-color="#4268d9"/>
+    </linearGradient>
+    <linearGradient id="blackPaper" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#17191d"/><stop offset=".12" stop-color="#292c30"/>
+      <stop offset=".35" stop-color="#42454a"/><stop offset=".58" stop-color="#25272b"/>
+      <stop offset=".85" stop-color="#16181c"/><stop offset="1" stop-color="#0e1014"/>
+    </linearGradient>
+    <linearGradient id="redWax" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ef6660"/><stop offset="1" stop-color="#b83242"/>
+    </linearGradient>
+    <linearGradient id="yellowWax" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffe081"/><stop offset="1" stop-color="#deaa22"/>
+    </linearGradient>
+    <linearGradient id="greenWax" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#78c58b"/><stop offset="1" stop-color="#238854"/>
+    </linearGradient>
+    <linearGradient id="blueWax" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#72aff0"/><stop offset="1" stop-color="#355bc0"/>
+    </linearGradient>
+    <filter id="windowShadow" x="-.3" y="-.2" width="1.6" height="1.6">
+      <feDropShadow dx="0" dy="16" stdDeviation="15" flood-color="#30465b" flood-opacity=".14"/>
+    </filter>
+    <filter id="paperShadow" x="-.3" y="-.2" width="1.6" height="1.6">
+      <feDropShadow dx="5" dy="9" stdDeviation="9" flood-color="#414b4f" flood-opacity=".16"/>
+    </filter>
+    <filter id="crayonShadow" x="-.8" y="-.3" width="2.6" height="1.6">
+      <feDropShadow dx="8" dy="12" stdDeviation="11" flood-color="#212d3d" flood-opacity=".2"/>
+    </filter>
+    <filter id="frost" x="-.15" y="-.15" width="1.3" height="1.3">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+    <filter id="grain" x="0" y="0" width="1" height="1">
+      <feTurbulence type="fractalNoise" baseFrequency=".6" numOctaves="3" seed="17"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".065"/></feComponentTransfer>
+      <feComposite in2="SourceGraphic" operator="in"/>
+      <feBlend in2="SourceGraphic" mode="multiply"/>
+    </filter>
+    <clipPath id="windowClip"><path d="M170 199 L963 172 Q986 171 987 194 L1011 1083 Q1012 1106 989 1107 L197 1133 Q175 1134 174 1110 L151 224 Q150 200 170 199Z"/></clipPath>
+    <clipPath id="paperClip"><path d="M195 337 L1009 244 L1094 1190 L445 1262 Q424 1263 410 1248 L271 1084 Q258 1068 257 1048Z"/></clipPath>
+  </defs>
+  <g id="01-glass-window" filter="url(#windowShadow)">
+    <path d="M170 199 L963 172 Q986 171 987 194 L1011 1083 Q1012 1106 989 1107 L197 1133 Q175 1134 174 1110 L151 224 Q150 200 170 199Z" fill="url(#glass)" stroke="#98a8b4" stroke-opacity=".8" stroke-width="2"/>
+    <g clip-path="url(#windowClip)">
+      <path d="M157 207 L981 179 L985 267 L159 295Z" fill="#ffffff" fill-opacity=".48"/>
+      <path d="M159 295 L985 267" fill="none" stroke="#8b9dab" stroke-opacity=".33" stroke-width="2"/>
+      <path d="M163 301 L322 296 L346 1130 L184 1135Z" fill="#a9bdcb" fill-opacity=".24"/>
+      <g fill="#698395" opacity=".19" filter="url(#frost)">
+        <rect x="210" y="375" width="79" height="11" rx="5"/>
+        <rect x="212" y="420" width="101" height="11" rx="5"/>
+        <rect x="214" y="465" width="72" height="11" rx="5"/>
+        <rect x="380" y="385" width="339" height="22" rx="10"/>
+        <rect x="383" y="438" width="448" height="12" rx="6"/>
+        <rect x="385" y="472" width="377" height="12" rx="6"/>
+        <rect x="389" y="525" width="413" height="165" rx="19" fill="#9ab3c5"/>
+      </g>
+      <path d="M157 220 Q154 204 174 205 L961 179" fill="none" stroke="white" stroke-width="6" opacity=".9"/>
+      <path d="M183 1102 L205 1119 L989 1098" fill="none" stroke="white" stroke-width="4" opacity=".55"/>
+    </g>
+    <g transform="translate(202 249) rotate(-2)">
+      <circle r="12" fill="#e16b65"/><circle cx="59" r="12" fill="#dfba61"/><circle cx="118" r="12" fill="#78b991"/>
+      <g fill="white" opacity=".38"><ellipse cy="-5" rx="7" ry="3"/><ellipse cx="59" cy="-5" rx="7" ry="3"/><ellipse cx="118" cy="-5" rx="7" ry="3"/></g>
+    </g>
+    <path d="M170 199 L963 172 Q986 171 987 194 L1011 1083 Q1012 1106 989 1107 L197 1133 Q175 1134 174 1110 L151 224 Q150 200 170 199Z" fill="none" stroke="url(#rim)" stroke-width="4"/>
+  </g>
+  <g id="02-tracing-paper" filter="url(#paperShadow)">
+    <path d="M195 337 L1009 244 L1094 1190 L445 1262 Q424 1263 410 1248 L271 1084 Q258 1068 257 1048Z" fill="url(#vellum)" stroke="#b8beb9" stroke-opacity=".68" stroke-width="2" filter="url(#grain)"/>
+    <path d="M200 341 L1005 249 L1089 1186" fill="none" stroke="white" stroke-opacity=".94" stroke-width="3"/>
+    <path d="M272 1086 Q335 1111 399 1092 Q409 1192 442 1259 Q358 1195 272 1086Z" fill="#a8afa5" opacity=".2"/>
+    <path d="M258 1057 Q303 1080 400 1088 Q397 1199 445 1262 Q347 1184 271 1084 Q263 1075 258 1057Z" fill="url(#fold)" stroke="#c6cac1" stroke-width="1.5"/>
+    <path d="M260 1059 Q304 1085 400 1088 Q400 1190 445 1262" fill="none" stroke="#fffffb" stroke-width="3"/>
+    <path d="M264 1067 Q343 1156 440 1254" fill="none" stroke="#b5bcb1" stroke-opacity=".7" stroke-width="2"/>
+  </g>
+  <g id="03-voice-ink" clip-path="url(#paperClip)">
+    <path d="M352 979
+      C407 910 450 773 511 731
+      C554 699 588 729 620 777
+      C655 830 675 895 716 912
+      C757 930 794 895 821 860
+      C845 829 861 824 888 837
+      C907 847 920 854 934 850
+      L934 857
+      C918 865 898 853 882 847
+      C858 838 848 845 829 870
+      C798 911 759 954 711 934
+      C659 913 642 844 609 790
+      C578 740 551 716 519 742
+      C463 784 415 924 352 979Z"
+      fill="url(#ink)" filter="url(#grain)"/>
+  </g>
+  <g id="04-four-color-crayon" transform="translate(934 853) rotate(28)">
+    <g filter="url(#crayonShadow)">
+      <path d="M-73 -180 L-79 -734 Q-80 -767 -47 -778 Q0 -790 47 -778 Q80 -767 79 -734 L73 -180 Q0 -153 -73 -180Z" fill="url(#blackPaper)" stroke="#17191d" stroke-width="2" filter="url(#grain)"/>
+      <ellipse cy="-751" rx="77" ry="29" fill="#33363c"/>
+      <ellipse cy="-758" rx="68" ry="20" fill="#45494e"/>
+      <path d="M-69 -743 Q-57 -764 -33 -764" fill="none" stroke="#777b7e" stroke-opacity=".65" stroke-width="3"/>
+      <path d="M-61 -722 L-57 -202" fill="none" stroke="#8f9296" stroke-opacity=".23" stroke-width="4"/>
+      <path d="M56 -722 L54 -197" fill="none" stroke="#090b10" stroke-opacity=".6" stroke-width="3"/>
+      <path d="M-73 -180 Q-61 -197 -36 -190 L0 -2 Q-8 -3 -15 -21Z" fill="url(#redWax)"/>
+      <path d="M-36 -190 Q-14 -194 0 -190 L2 -1 L0 -2Z" fill="url(#yellowWax)"/>
+      <path d="M0 -190 Q20 -194 37 -187 L7 -16 L2 -1Z" fill="url(#greenWax)"/>
+      <path d="M37 -187 Q60 -192 73 -180 L15 -25 Q10 -10 2 -1Z" fill="url(#blueWax)"/>
+      <path d="M-36 -186 L-2 -14" fill="none" stroke="#ffedb1" stroke-opacity=".45" stroke-width="2"/>
+      <path d="M37 -182 L7 -17" fill="none" stroke="#142658" stroke-opacity=".25" stroke-width="2"/>
+      <path d="M-73 -184 Q-2 -159 73 -184" fill="none" stroke="#0c0e12" stroke-width="7"/>
+      <path d="M-66 -198 Q-6 -177 66 -198" fill="none" stroke="#74767b" stroke-opacity=".32" stroke-width="2"/>
+    </g>
+  </g>
+</svg>
