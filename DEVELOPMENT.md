@@ -32,6 +32,11 @@ icon metadata before signing. Edit the source in Icon Composer and rebuild;
 the standalone Blender PNGs are not used as the application icon. Use an Xcode
 version that supports the source's Icon Composer features (verified with Xcode 27).
 
+The editable artwork is `design/app-icon/trace-e.blend`; the Python builder
+and layer exporter live alongside it. Generated `trace-e.png` previews and
+`layers/` exports are ignored. The assets inside `trace.icon` remain tracked
+and are the inputs used by every packaged Trace build.
+
 Reset onboarding, calibration, window state, and Trace privacy grants:
 
 ```sh
