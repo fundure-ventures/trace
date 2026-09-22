@@ -120,6 +120,15 @@ cp -R "$WEB_ROOT/dist" "$WEB_RESOURCES"
 "$ROOT/tools/copy-swiftpm-resource-bundles" \
     "$BIN_DIRECTORY" \
     "$CONTENTS/Resources"
+ICON_INFO_PLIST="$ROOT/.build/trace-icon-info.plist"
+xcrun actool "$ROOT/design/app-icon/trace.icon" \
+    --compile "$CONTENTS/Resources" \
+    --platform macosx \
+    --minimum-deployment-target 13.0 \
+    --app-icon trace \
+    --output-partial-info-plist "$ICON_INFO_PLIST" \
+    --output-format human-readable-text
+/usr/libexec/PlistBuddy -c "Merge $ICON_INFO_PLIST" "$CONTENTS/Info.plist"
 "$ROOT/tools/sign-app" "$APP"
 
 if [[ "${TRACE_BUILD_ONLY:-0}" == "1" ]]; then
