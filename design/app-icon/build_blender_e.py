@@ -66,8 +66,8 @@ def rounded_panel(name, width, height, radius, z, collection, mat, center=(0, 0)
 
 def paper_position(x, y):
     # Bend only the diagonal lower-left corner; preserve surface arc length.
-    distance = max(0, 2.8 - ((x + 2.95) + (y + 3.45))) / math.sqrt(2)
-    radius = 0.70
+    distance = max(0, 2.7 - ((x + 2.95) + (y + 3.45))) / math.sqrt(2)
+    radius = 0.75
     angle = distance / radius
     inset = (distance - radius * math.sin(angle)) / math.sqrt(2)
     z = 0.25 + radius * (1 - math.cos(angle))
@@ -90,8 +90,8 @@ def build_scene():
         groups[name] = group
 
     white = material("E - porcelain white", (0.88, 0.88, 0.865), 0.65)
-    silver = material("E - satin window edge", (0.53, 0.55, 0.58), 0.34)
-    header = material("E - macOS title bar", (0.72, 0.73, 0.75), 0.52)
+    silver = material("E - satin window edge", (0.43, 0.47, 0.53), 0.34)
+    header = material("E - macOS title bar", (0.63, 0.66, 0.71), 0.52)
     black = material("E - charcoal wax wrapper", (0.005, 0.006, 0.007), 0.48, 0.012)
     black.node_tree.nodes.get("Principled BSDF").inputs["Specular IOR Level"].default_value = 0.4
     paper = material("E - translucent vellum", (0.89, 0.88, 0.83), 0.78, 0.006)
@@ -154,9 +154,9 @@ def build_scene():
     # A thin ribbon carries the color and pressure, not a round plastic tube.
     controls = [
         ((-2.50, -0.93), (-2.05, -0.65), (-1.94, 1.22), (-1.28, 1.22)),
-        ((-1.28, 1.22), (-0.62, 1.22), (-0.85, -1.13), (-0.40, -1.13)),
-        ((-0.40, -1.13), (0.03, -1.13), (0.01, -0.22), (0.40, -0.22)),
-        ((0.40, -0.22), (0.68, -0.22), (0.76, -1.08), (1.03, -0.82)),
+        ((-1.28, 1.22), (-0.62, 1.22), (-0.85, -1.13), (-0.48, -1.13)),
+        ((-0.48, -1.13), (-0.04, -1.13), (-0.04, -0.06), (0.35, -0.06)),
+        ((0.35, -0.06), (0.66, -0.06), (0.76, -1.08), (1.03, -0.82)),
     ]
     controls = [tuple((p[0]*1.12/1.22 + 0.15*math.cos(math.radians(9))/1.22,
                        p[1] - 0.15*math.sin(math.radians(9))/1.05)
@@ -171,13 +171,17 @@ def build_scene():
     centers.append(Vector(controls[-1][-1]))
     vertices, faces, vertex_colors = [], [], []
     stops = [(0, colors[0]), (0.20, colors[0]), (0.33, colors[1]),
-             (0.50, colors[2]), (0.70, colors[2]), (1, colors[3])]
+             (0.50, colors[2]), (0.64, colors[2]), (1, colors[3])]
     for i, point in enumerate(centers):
         t = i / (len(centers) - 1)
         tangent = centers[min(i + 1, len(centers) - 1)] - centers[max(i - 1, 0)]
         normal = Vector((-tangent.y, tangent.x)).normalized()
         width = (0.067 + 0.025 * math.sin(t * math.tau * 1.4)**2) * min(1, t * 17 + 0.015)
+        if t > 0.5:
+            width *= 1 + 0.16 * math.sin(math.pi * (t-0.5)/0.5)**2
+        width *= 1 + 0.09*math.sin(t*math.tau*3.4+0.6) + 0.04*math.sin(t*math.tau*7.3)
         width *= 1 + 0.04*math.sin(i*2.39) + 0.02*math.sin(i*7.13)
+        point = point + normal * (0.014 * math.sin(t*math.tau*6) * math.sin(math.pi*t))
         for left, right in zip(stops, stops[1:]):
             if left[0] <= t <= right[0]:
                 blend = (t-left[0])/(right[0]-left[0])
@@ -275,13 +279,15 @@ def build_scene():
         ("Key softbox", (-5, -3, 10), 1100, 5),
         ("Fill softbox", (5, 0, 8), 350, 6),
         ("Rim softbox", (0, 7, 9), 500, 5),
+        ("Curl bounce", (-3.5, -4, 2.8), 15, 3),
     ):
         data = bpy.data.lights.new(name, "AREA")
         data.energy, data.shape, data.size = power, "DISK", size
         obj = bpy.data.objects.new(name, data)
         studio.objects.link(obj)
         obj.location = location
-        obj.rotation_euler = (-obj.location).to_track_quat("-Z", "Y").to_euler()
+        light_target = Vector((-1.6, -2.4, 0.35)) if name == "Curl bounce" else Vector((0, 0, 0))
+        obj.rotation_euler = (light_target-obj.location).to_track_quat("-Z", "Y").to_euler()
     world = bpy.data.worlds.new("E neutral studio")
     world.color = (0.55, 0.55, 0.55)
     scene.world = world
