@@ -258,6 +258,7 @@ fi
 resolver_line=$(grep -nF 'resolve-xcode-developer-dir' "$LAUNCHER" | head -n 1 | cut -d: -f1)
 build_only_line=$(grep -nF 'if [[ "${TRACE_BUILD_ONLY:-0}" == "1" ]]' "$LAUNCHER" | tail -n 1 | cut -d: -f1)
 resources_line=$(grep -nF 'copy-swiftpm-resource-bundles' "$LAUNCHER" | head -n 1 | cut -d: -f1)
+version_line=$(grep -nF 'plutil -replace CFBundleShortVersionString' "$LAUNCHER" | head -n 1 | cut -d: -f1)
 sign_line=$(grep -nF 'sign-app' "$LAUNCHER" | head -n 1 | cut -d: -f1)
 quit_line=$(grep -nF 'quit-running-app' "$LAUNCHER" | head -n 1 | cut -d: -f1)
 open_line=$(grep -nF 'open "$APP"' "$LAUNCHER" | tail -n 1 | cut -d: -f1)
@@ -265,6 +266,7 @@ wait_line=$(grep -nF 'wait-for-running-app' "$LAUNCHER" | head -n 1 | cut -d: -f
 
 if ! [[ "$resolver_line" -lt "$resources_line" &&
     "$resources_line" -lt "$sign_line" &&
+    "$version_line" -lt "$sign_line" &&
     "$sign_line" -lt "$build_only_line" &&
     "$build_only_line" -lt "$quit_line" &&
     "$quit_line" -lt "$open_line" &&
@@ -277,6 +279,8 @@ grep -Fq 'resolve-macos-sdk' "$LAUNCHER"
 grep -Fq -- '--sdk "$MACOS_SDK"' "$LAUNCHER"
 grep -Fq -- '-platform_version' "$LAUNCHER"
 grep -Fq -- '"$MACOS_SDK_VERSION"' "$LAUNCHER"
+grep -Fq 'plutil -replace CFBundleShortVersionString' "$LAUNCHER"
+grep -Fq 'plutil -replace CFBundleVersion' "$LAUNCHER"
 
 icon_line=$(grep -nF 'xcrun actool' "$LAUNCHER" | head -n 1 | cut -d: -f1)
 icon_merge_line=$(grep -nF 'Merge $ICON_INFO_PLIST' "$LAUNCHER" | head -n 1 | cut -d: -f1)

@@ -156,6 +156,24 @@ BIN_DIRECTORY=$("$SWIFT" build "${BUILD_ARGS[@]}" --show-bin-path)
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 cp "$BIN_DIRECTORY/trace" "$CONTENTS/MacOS/trace"
 cp "$ROOT/apps/trace-macos/Trace-Info.plist" "$CONTENTS/Info.plist"
+if [[ -n "${TRACE_VERSION:-}" ]]; then
+    if [[ ! "$TRACE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "error: TRACE_VERSION must use MAJOR.MINOR.PATCH." >&2
+        exit 64
+    fi
+    plutil -replace CFBundleShortVersionString \
+        -string "$TRACE_VERSION" \
+        "$CONTENTS/Info.plist"
+fi
+if [[ -n "${TRACE_BUILD_NUMBER:-}" ]]; then
+    if [[ ! "$TRACE_BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+        echo "error: TRACE_BUILD_NUMBER must be a positive integer." >&2
+        exit 64
+    fi
+    plutil -replace CFBundleVersion \
+        -string "$TRACE_BUILD_NUMBER" \
+        "$CONTENTS/Info.plist"
+fi
 rm -rf "$WEB_RESOURCES"
 cp -R "$WEB_ROOT/dist" "$WEB_RESOURCES"
 "$ROOT/tools/copy-swiftpm-resource-bundles" \

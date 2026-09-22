@@ -1,0 +1,64 @@
+#!/bin/bash
+set -eu
+
+if (($# != 2)); then
+    echo "usage: tools/package-notarized-release APP OUTPUT_ZIP" >&2
+    exit 64
+fi
+
+APP=$1
+OUTPUT_ZIP=$2
+
+if [[ ! -d "$APP" ]]; then
+    echo "error: missing app bundle: $APP" >&2
+    exit 66
+fi
+
+if [[ -n "${TRACE_NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
+    NOTARY_AUTH=(
+        --keychain-profile "$TRACE_NOTARY_KEYCHAIN_PROFILE"
+    )
+elif [[ -n "${TRACE_NOTARY_KEY_PATH:-}"
+    && -n "${TRACE_NOTARY_KEY_ID:-}"
+    && -n "${TRACE_NOTARY_ISSUER_ID:-}" ]]; then
+    if [[ ! -f "$TRACE_NOTARY_KEY_PATH" ]]; then
+        echo "error: missing notarization API key: $TRACE_NOTARY_KEY_PATH" >&2
+        exit 66
+    fi
+    NOTARY_AUTH=(
+        --key "$TRACE_NOTARY_KEY_PATH"
+        --key-id "$TRACE_NOTARY_KEY_ID"
+        --issuer "$TRACE_NOTARY_ISSUER_ID"
+    )
+else
+    echo \
+        "error: notarization credentials are required; set a keychain profile or API key variables." \
+        >&2
+    exit 64
+fi
+
+TEMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/trace-notarization.XXXXXX")
+cleanup() {
+    rm -rf "$TEMP_ROOT"
+}
+trap cleanup EXIT
+
+SUBMISSION_ZIP="$TEMP_ROOT/Trace.zip"
+mkdir -p "$(dirname "$OUTPUT_ZIP")"
+
+ditto -c -k --sequesterRsrc --keepParent "$APP" "$SUBMISSION_ZIP"
+xcrun notarytool submit \
+    "$SUBMISSION_ZIP" \
+    "${NOTARY_AUTH[@]}" \
+    --wait
+xcrun stapler staple "$APP"
+xcrun stapler validate "$APP"
+spctl --assess --type execute --verbose=4 "$APP"
+
+rm -f "$OUTPUT_ZIP" "$OUTPUT_ZIP.sha256"
+ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUTPUT_ZIP"
+(
+    cd "$(dirname "$OUTPUT_ZIP")"
+    shasum -a 256 "$(basename "$OUTPUT_ZIP")" \
+        > "$(basename "$OUTPUT_ZIP").sha256"
+)

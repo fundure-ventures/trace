@@ -1,0 +1,99 @@
+name: Build signed release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version in MAJOR.MINOR.PATCH form
+        required: true
+        type: string
+      build_number:
+        description: Positive integer build number
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Sign and notarize
+    runs-on: xcode-27
+    environment: production
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Import Developer ID certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.APPLE_SIGNING_KEYCHAIN_PASSWORD }}
+        run: |
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+          keychain_path="$RUNNER_TEMP/trace-signing.keychain-db"
+
+          printf '%s' "$CERTIFICATE_BASE64" |
+            base64 --decode -o "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$keychain_path"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          printf 'TRACE_SIGNING_KEYCHAIN=%s\n' "$keychain_path" \
+            >> "$GITHUB_ENV"
+
+      - name: Install notarization API key
+        env:
+          NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_API_KEY_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+        run: |
+          key_path="$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
+          printf '%s' "$NOTARY_KEY_BASE64" |
+            base64 --decode -o "$key_path"
+          chmod 600 "$key_path"
+          printf 'TRACE_NOTARY_KEY_PATH=%s\n' "$key_path" >> "$GITHUB_ENV"
+
+      - name: Build, sign, and notarize
+        env:
+          TRACE_CODE_SIGN_IDENTITY: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_IDENTITY }}
+          TRACE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          TRACE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          VITE_TLDRAW_LICENSE_KEY: ${{ secrets.VITE_TLDRAW_LICENSE_KEY }}
+        run: |
+          ./tools/build-signed-release \
+            "${{ inputs.version }}" \
+            "${{ inputs.build_number }}"
+
+      - name: Upload signed artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Trace-${{ inputs.version }}-${{ inputs.build_number }}
+          path: |
+            .build/release/Trace-${{ inputs.version }}-${{ inputs.build_number }}.zip
+            .build/release/Trace-${{ inputs.version }}-${{ inputs.build_number }}.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove temporary keychain
+        if: always()
+        run: |
+          if [[ -n "${TRACE_SIGNING_KEYCHAIN:-}" ]]; then
+            security delete-keychain "$TRACE_SIGNING_KEYCHAIN" || true
+          fi

@@ -5,5 +5,10 @@ logs/
 .mimo/
 .impeccable/
 .env
+*.cer
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
 /design/app-icon/trace-e.png
 /design/app-icon/layers/

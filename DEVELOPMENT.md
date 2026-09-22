@@ -65,6 +65,57 @@ bun install --frozen-lockfile
 bun run build
 ```
 
+## Production signing
+
+The direct-download release path uses the same SwiftPM app packager as local
+development, with release optimization, explicit version injection, Developer
+ID signing, hardened runtime, notarization, stapling, and Gatekeeper
+verification. It does not require opening Xcode.
+
+Required local credentials:
+
+- A `Developer ID Application` certificate installed in a keychain.
+- An App Store Connect API key authorized for notarization, or a notarytool
+  keychain profile.
+- The production `VITE_TLDRAW_LICENSE_KEY` in the environment.
+
+Store API credentials locally once:
+
+```sh
+xcrun notarytool store-credentials trace-notary \
+  --key /path/to/AuthKey_KEYID.p8 \
+  --key-id KEYID \
+  --issuer ISSUER_ID
+```
+
+Build a signed and notarized archive:
+
+```sh
+TRACE_CODE_SIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
+TRACE_NOTARY_KEYCHAIN_PROFILE=trace-notary \
+VITE_TLDRAW_LICENSE_KEY="..." \
+./tools/build-signed-release 0.2.0 2
+```
+
+The command writes `.build/release/Trace-0.2.0-2.zip` and its SHA-256 file.
+Release artifacts, certificates, API keys, provisioning profiles, `.env`, and
+all `.build/` contents are ignored. Signing scripts, entitlements, workflows,
+and source `Info.plist` defaults are versioned.
+
+The manual **Build signed release** GitHub Actions workflow currently uploads
+the notarized ZIP as a short-lived workflow artifact. It intentionally does
+not create a GitHub Release or changelog yet. Configure its protected
+`production` environment with:
+
+- `APPLE_DEVELOPER_ID_CERTIFICATE_BASE64`
+- `APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD`
+- `APPLE_DEVELOPER_ID_APPLICATION_IDENTITY`
+- `APPLE_SIGNING_KEYCHAIN_PASSWORD`
+- `APPLE_NOTARY_API_KEY_BASE64`
+- `APPLE_NOTARY_KEY_ID`
+- `APPLE_NOTARY_ISSUER_ID`
+- `VITE_TLDRAW_LICENSE_KEY`
+
 ## Test
 
 ```sh
