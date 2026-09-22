@@ -179,6 +179,24 @@ def paper_position(x, y, curl_span=2.7, radius=0.75, tilt_degrees=9):
     ))
 
 
+def a4_paper_position(u, v):
+    width = 5.7
+    height = width * 297 / 210
+    x, y = width*(u-0.5), height*(v-0.5)
+    # Curl in physical sheet coordinates so the undeformed sheet remains A4.
+    distance = max(0, 2.5 - (width*u + height*v)) / math.sqrt(2)
+    radius = 0.68
+    angle = distance / radius
+    inset = (distance - radius*math.sin(angle)) / math.sqrt(2)
+    x, y = x+inset, y+inset
+    tilt = math.radians(4)
+    return Vector((
+        x*math.cos(tilt) - y*math.sin(tilt) - 0.12,
+        x*math.sin(tilt) + y*math.cos(tilt) + 0.012,
+        0.25 + radius*(1-math.cos(angle)),
+    ))
+
+
 def build_scene():
     scene = bpy.data.scenes.new("Trace E - material study")
     bpy.context.window.scene = scene
@@ -239,12 +257,7 @@ def build_scene():
     nx, ny = 100, 116
     for j in range(ny + 1):
         for i in range(nx + 1):
-            position = paper_position(-2.95 + 5.9 * i / nx, -3.45 + 6.9 * j / ny,
-                                      curl_span=1.5, radius=0.55, tilt_degrees=4)
-            # Inset the sheet, not the ink or pen, to expose a continuous window margin.
-            position.x = position.x*0.92 - 0.12
-            position.y = position.y*0.87 + 0.36
-            vertices.append(position)
+            vertices.append(a4_paper_position(i / nx, j / ny))
     for j in range(ny):
         for i in range(nx):
             k = j * (nx + 1) + i

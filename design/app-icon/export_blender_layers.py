@@ -3,6 +3,8 @@
 Run: blender --background design/app-icon/trace-e.blend --python-exit-code 1 \
 --python design/app-icon/export_blender_layers.py
 
+Append -- --layer paper to export only paper (also: window-chrome, trace, pen).
+
 Outputs use the original full canvas and camera, ordered back to front.
 Lighting and self-shading are baked in; inter-layer shadows and refraction are
 not. Stacking these PNGs cannot exactly reproduce the full-scene render or
@@ -10,13 +12,15 @@ dynamically blur content behind the vellum. These are artwork layers, not a
 validated Icon Composer document.
 """
 
+import argparse
 import json
 from pathlib import Path
+import sys
 
 import bpy
 
 
-def export_layers():
+def export_layers(layer=None):
     scene = bpy.data.scenes["Trace E - 03-rainbow-rim"]
     output = Path(__file__).resolve().parent / "layers"
     layers = [
@@ -25,7 +29,10 @@ def export_layers():
         ("03-trace.png", "03 Voice ink"),
         ("04-pen.png", "04 Crayon"),
     ]
-    groups = [(filename, scene.collection.children[name]) for filename, name in layers]
+    if layer is not None and layer not in {filename[3:-4] for filename, _ in layers}:
+        raise ValueError(f"Unknown layer: {layer}")
+    groups = [(filename, scene.collection.children[name]) for filename, name in layers
+              if layer is None or filename[3:-4] == layer]
     assert scene.camera is not None
     assert scene.render.resolution_percentage == 100
     assert all(len(group.objects) for _, group in groups)
@@ -73,4 +80,7 @@ def export_layers():
 
 
 if __name__ == "__main__":
-    export_layers()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--layer", choices=("window-chrome", "paper", "trace", "pen"))
+    args = parser.parse_args(sys.argv[sys.argv.index("--")+1:] if "--" in sys.argv else [])
+    export_layers(args.layer)
