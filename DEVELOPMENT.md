@@ -26,6 +26,10 @@ Build and package without launching:
 TRACE_BUILD_ONLY=1 ./tools/trace
 ```
 
+If Finder reports no application for `.traceboard` after removing a worktree,
+run **Launch Trace** or `./tools/trace` from the current worktree to register
+its app with macOS. **Build Trace** alone does not update file associations.
+
 Reset onboarding, calibration, window state, and Trace privacy grants:
 
 ```sh
