@@ -20,12 +20,9 @@ Trace is developed and physically tested with the **Neo Smartpen M1
 (`NWP-F50`)** over Bluetooth. Other Neo models have not been validated.
 
 Pen coordinates require compatible **Neo Ncode paper**; ordinary paper cannot
-provide spatial input. Trace does not distribute proprietary Ncode patterns.
-Use authorized Neo paper when possible. For local print testing, only the
-B-source pattern printed at its original 100% scale has produced usable
-coordinates; scaled and A-source variants are not supported.
+provide spatial input. 
 
-Complete Trace's four-corner calibration before drawing with the pen.
+Trace requires a simple calibration before drawing with the pen.
 
 ## Custom build configuration
 
