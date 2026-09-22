@@ -1,9 +1,8 @@
 # Trace
 
-Trace is a macOS menu-bar app for turning a screenshot or blank canvas into a
-visual prompt. Capture a window, annotate it with a Neo Smartpen or the built-in
-drawing tools, optionally record a transcript, then copy the image and text in
-one action.
+Trace is a macOS menu-bar app for capturing a window or starting with a blank
+canvas, annotating it with a Neo Smartpen or built-in tools, adding Dictation,
+and copying the image and text together.
 
 ## Requirements
 
