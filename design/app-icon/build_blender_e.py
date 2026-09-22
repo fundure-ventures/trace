@@ -1,7 +1,8 @@
 """Build concept E and four lighting studies without modifying existing scenes.
 
 Run in Blender's Scripting workspace. The studies share artwork and camera, not
-lights or worlds. Rendering/saving is intentionally separate.
+lights or worlds. Rainbow lighting is selected for the main preview.
+Rendering/saving is intentionally separate.
 """
 
 import math
@@ -191,9 +192,9 @@ def build_scene():
     header = material("E - macOS title bar", (0.63, 0.66, 0.71), 0.52)
     black = material("E - charcoal wax wrapper", (0.005, 0.006, 0.007), 0.48, 0.012)
     black.node_tree.nodes.get("Principled BSDF").inputs["Specular IOR Level"].default_value = 0.4
-    paper = material("E - translucent vellum", (0.89, 0.88, 0.83), 0.78, 0.006)
+    paper = material("E - translucent vellum", (0.97, 0.97, 0.94), 0.48, 0.006)
     for mat, low, high in (
-        (paper, (0.81, 0.80, 0.76, 1), (0.89, 0.88, 0.84, 1)),
+        (paper, (0.90, 0.90, 0.87, 1), (0.97, 0.97, 0.94, 1)),
         (black, (0.002, 0.003, 0.004, 1), (0.012, 0.013, 0.014, 1)),
     ):
         nodes = mat.node_tree.nodes
@@ -207,10 +208,23 @@ def build_scene():
         mat.node_tree.links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
         mat.node_tree.links.new(ramp.outputs["Color"], nodes.get("Principled BSDF").inputs["Base Color"])
     shader = paper.node_tree.nodes.get("Principled BSDF")
-    shader.inputs["Transmission Weight"].default_value = 0.16
+    shader.inputs["Transmission Weight"].default_value = 0.68
     shader.inputs["IOR"].default_value = 1.35
-    shader.inputs["Subsurface Weight"].default_value = 0.07
+    shader.inputs["Subsurface Weight"].default_value = 0.025
     shader.inputs["Subsurface Scale"].default_value = 0.025
+    shader.inputs["Specular IOR Level"].default_value = 0.25
+    # Rough transmission blurs the window; diffuse scattering keeps the sheet fibrous, not glassy.
+    nodes, links = paper.node_tree.nodes, paper.node_tree.links
+    translucent = nodes.new("ShaderNodeBsdfTranslucent")
+    translucent.name = "Diffuse fiber transmission"
+    mix = nodes.new("ShaderNodeMixShader")
+    mix.name = "Vellum surface and fiber scattering"
+    mix.inputs[0].default_value = 0.12
+    links.new(nodes["Material grain tones"].outputs["Color"], translucent.inputs["Color"])
+    links.new(nodes["Bump"].outputs["Normal"], translucent.inputs["Normal"])
+    links.new(shader.outputs["BSDF"], mix.inputs[1])
+    links.new(translucent.outputs["BSDF"], mix.inputs[2])
+    links.new(mix.outputs[0], nodes["Material Output"].inputs["Surface"])
     colors = [(0.83, 0.018, 0.012), (1.0, 0.58, 0.009),
               (0.025, 0.43, 0.065), (0.015, 0.17, 0.78)]
     wax = [material("E - wax " + name, color, 0.6, 0.012)
@@ -446,4 +460,9 @@ def lighting_variants(baseline):
 
 
 if __name__ == "__main__":
-    lighting_variants(build_scene())
+    baseline = build_scene()
+    variants = lighting_variants(baseline)
+    baseline.render.filepath = "//trace-e-neutral.png"
+    selected = next(scene for scene in variants if scene["lighting_variant"] == "03-rainbow-rim")
+    selected.render.filepath = "//trace-e.png"
+    bpy.context.window.scene = selected
