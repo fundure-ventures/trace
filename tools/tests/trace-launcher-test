@@ -278,4 +278,16 @@ grep -Fq -- '--sdk "$MACOS_SDK"' "$LAUNCHER"
 grep -Fq -- '-platform_version' "$LAUNCHER"
 grep -Fq -- '"$MACOS_SDK_VERSION"' "$LAUNCHER"
 
+icon_line=$(grep -nF 'xcrun actool' "$LAUNCHER" | head -n 1 | cut -d: -f1)
+icon_merge_line=$(grep -nF 'Merge $ICON_INFO_PLIST' "$LAUNCHER" | head -n 1 | cut -d: -f1)
+if ! [[ -n "$icon_line" && -n "$icon_merge_line" &&
+    "$icon_line" -lt "$icon_merge_line" && "$icon_merge_line" -lt "$sign_line" ]]; then
+    echo "expected Icon Composer compilation and metadata merge before signing" >&2
+    exit 1
+fi
+grep -Fq '"$ROOT/design/app-icon/trace.icon"' "$LAUNCHER"
+grep -Fq -- '--compile "$CONTENTS/Resources"' "$LAUNCHER"
+grep -Fq -- '--app-icon trace' "$LAUNCHER"
+grep -Fq -- '--minimum-deployment-target 13.0' "$LAUNCHER"
+
 echo "trace launcher tests passed"
