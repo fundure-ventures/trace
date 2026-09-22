@@ -1,7 +1,7 @@
 # Trace
 
 Trace is a macOS menu-bar app for capturing an app window, annotating it with
-built-in drawing tools while you speak, and copying the image and dictation
+built-in drawing tools while you speak, and copying the image and Dictation
 together with one command.
 
 ## Requirements
