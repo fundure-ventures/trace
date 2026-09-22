@@ -174,6 +174,14 @@ output canvas or a stretched bounding box is not perspective correction.
 Keep the untouched crop and distinguish measured edges from estimated corners.
 Flag clipped or ambiguous boundaries rather than manufacturing a complete tile;
 do not flatten intentional perspective inside the artwork.
-Do not treat photographed colors as exact
+
+For a recorded lighting cast, measure a known neutral patch inside the artwork,
+away from colored edges, shadows, and clipped highlights. Retain its source
+coordinates and robust RGB statistics. Apply a documented, shared white-balance
+transform in linear light; preserve reference luminance instead of forcing
+white to maximum brightness. Keep pre-color images, leave comparison padding
+untouched, and report highlight-gamut handling. A single white point does not
+correct spatially uneven illumination or lighting changes between frames.
+Do not treat photographed or white-balanced colors as exact
 design tokens or an illustrated book's historical exports as current platform
 requirements.
