@@ -1,7 +1,8 @@
 """Build concept E and four lighting studies without modifying existing scenes.
 
 Run in Blender's Scripting workspace. The studies share artwork and camera, not
-lights or worlds. Rainbow lighting is selected for the main preview.
+lights or worlds. The main preview uses pen-linked rainbow lights and neutral
+surface lighting to separate the inset vellum from the cool window chrome.
 Rendering/saving is intentionally separate.
 """
 
@@ -163,15 +164,14 @@ def mac_window(collection, silver, white, header):
                 polygon.material_index = 1
 
 
-def paper_position(x, y):
+def paper_position(x, y, curl_span=2.7, radius=0.75, tilt_degrees=9):
     # Bend only the diagonal lower-left corner; preserve surface arc length.
-    distance = max(0, 2.7 - ((x + 2.95) + (y + 3.45))) / math.sqrt(2)
-    radius = 0.75
+    distance = max(0, curl_span - ((x + 2.95) + (y + 3.45))) / math.sqrt(2)
     angle = distance / radius
     inset = (distance - radius * math.sin(angle)) / math.sqrt(2)
     z = 0.25 + radius * (1 - math.cos(angle))
     x, y = (x + inset) * 1.22, (y + inset) * 1.05
-    tilt = math.radians(9)
+    tilt = math.radians(tilt_degrees)
     return Vector((
         x * math.cos(tilt) - y * math.sin(tilt),
         x * math.sin(tilt) + y * math.cos(tilt) - 0.40,
@@ -188,10 +188,10 @@ def build_scene():
         scene.collection.children.link(group)
         groups[name] = group
 
-    white = material("E - porcelain white", (0.88, 0.88, 0.865), 0.65)
+    white = material("E - porcelain white", (0.65, 0.69, 0.74), 0.65)
     silver = material("E - satin window edge", (0.68, 0.70, 0.73), 0.24)
     silver.node_tree.nodes.get("Principled BSDF").inputs["Metallic"].default_value = 0.38
-    header = material("E - macOS title bar", (0.63, 0.66, 0.71), 0.52)
+    header = material("E - macOS title bar", (0.48, 0.53, 0.61), 0.52)
     black = material("E - charcoal wax wrapper", (0.005, 0.006, 0.007), 0.48, 0.012)
     black.node_tree.nodes.get("Principled BSDF").inputs["Specular IOR Level"].default_value = 0.4
     paper = material("E - translucent vellum", (0.97, 0.97, 0.94), 0.48, 0.006)
@@ -210,7 +210,7 @@ def build_scene():
         mat.node_tree.links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
         mat.node_tree.links.new(ramp.outputs["Color"], nodes.get("Principled BSDF").inputs["Base Color"])
     shader = paper.node_tree.nodes.get("Principled BSDF")
-    shader.inputs["Transmission Weight"].default_value = 0.68
+    shader.inputs["Transmission Weight"].default_value = 0.40
     shader.inputs["IOR"].default_value = 1.35
     shader.inputs["Subsurface Weight"].default_value = 0.025
     shader.inputs["Subsurface Scale"].default_value = 0.025
@@ -239,7 +239,12 @@ def build_scene():
     nx, ny = 100, 116
     for j in range(ny + 1):
         for i in range(nx + 1):
-            vertices.append(paper_position(-2.95 + 5.9 * i / nx, -3.45 + 6.9 * j / ny))
+            position = paper_position(-2.95 + 5.9 * i / nx, -3.45 + 6.9 * j / ny,
+                                      curl_span=1.5, radius=0.55, tilt_degrees=4)
+            # Inset the sheet, not the ink or pen, to expose a continuous window margin.
+            position.x = position.x*0.92 - 0.12
+            position.y = position.y*0.87 + 0.36
+            vertices.append(position)
     for j in range(ny):
         for i in range(nx):
             k = j * (nx + 1) + i
@@ -465,6 +470,7 @@ def lighting_variants(baseline):
     for slug, lights in rigs.items():
         scene = baseline.copy()
         scene.name = "Trace E - " + slug
+        scene.use_fake_user = True
         scene.world = baseline.world.copy()
         scene.collection.children.unlink(baseline.collection.children["Studio"])
         studio = bpy.data.collections.new(slug + " lighting")
@@ -475,9 +481,23 @@ def lighting_variants(baseline):
             data.energy, data.shape, data.size, data.color = power, "DISK", size, color
             obj = bpy.data.objects.new(slug + " " + name, data)
             studio.objects.link(obj)
+            if slug == "03-rainbow-rim" and color != neutral:
+                obj.light_linking.receiver_collection = baseline.collection.children["04 Crayon"]
             obj.location = location
             target = Vector((-1.6, -2.4, 0.35)) if name == "Curl bounce" else Vector((0, 0, 0))
             obj.rotation_euler = (target-obj.location).to_track_quat("-Z", "Y").to_euler()
+        if slug == "03-rainbow-rim":
+            receivers = bpy.data.collections.new("Neutral paper and chrome receivers")
+            for group in ("01 Mac window", "02 Tracing paper", "03 Voice ink"):
+                for obj in baseline.collection.children[group].objects:
+                    receivers.objects.link(obj)
+            data = bpy.data.lights.new("Neutral surface softbox", "AREA")
+            data.energy, data.shape, data.size = 550, "DISK", 8
+            obj = bpy.data.objects.new("Neutral surface softbox", data)
+            studio.objects.link(obj)
+            obj.location = (-3, 1, 10)
+            obj.rotation_euler = (-obj.location).to_track_quat("-Z", "Y").to_euler()
+            obj.light_linking.receiver_collection = receivers
         scene.render.filepath = "//trace-e-" + slug + ".png"
         scene["lighting_variant"] = slug
         scenes.append(scene)
