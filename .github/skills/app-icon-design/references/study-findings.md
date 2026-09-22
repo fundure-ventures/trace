@@ -2,9 +2,9 @@
 
 These are original visual interpretations, not quotations from the book or
 claims about the designers' intentions. The study examined a user-supplied
-299.97-second recording, retained 70 distinct spreads, and produced 1,301
+299.97-second recording, retained 70 distinct spreads, and produced 1,306
 separately documented printed occurrences. Counts include alternate designs,
-repeated sizes, sketches, and tiny comparison-grid examples, not 1,301 unique
+repeated sizes, sketches, and tiny comparison-grid examples, not 1,306 unique
 apps.
 
 The book is predominantly an iOS reference. Its compositional lessons transfer
@@ -37,7 +37,7 @@ Compare the old and new silhouettes and negative spaces.
 **Evidence:** A chef's hat above pepper-shaped moustaches (`047-001`); a rolled
 newspaper forming the crossbar of an H (`052-006`); a central fountain nib
 between butterfly wings (`070-019`); a contact-card layout toasted into a
-sandwich (`070-001`).
+sandwich (`070-001`); a whale carrying a grid of containers (`063-030`).
 
 The second meaning lives inside the first object's structure. The image does
 not ask the viewer to decode several unrelated badges.
