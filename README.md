@@ -1,6 +1,8 @@
 # Trace
 
-Trace is a macOS menu-bar app for capturing an app window to annotate on top with the drawing built-in tools while you speak. Then you can just copy the image and transcription together in one command.
+Trace is a macOS menu-bar app for capturing an app window, annotating it with
+built-in drawing tools while you speak, and copying the image and dictation
+together with one command.
 
 ## Requirements
 
