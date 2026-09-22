@@ -77,7 +77,6 @@ Required local credentials:
 - A `Developer ID Application` certificate installed in a keychain.
 - An App Store Connect API key authorized for notarization, or a notarytool
   keychain profile.
-- The production `VITE_TLDRAW_LICENSE_KEY` in the environment.
 
 Store API credentials locally once:
 
@@ -93,7 +92,6 @@ Build a signed and notarized archive:
 ```sh
 TRACE_CODE_SIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
 TRACE_NOTARY_KEYCHAIN_PROFILE=trace-notary \
-VITE_TLDRAW_LICENSE_KEY="..." \
 ./tools/build-signed-release 0.2.0 2
 ```
 
@@ -114,7 +112,16 @@ not create a GitHub Release or changelog yet. Configure its protected
 - `APPLE_NOTARY_API_KEY_BASE64`
 - `APPLE_NOTARY_KEY_ID`
 - `APPLE_NOTARY_ISSUER_ID`
-- `VITE_TLDRAW_LICENSE_KEY`
+
+The workflow does not upload dependency caches. Its artifact allowlist contains
+only the notarized ZIP and checksum. Decoded certificates, API keys, and the
+temporary keychain live under the ephemeral runner directory and are removed
+in an `always()` cleanup step. Packaging also refuses app bundles containing
+environment files, signing credentials, provisioning profiles, keychains, or
+PEM private-key material.
+
+GitHub secret scanning and push protection are enabled for this public
+repository and should remain enabled.
 
 ## Test
 

@@ -5,9 +5,13 @@ logs/
 .mimo/
 .impeccable/
 .env
+.env.*
+!.env.example
 *.cer
 *.p12
 *.p8
+*.keychain
+*.keychain-db
 *.mobileprovision
 *.provisionprofile
 /design/app-icon/trace-e.png

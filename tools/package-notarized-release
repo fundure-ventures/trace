@@ -14,6 +14,34 @@ if [[ ! -d "$APP" ]]; then
     exit 66
 fi
 
+SENSITIVE_FILE=$(
+    find "$APP" -type f \
+        \( -name '.env' \
+        -o -name '.env.*' \
+        -o -name '*.p8' \
+        -o -name '*.p12' \
+        -o -name '*.keychain' \
+        -o -name '*.keychain-db' \
+        -o -name '*.mobileprovision' \
+        -o -name '*.provisionprofile' \) \
+        -print -quit
+)
+if [[ -n "$SENSITIVE_FILE" ]]; then
+    echo "error: sensitive file in app bundle: $SENSITIVE_FILE" >&2
+    exit 65
+fi
+
+PRIVATE_KEY_FILE=$(
+    grep -RIlE \
+        -- '-----BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY-----' \
+        "$APP" 2>/dev/null |
+        head -n 1
+)
+if [[ -n "$PRIVATE_KEY_FILE" ]]; then
+    echo "error: private key material in app bundle: $PRIVATE_KEY_FILE" >&2
+    exit 65
+fi
+
 if [[ -n "${TRACE_NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
     NOTARY_AUTH=(
         --keychain-profile "$TRACE_NOTARY_KEYCHAIN_PROFILE"
