@@ -92,7 +92,7 @@ export type TraceRendererHostMessage =
   | {
       type: 'product-tool-preview'
       documentId: string
-      tool: 'select' | null
+      tool: 'select' | 'pen' | 'highlighter' | 'rectangle' | null
     }
   | {
       type: 'product-history'

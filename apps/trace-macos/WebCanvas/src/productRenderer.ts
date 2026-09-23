@@ -265,7 +265,9 @@ export function installTraceProductRenderer(editor: Editor): () => void {
   let userEditPending = false
   let lastExportPlan: TraceImageExportPlan | null = null
   let temporarySelectActive = false
+  let temporaryDrawActive = false
   let commandSelectHeld = false
+  let lastDrawingTool: Exclude<ProductCanvasTool, 'select'> = 'pen'
   let activeTimedGesture: {
     documentId: string
     shapeType: 'draw' | 'geo'
@@ -370,7 +372,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
   }
 
   const postTemporaryTool = (
-    tool: 'select' | null,
+    tool: ProductCanvasTool | null,
   ) => {
     postToTraceHost({
       type: 'product-tool-preview',
@@ -406,6 +408,49 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     releaseTemporarySelect()
   }
 
+  // The inverse of activateTemporarySelect/releaseTemporarySelect: when the
+  // persistent tool is select, holding Cmd temporarily switches to whichever
+  // drawing tool was last used, so Cmd always toggles select<>draw.
+  const temporaryDrawTool = (): ProductTool => ({
+    ...currentTool,
+    tool: lastDrawingTool,
+    brush: lastDrawingTool === 'highlighter' ? 'highlighter' : 'pen',
+  })
+
+  const activateTemporaryDraw = () => {
+    if (temporaryDrawActive) return
+    temporaryDrawActive = true
+    runHostMutation(() => {
+      applyTool(editor, temporaryDrawTool())
+    })
+    postTemporaryTool(lastDrawingTool)
+  }
+
+  const releaseTemporaryDraw = () => {
+    if (!temporaryDrawActive) return
+    temporaryDrawActive = false
+    runHostMutation(() => {
+      applyTool(editor, currentTool)
+    })
+    postTemporaryTool(null)
+  }
+
+  const reconcileTemporaryDraw = () => {
+    if (!temporaryDrawActive || editor.inputs.getIsPointing()) return
+    if (commandSelectHeld) {
+      // The rectangle (geo) tool reverts to select after each shape; while
+      // Cmd is still held, re-arm it so consecutive shapes keep working.
+      if (lastDrawingTool === 'rectangle') {
+        runHostMutation(() => {
+          editor.selectNone()
+          applyTool(editor, temporaryDrawTool())
+        })
+      }
+      return
+    }
+    releaseTemporaryDraw()
+  }
+
   const restorePersistentRectangleTool = () => {
     if (
       temporarySelectActive
@@ -433,11 +478,20 @@ export function installTraceProductRenderer(editor: Editor): () => void {
             ? 'pen'
             : currentTool.brush,
     }
+    if (tool !== 'select') {
+      lastDrawingTool = tool
+    }
     runHostMutation(() => {
+      // Manually switching to a drawing tool must clear the current
+      // selection: otherwise a selected shape (e.g. an image) keeps
+      // intercepting pointer events instead of letting the user draw.
+      if (tool !== 'select') {
+        editor.selectNone()
+      }
       applyTool(
         editor,
         currentTool,
-        !temporarySelectActive,
+        !temporarySelectActive && !temporaryDrawActive,
       )
     })
     if (notifyHost) {
@@ -707,6 +761,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       }
       queueMicrotask(() => {
         reconcileTemporarySelect()
+        reconcileTemporaryDraw()
         restorePersistentRectangleTool()
       })
     }
@@ -786,6 +841,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       userEditPending = false
       commandSelectHeld = false
       temporarySelectActive = false
+      temporaryDrawActive = false
       activeTimedGesture = null
       recentlyCompletedGesture = null
       explicitlyReportedRecordIds.clear()
@@ -926,11 +982,19 @@ export function installTraceProductRenderer(editor: Editor): () => void {
         gridStyle: tool.gridStyle,
         gridSpacing: positive(tool.gridSpacing, 8),
       }
+      if (tool.tool !== 'select') {
+        lastDrawingTool = tool.tool
+      }
       runHostMutation(() => {
+        // Manually switching to a drawing tool must clear the current
+        // selection so a selected shape can't keep blocking drawing.
+        if (tool.tool !== 'select') {
+          editor.selectNone()
+        }
         applyTool(
           editor,
           currentTool,
-          !temporarySelectActive,
+          !temporarySelectActive && !temporaryDrawActive,
         )
       })
       postDocumentChange()
@@ -1469,7 +1533,10 @@ export function installTraceProductRenderer(editor: Editor): () => void {
   }
   const handlePointerUp = () => {
     flushPendingDocumentChange()
-    queueMicrotask(reconcileTemporarySelect)
+    queueMicrotask(() => {
+      reconcileTemporarySelect()
+      reconcileTemporaryDraw()
+    })
   }
   const isEditableTarget = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return false
@@ -1543,7 +1610,11 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     if (isEditableTarget(event.target)) return
     if (event.key === 'Meta') {
       commandSelectHeld = true
-      activateTemporarySelect()
+      if (currentTool.tool === 'select') {
+        activateTemporaryDraw()
+      } else {
+        activateTemporarySelect()
+      }
       return
     }
     if (
@@ -1570,13 +1641,15 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       event.preventDefault()
       return
     }
-    if (event.key !== 'Meta' || !temporarySelectActive) return
+    if (event.key !== 'Meta') return
     commandSelectHeld = false
     reconcileTemporarySelect()
+    reconcileTemporaryDraw()
   }
   const handleBlur = () => {
     commandSelectHeld = false
     reconcileTemporarySelect()
+    reconcileTemporaryDraw()
   }
   container.addEventListener('dragover', handleDragOver, true)
   container.addEventListener('drop', handleDrop, true)
