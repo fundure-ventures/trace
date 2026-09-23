@@ -1,6 +1,7 @@
 import AppKit
 import Darwin
 import NeoTransport
+import ServiceManagement
 import TraceAppCore
 import UniformTypeIdentifiers
 
@@ -172,9 +173,11 @@ enum TraceAppSettingsMenuPresentation {
     static let captureScreenshot = "Capture screenshot"
     static let disconnectedSection = "When pen is disconnected"
     static let copyTraceAndClose = "Copy trace and close app"
+    static let onCopySection = "On copy (cmd+c)"
     static let dictationSection = "Dictation"
     static let autoAnnotateDictation = "Annotate dictation automatically"
     static let annotationScale = "Annotation scale"
+    static let launchInMenuBarAtLogin = "Launch in menu bar at login"
 
     static func annotationScaleTitle(
         _ scale: TraceTranscriptAnnotationScale
@@ -327,8 +330,10 @@ final class TraceAppDelegate:
     private let globalShortcuts = TraceGlobalShortcutManager()
     private var statusItem: NSStatusItem?
     private weak var statusMenu: NSMenu?
-    private var globalShortcutMenuItems:
-        [TraceGlobalShortcutAction: NSMenuItem] = [:]
+    private var statusShortcutMenuItems:
+        [TraceGlobalShortcutAction: [NSMenuItem]] = [:]
+    private var fileShortcutMenuItems:
+        [TraceGlobalShortcutAction: [NSMenuItem]] = [:]
     private var projectionMenuItems: [NSMenuItem] = []
     private var projectionMenuAnchor: NSMenuItem?
     private var penSettingsItem: NSMenuItem?
@@ -343,7 +348,9 @@ final class TraceAppDelegate:
     private var penSensitivityItems: [NSMenuItem] = []
     private var captureOnCapOffItem: NSMenuItem?
     private var copyOnDisconnectItem: NSMenuItem?
+    private var copyOnCopyItem: NSMenuItem?
     private var autoAnnotateDictationItem: NSMenuItem?
+    private var launchInMenuBarAtLoginItem: NSMenuItem?
     private var transcriptAnnotationScaleItems:
         [TraceTranscriptAnnotationScale: NSMenuItem] = [:]
     private var copyProgress = TraceDocumentCopyProgress()
@@ -401,6 +408,19 @@ final class TraceAppDelegate:
         configureBoard()
         configureStatusItem()
         configureMainMenu()
+        if !isUIPreview {
+            do {
+                try updateLaunchInMenuBarAtLogin(
+                    enabled:
+                        model.snapshot.appSettings.launchInMenuBarAtLogin
+                )
+            } catch {
+                showSettingsError(
+                    "Trace could not update its launch-at-login setting: "
+                        + error.localizedDescription
+                )
+            }
+        }
         projection.onDisplaysChange = { [weak self] in
             self?.refreshProjectionMenu()
         }
@@ -857,13 +877,13 @@ final class TraceAppDelegate:
         )
         capture.target = self
         menu.addItem(capture)
-        globalShortcutMenuItems = [
-            .newBlankTrace: showBoard,
-            .captureFrontmostApp: capture,
+        statusShortcutMenuItems = [
+            .newBlankTrace: [showBoard],
+            .captureFrontmostApp: [capture],
         ]
         TraceGlobalShortcutMenuPresentation.apply(
             globalShortcuts.snapshot,
-            to: globalShortcutMenuItems
+            to: statusShortcutMenuItems
         )
         menu.addItem(.separator())
 
@@ -1005,6 +1025,19 @@ final class TraceAppDelegate:
         )
         appSettingsMenu.addItem(copyOnDisconnect)
         appSettingsMenu.addItem(.separator())
+        let onCopySection = NSMenuItem(
+            title: TraceAppSettingsMenuPresentation.onCopySection,
+            action: nil,
+            keyEquivalent: ""
+        )
+        onCopySection.isEnabled = false
+        appSettingsMenu.addItem(onCopySection)
+        let copyOnCopy = penToggleItem(
+            title: TraceAppSettingsMenuPresentation.copyTraceAndClose,
+            action: #selector(toggleCopyOnCopy(_:))
+        )
+        appSettingsMenu.addItem(copyOnCopy)
+        appSettingsMenu.addItem(.separator())
         let dictationSection = NSMenuItem(
             title: TraceAppSettingsMenuPresentation.dictationSection,
             action: nil,
@@ -1042,11 +1075,21 @@ final class TraceAppDelegate:
         }
         annotationScale.submenu = annotationScaleMenu
         appSettingsMenu.addItem(annotationScale)
+        appSettingsMenu.addItem(.separator())
+        let launchInMenuBarAtLogin = penToggleItem(
+            title:
+                TraceAppSettingsMenuPresentation
+                    .launchInMenuBarAtLogin,
+            action: #selector(toggleLaunchInMenuBarAtLogin(_:))
+        )
+        appSettingsMenu.addItem(launchInMenuBarAtLogin)
         appSettings.submenu = appSettingsMenu
         menu.addItem(appSettings)
         captureOnCapOffItem = captureOnCapOff
         copyOnDisconnectItem = copyOnDisconnect
+        copyOnCopyItem = copyOnCopy
         autoAnnotateDictationItem = autoAnnotateDictation
+        launchInMenuBarAtLoginItem = launchInMenuBarAtLogin
         let projectionAnchor = NSMenuItem.separator()
         menu.addItem(projectionAnchor)
         projectionMenuAnchor = projectionAnchor
@@ -1091,18 +1134,25 @@ final class TraceAppDelegate:
         let blankItem = NSMenuItem(
             title: TraceAppMenuPresentation.newBlankTrace,
             action: #selector(showBoard),
-            keyEquivalent: "n"
+            keyEquivalent: ""
         )
-        blankItem.keyEquivalentModifierMask = [.command, .shift]
         blankItem.target = self
         fileMenu.addItem(blankItem)
         let newItem = NSMenuItem(
             title: TraceAppMenuPresentation.newScreenshotTrace,
             action: #selector(newCapture),
-            keyEquivalent: "n"
+            keyEquivalent: ""
         )
         newItem.target = self
         fileMenu.addItem(newItem)
+        fileShortcutMenuItems = [
+            .newBlankTrace: [blankItem],
+            .captureFrontmostApp: [newItem],
+        ]
+        TraceGlobalShortcutMenuPresentation.apply(
+            globalShortcuts.snapshot,
+            to: fileShortcutMenuItems
+        )
         fileMenu.addItem(.separator())
         let openItem = NSMenuItem(
             title: TraceAppMenuPresentation.openTraces,
@@ -1200,7 +1250,11 @@ final class TraceAppDelegate:
             }
             TraceGlobalShortcutMenuPresentation.apply(
                 shortcuts,
-                to: self.globalShortcutMenuItems
+                to: self.statusShortcutMenuItems
+            )
+            TraceGlobalShortcutMenuPresentation.apply(
+                shortcuts,
+                to: self.fileShortcutMenuItems
             )
             self.board.updateOnboarding(
                 self.model.snapshot,
@@ -1319,8 +1373,12 @@ final class TraceAppDelegate:
             settings.captureScreenshotOnCapOff ? .on : .off
         copyOnDisconnectItem?.state =
             settings.copyTraceAndCloseOnDisconnect ? .on : .off
+        copyOnCopyItem?.state =
+            settings.copyTraceAndCloseOnCopy ? .on : .off
         autoAnnotateDictationItem?.state =
             settings.autoAnnotateDictation ? .on : .off
+        launchInMenuBarAtLoginItem?.state =
+            settings.launchInMenuBarAtLogin ? .on : .off
         for (scale, item) in transcriptAnnotationScaleItems {
             item.state = settings.transcriptAnnotationScale == scale
                 ? .on
@@ -1417,6 +1475,10 @@ final class TraceAppDelegate:
         model.setCopyTraceAndCloseOnDisconnect(sender.state != .on)
     }
 
+    @objc private func toggleCopyOnCopy(_ sender: NSMenuItem) {
+        model.setCopyTraceAndCloseOnCopy(sender.state != .on)
+    }
+
     @objc private func toggleAutoAnnotateDictation(
         _ sender: NSMenuItem
     ) {
@@ -1434,6 +1496,33 @@ final class TraceAppDelegate:
             return
         }
         model.setTranscriptAnnotationScale(scale)
+    }
+
+    @objc private func toggleLaunchInMenuBarAtLogin(
+        _ sender: NSMenuItem
+    ) {
+        let enabled = sender.state != .on
+        do {
+            try updateLaunchInMenuBarAtLogin(enabled: enabled)
+            model.setLaunchInMenuBarAtLogin(enabled)
+        } catch {
+            showSettingsError(
+                "Trace could not update its launch-at-login setting: "
+                    + error.localizedDescription
+            )
+        }
+    }
+
+    private func updateLaunchInMenuBarAtLogin(
+        enabled: Bool
+    ) throws {
+        if enabled {
+            if SMAppService.mainApp.status != .enabled {
+                try SMAppService.mainApp.register()
+            }
+        } else if SMAppService.mainApp.status != .notRegistered {
+            try SMAppService.mainApp.unregister()
+        }
     }
 
     @objc private func changeProjectionMode(_ sender: NSMenuItem) {
@@ -1497,7 +1586,13 @@ final class TraceAppDelegate:
     }
 
     @objc private func copyDrawing(_ sender: Any?) {
-        copyCurrentDrawing(.all)
+        copyCurrentDrawing(
+            .all,
+            closesDocument:
+                TraceAppBehaviorPolicy.shouldCloseAfterManualCopy(
+                    settings: model.snapshot.appSettings
+                )
+        )
     }
 
     @objc private func undoDrawing(_ sender: Any?) {
@@ -1652,7 +1747,8 @@ final class TraceAppDelegate:
     }
 
     private func copyCurrentDrawing(
-        _ content: TraceCopyContent = .all
+        _ content: TraceCopyContent = .all,
+        closesDocument: Bool = true
     ) {
         guard let documentID =
                 model.snapshot.currentDocument?.manifest.id,
@@ -1677,20 +1773,23 @@ final class TraceAppDelegate:
             }
             self.beginCopy(
                 content,
-                documentID: documentID
+                documentID: documentID,
+                closesDocument: closesDocument
             )
         }
     }
 
     private func beginCopy(
         _ content: TraceCopyContent,
-        documentID: UUID
+        documentID: UUID,
+        closesDocument: Bool
     ) {
         if content == .image {
             completeCopy(
                 content,
                 transcript: nil,
-                documentID: documentID
+                documentID: documentID,
+                closesDocument: closesDocument
             )
             return
         }
@@ -1711,7 +1810,8 @@ final class TraceAppDelegate:
             self.completeCopy(
                 content,
                 transcript: transcript,
-                documentID: documentID
+                documentID: documentID,
+                closesDocument: closesDocument
             )
         }
     }
@@ -1719,7 +1819,8 @@ final class TraceAppDelegate:
     private func completeCopy(
         _ content: TraceCopyContent,
         transcript: String?,
-        documentID: UUID
+        documentID: UUID,
+        closesDocument: Bool
     ) {
         guard model.snapshot.currentDocument?.manifest.id
                 == documentID
@@ -1748,7 +1849,8 @@ final class TraceAppDelegate:
                         image,
                         transcript: transcript
                     ),
-                    documentID: documentID
+                    documentID: documentID,
+                    closesDocument: closesDocument
                 )
             }
             return
@@ -1762,7 +1864,8 @@ final class TraceAppDelegate:
                     transcript,
                     to: .general
                 ),
-                documentID: documentID
+                documentID: documentID,
+                closesDocument: closesDocument
             )
         case .image:
             board.compositeImage { [weak self] image in
@@ -1784,7 +1887,8 @@ final class TraceAppDelegate:
                         image,
                         to: .general
                     ),
-                    documentID: documentID
+                    documentID: documentID,
+                    closesDocument: closesDocument
                 )
             }
             return
@@ -1793,7 +1897,8 @@ final class TraceAppDelegate:
 
     private func finishCopy(
         _ copied: Bool,
-        documentID: UUID
+        documentID: UUID,
+        closesDocument: Bool
     ) {
         guard copied else {
             failCopy(for: documentID)
@@ -1805,7 +1910,7 @@ final class TraceAppDelegate:
             endCopyProgress(for: documentID)
             return
         }
-        model.copyCompleted()
+        model.copyCompleted(closeDocument: closesDocument)
         endCopyProgress(for: documentID)
     }
 
@@ -1850,6 +1955,14 @@ final class TraceAppDelegate:
         alert.alertStyle = .warning
         alert.messageText = "Trace could not access the pen"
         alert.informativeText = error.localizedDescription
+        alert.runModal()
+    }
+
+    private func showSettingsError(_ message: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Trace could not update Settings"
+        alert.informativeText = message
         alert.runModal()
     }
 }

@@ -102,8 +102,10 @@ enum TraceHoverSyncPolicy {
 struct TraceAppSettings: Equatable {
     var captureScreenshotOnCapOff = true
     var copyTraceAndCloseOnDisconnect = false
+    var copyTraceAndCloseOnCopy = true
     var autoAnnotateDictation = true
     var transcriptAnnotationScale: TraceTranscriptAnnotationScale = .medium
+    var launchInMenuBarAtLogin = true
 }
 
 enum TraceAppSettingsPreferences {
@@ -111,10 +113,13 @@ enum TraceAppSettingsPreferences {
         "TraceCaptureScreenshotOnCapOff"
     private static let copyOnDisconnectKey =
         "TraceCopyTraceAndCloseOnDisconnect"
+    private static let copyOnCopyKey = "TraceCopyTraceAndCloseOnCopy"
     private static let autoAnnotateDictationKey =
         "TraceAutoAnnotateTranscriptions"
     private static let transcriptAnnotationScaleKey =
         "TraceTranscriptAnnotationScale"
+    private static let launchInMenuBarAtLoginKey =
+        "TraceLaunchInMenuBarAtLogin"
     private static let legacyCloseOnCopyKey = "TraceCloseOnCopy"
     private static let legacyCopyOnCapOnKey = "TraceCopyOnCapOn"
 
@@ -132,6 +137,11 @@ enum TraceAppSettingsPreferences {
                         defaultValue: false,
                         defaults: defaults
                     ),
+            copyTraceAndCloseOnCopy: bool(
+                forKey: copyOnCopyKey,
+                defaultValue: true,
+                defaults: defaults
+            ),
             autoAnnotateDictation: bool(
                 forKey: autoAnnotateDictationKey,
                 defaultValue: true,
@@ -140,7 +150,12 @@ enum TraceAppSettingsPreferences {
             transcriptAnnotationScale: defaults.string(
                 forKey: transcriptAnnotationScaleKey
             ).flatMap(TraceTranscriptAnnotationScale.init(rawValue:))
-                ?? .medium
+                ?? .medium,
+            launchInMenuBarAtLogin: bool(
+                forKey: launchInMenuBarAtLoginKey,
+                defaultValue: true,
+                defaults: defaults
+            )
         )
     }
 
@@ -157,12 +172,20 @@ enum TraceAppSettingsPreferences {
             forKey: copyOnDisconnectKey
         )
         defaults.set(
+            settings.copyTraceAndCloseOnCopy,
+            forKey: copyOnCopyKey
+        )
+        defaults.set(
             settings.autoAnnotateDictation,
             forKey: autoAnnotateDictationKey
         )
         defaults.set(
             settings.transcriptAnnotationScale.rawValue,
             forKey: transcriptAnnotationScaleKey
+        )
+        defaults.set(
+            settings.launchInMenuBarAtLogin,
+            forKey: launchInMenuBarAtLoginKey
         )
         defaults.removeObject(forKey: legacyCloseOnCopyKey)
         defaults.removeObject(forKey: legacyCopyOnCapOnKey)
@@ -189,6 +212,12 @@ enum TraceAppBehaviorPolicy {
         force: Bool
     ) -> Bool {
         force || settings.captureScreenshotOnCapOff
+    }
+
+    static func shouldCloseAfterManualCopy(
+        settings: TraceAppSettings
+    ) -> Bool {
+        settings.copyTraceAndCloseOnCopy
     }
 
     static func penDisconnectPlan(
@@ -979,6 +1008,14 @@ final class TraceAppModel {
         persistAppSettings()
     }
 
+    func setCopyTraceAndCloseOnCopy(_ enabled: Bool) {
+        guard appSettings.copyTraceAndCloseOnCopy != enabled else {
+            return
+        }
+        appSettings.copyTraceAndCloseOnCopy = enabled
+        persistAppSettings()
+    }
+
     func setAutoAnnotateDictation(_ enabled: Bool) {
         guard appSettings.autoAnnotateDictation != enabled else {
             return
@@ -997,6 +1034,14 @@ final class TraceAppModel {
             return
         }
         appSettings.transcriptAnnotationScale = scale
+        persistAppSettings()
+    }
+
+    func setLaunchInMenuBarAtLogin(_ enabled: Bool) {
+        guard appSettings.launchInMenuBarAtLogin != enabled else {
+            return
+        }
+        appSettings.launchInMenuBarAtLogin = enabled
         persistAppSettings()
     }
 
@@ -1042,9 +1087,15 @@ final class TraceAppModel {
         onStateChange?(snapshot)
     }
 
-    func copyCompleted() {
+    func copyCompleted(closeDocument: Bool = true) {
         guard saveCurrentDocumentReportingError() else {
             copyRequestPending = false
+            return
+        }
+        guard closeDocument else {
+            voiceController.completeCopy()
+            copyRequestPending = false
+            onStateChange?(snapshot)
             return
         }
         resetAnnotationState()
@@ -1668,8 +1719,8 @@ final class TraceAppModel {
             words: transcript.words,
             in: currentDocument
         )
+        _ = applyAutomaticTranscriptAnnotations()
         if activeDocumentStrokeID == nil {
-            _ = applyAutomaticTranscriptAnnotations()
             scheduleAutosaveAfterIdle(for: currentDocument.manifest.id)
         }
         onStateChange?(snapshot)
