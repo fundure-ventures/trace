@@ -388,10 +388,13 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     postTemporaryTool('select')
   }
 
-  const releaseTemporarySelect = () => {
+  const releaseTemporarySelect = (clearSelection = false) => {
     if (!temporarySelectActive) return
     temporarySelectActive = false
     runHostMutation(() => {
+      if (clearSelection) {
+        editor.selectNone()
+      }
       applyTool(editor, currentTool)
     })
     postTemporaryTool(null)
@@ -1611,7 +1614,12 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     if (isEditableTarget(event.target)) return
     if (event.key === 'Meta') {
       commandSelectHeld = true
-      if (currentTool.tool === 'select') {
+      if (
+        temporarySelectActive
+        && currentTool.tool !== 'select'
+      ) {
+        releaseTemporarySelect(true)
+      } else if (currentTool.tool === 'select') {
         activateTemporaryDraw()
       } else {
         activateTemporarySelect()
