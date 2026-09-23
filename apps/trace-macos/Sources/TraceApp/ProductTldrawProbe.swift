@@ -789,6 +789,74 @@ enum ProductTldrawProbe {
                 && temporaryTools.count == previewEventCount + 1
                 && temporaryTools.last == "select"
         }
+        let latchedResumePreviewCount = temporaryTools.count
+        guard let resumedDrawDown =
+                await surface.keyboardEventForTesting(
+                    type: "keydown",
+                    key: "Meta",
+                    code: "MetaLeft",
+                    metaKey: true
+                ),
+              resumedDrawDown["selectedTool"] as? String == "draw",
+              resumedDrawDown["productTool"] as? String == "highlighter",
+              let resumedDrawUp =
+                await surface.keyboardEventForTesting(
+                    type: "keyup",
+                    key: "Meta",
+                    code: "MetaLeft"
+                ),
+              resumedDrawUp["selectedTool"] as? String == "draw"
+        else {
+            throw probeError(
+                "Command did not restore the persistent Draw tool "
+                    + "from latched Select"
+            )
+        }
+        try await waitUntil("restored persistent Draw from latched Select") {
+            guard let state = await surface.stateForTesting()
+            else {
+                return false
+            }
+            return state["selectedTool"] as? String == "draw"
+                && (
+                    state["selectedShapeCount"] as? NSNumber
+                )?.intValue == 0
+                && temporaryTools.count == latchedResumePreviewCount + 1
+                && temporaryTools.last == "none"
+        }
+        guard let secondLatchedCommandDown =
+                await surface.keyboardEventForTesting(
+                    type: "keydown",
+                    key: "Meta",
+                    code: "MetaLeft",
+                    metaKey: true
+                ),
+              secondLatchedCommandDown["selectedTool"] as? String
+                == "select",
+              await surface.selectFirstUserShapeForTesting(),
+              let secondLatchedCommandUp =
+                await surface.keyboardEventForTesting(
+                    type: "keyup",
+                    key: "Meta",
+                    code: "MetaLeft"
+                )
+        else {
+            throw probeError(
+                "Command could not re-enter temporary Select"
+            )
+        }
+        _ = secondLatchedCommandUp
+        try await waitUntil("second latched temporary Select") {
+            guard let state = await surface.stateForTesting()
+            else {
+                return false
+            }
+            return state["selectedTool"] as? String == "select"
+                && (
+                    state["selectedShapeCount"] as? NSNumber
+                )?.intValue == 1
+                && temporaryTools.last == "select"
+        }
         guard await surface.emitPointerForTesting(
                   phase: "began",
                   x: 0.95,
@@ -813,6 +881,96 @@ enum ProductTldrawProbe {
                 && (
                     releasedState["selectedShapeCount"] as? NSNumber
                 )?.intValue == 0
+                && temporaryTools.last == "none"
+        }
+        guard let selectKey = await surface.keyboardEventForTesting(
+                  type: "keydown",
+                  key: "v",
+                  code: "KeyV"
+              ),
+              selectKey["selectedTool"] as? String == "select",
+              selectKey["productTool"] as? String == "select",
+              await surface.selectFirstUserShapeForTesting(),
+              let selectedImageState = await surface.stateForTesting(),
+              (
+                  selectedImageState["selectedUserImageCount"]
+                      as? NSNumber
+              )?.intValue == 1
+        else {
+            throw probeError(
+                "V did not persistently select a user image"
+            )
+        }
+        let drawCountBeforeTemporaryDraw =
+            (selectedImageState["drawWidths"] as? [NSNumber])?.count
+                ?? 0
+        let selectToDrawPreviewCount = temporaryTools.count
+        guard let temporaryDrawDown =
+                await surface.keyboardEventForTesting(
+                    type: "keydown",
+                    key: "Meta",
+                    code: "MetaLeft",
+                    metaKey: true
+                ),
+              temporaryDrawDown["selectedTool"] as? String == "draw",
+              temporaryDrawDown["productTool"] as? String == "select"
+        else {
+            throw probeError(
+                "Command did not temporarily activate Draw from Select"
+            )
+        }
+        try await waitUntil("temporary Draw clears selected image") {
+            guard let state = await surface.stateForTesting()
+            else {
+                return false
+            }
+            return state["selectedTool"] as? String == "draw"
+                && (
+                    state["selectedUserImageCount"] as? NSNumber
+                )?.intValue == 0
+                && (
+                    state["selectedShapeCount"] as? NSNumber
+                )?.intValue == 0
+                && temporaryTools.count == selectToDrawPreviewCount + 1
+                && temporaryTools.last == "highlighter"
+        }
+        guard await surface.emitPointerForTesting(
+                  phase: "began",
+                  x: 0.5,
+                  y: 0.5
+              ),
+              await surface.emitPointerForTesting(
+                  phase: "moved",
+                  x: 0.55,
+                  y: 0.55
+              ),
+              await surface.emitPointerForTesting(
+                  phase: "ended",
+                  x: 0.6,
+                  y: 0.6
+              ),
+              let temporaryDrawUp =
+                await surface.keyboardEventForTesting(
+                    type: "keyup",
+                    key: "Meta",
+                    code: "MetaLeft"
+                ),
+              temporaryDrawUp["selectedTool"] as? String == "select"
+        else {
+            throw probeError(
+                "temporary Draw from Select did not accept pointer input"
+            )
+        }
+        try await waitUntil("temporary Draw restored Select") {
+            guard let state = await surface.stateForTesting()
+            else {
+                return false
+            }
+            let drawCount =
+                (state["drawWidths"] as? [NSNumber])?.count ?? 0
+            return state["selectedTool"] as? String == "select"
+                && state["productTool"] as? String == "select"
+                && drawCount > drawCountBeforeTemporaryDraw
                 && temporaryTools.last == "none"
         }
         guard let rectangleKey = await surface.keyboardEventForTesting(
