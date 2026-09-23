@@ -1,0 +1,42 @@
+#!/bin/bash
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+SKILL="$ROOT/.github/skills/trace-release/SKILL.md"
+WORKFLOW="$ROOT/.github/workflows/signed-release-build.yml"
+DEVELOPMENT="$ROOT/DEVELOPMENT.md"
+
+if [[ -e "$WORKFLOW" ]]; then
+    echo "expected CI signed-release workflow to be removed" >&2
+    exit 1
+fi
+
+grep -Fq 'name: trace-release' "$SKILL"
+grep -Fq 'current branch is exactly `main`' "$SKILL"
+grep -Fq '`HEAD` equals `origin/main`' "$SKILL"
+grep -Fq 'working tree and index are clean' "$SKILL"
+grep -Fq './tools/build-release "$VERSION" "$BUILD_NUMBER"' "$SKILL"
+grep -Fq './tools/sign-release "$VERSION" "$BUILD_NUMBER"' "$SKILL"
+grep -Fq 'CFBundleShortVersionString' "$SKILL"
+grep -Fq 'CFBundleVersion' "$SKILL"
+grep -Fq 'xcrun stapler validate' "$SKILL"
+grep -Fq 'spctl --assess --type execute' "$SKILL"
+grep -Fq 'shasum -a 256 -c' "$SKILL"
+grep -Fq 'release notes' "$SKILL"
+grep -Fq 'ask_user' "$SKILL"
+grep -Fq 'gh release create' "$SKILL"
+grep -Fq '"$ZIP"' "$SKILL"
+grep -Fq '"$CHECKSUM"' "$SKILL"
+grep -Fq 'Do not create or push the tag separately' "$SKILL"
+
+grep -Fq 'Trace release skill' "$DEVELOPMENT"
+if grep -Fq 'Build signed release' "$DEVELOPMENT"; then
+    echo "expected CI signed-release workflow documentation to be removed" >&2
+    exit 1
+fi
+if grep -Fq 'APPLE_DEVELOPER_ID_CERTIFICATE_BASE64' "$DEVELOPMENT"; then
+    echo "expected CI signing secrets documentation to be removed" >&2
+    exit 1
+fi
+
+echo "release skill tests passed"

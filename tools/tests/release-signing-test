@@ -7,7 +7,6 @@ BUILD_RELEASE="$ROOT/tools/build-signed-release"
 BUILD_UNSIGNED_RELEASE="$ROOT/tools/build-release"
 SIGN_RELEASE="$ROOT/tools/sign-release"
 PACKAGE_RELEASE="$ROOT/tools/package-notarized-release"
-WORKFLOW="$ROOT/.github/workflows/signed-release-build.yml"
 TEMP_ROOT=$(mktemp -d)
 
 cleanup() {
@@ -295,17 +294,5 @@ if "$BUILD_UNSIGNED_RELEASE" 1.2.3 build-42 \
 fi
 grep -Fq "build number must be a positive integer" \
     "$TEMP_ROOT/build-number.err"
-
-grep -Fq 'persist-credentials: false' "$WORKFLOW"
-grep -Fq 'rm -f "$TRACE_CERTIFICATE_PATH"' "$WORKFLOW"
-grep -Fq 'rm -f "$TRACE_NOTARY_KEY_PATH"' "$WORKFLOW"
-if grep -Fq 'VITE_TLDRAW_LICENSE_KEY' "$WORKFLOW"; then
-    echo "expected signing workflow not to receive the tldraw license" >&2
-    exit 1
-fi
-if grep -Fq 'actions/cache' "$WORKFLOW"; then
-    echo "expected signing workflow not to upload a build cache" >&2
-    exit 1
-fi
 
 echo "release signing tests passed"

@@ -133,7 +133,7 @@ When exactly one Developer ID Application identity is installed,
 `trace-notary` keychain profile, so the **Sign Release** quick action works
 after the one-time credential setup above.
 
-CI can build and sign in one command:
+Build and sign in one command:
 
 ```sh
 ./tools/build-signed-release 0.2.0 2
@@ -141,28 +141,30 @@ CI can build and sign in one command:
 
 The command writes `.build/release/Trace-0.2.0-2.zip` and its SHA-256 file.
 Release artifacts, certificates, API keys, provisioning profiles, `.env`, and
-all `.build/` contents are ignored. Signing scripts, entitlements, workflows,
-and source `Info.plist` defaults are versioned.
-
-The manual **Build signed release** GitHub Actions workflow currently uploads
-the notarized ZIP as a short-lived workflow artifact. It intentionally does
-not create a GitHub Release or changelog yet. Configure its protected
-`production` environment with:
-
-- `APPLE_DEVELOPER_ID_CERTIFICATE_BASE64`
-- `APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD`
-- `APPLE_DEVELOPER_ID_APPLICATION_IDENTITY`
-- `APPLE_SIGNING_KEYCHAIN_PASSWORD`
-- `APPLE_NOTARY_API_KEY_BASE64`
-- `APPLE_NOTARY_KEY_ID`
-- `APPLE_NOTARY_ISSUER_ID`
-
-The workflow does not upload dependency caches. Its artifact allowlist contains
-only the notarized ZIP and checksum. Decoded certificates, API keys, and the
-temporary keychain live under the ephemeral runner directory and are removed
-in an `always()` cleanup step. Packaging also refuses app bundles containing
+all `.build/` contents are ignored. Signing scripts, entitlements, and source
+`Info.plist` defaults are versioned. Packaging refuses app bundles containing
 environment files, signing credentials, provisioning profiles, keychains, or
 PEM private-key material.
+
+## Publishing a GitHub Release
+
+Production releases are built and signed locally; CI release builds are
+intentionally disabled. Use the repository Trace release skill to publish
+a release. It requires a clean checkout whose current branch is `main` and
+whose `HEAD` exactly matches `origin/main`.
+
+The skill:
+
+1. Collects and validates the app version and build number.
+2. Drafts release notes for explicit approval.
+3. Builds `.build/Trace.app` from current `main`.
+4. Developer ID-signs, notarizes, staples, and Gatekeeper-verifies it.
+5. Verifies the embedded version/build and archive checksum.
+6. Creates `vVERSION` on the exact release commit and uploads only the
+   notarized ZIP and SHA-256 file to GitHub Releases.
+
+Run it from a dedicated, clean `main` session. It refuses to switch branches,
+merge, stash, or publish from a feature branch.
 
 GitHub secret scanning and push protection are enabled for this public
 repository and should remain enabled.
