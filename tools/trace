@@ -166,6 +166,12 @@ cp -R "$WEB_ROOT/dist" "$WEB_RESOURCES"
 "$ROOT/tools/copy-swiftpm-resource-bundles" \
     "$BIN_DIRECTORY" \
     "$CONTENTS/Resources"
+if [[ -f "$ROOT/.env" ]]; then
+    # Bake the repository .env into the bundle so an installed app (e.g.
+    # /Applications/Trace.app) can still resolve OPEN_ROUTER_API_KEY without
+    # depending on a repository checkout being nearby.
+    cp "$ROOT/.env" "$CONTENTS/Resources/.env"
+fi
 ICON_INFO_PLIST="$ROOT/.build/trace-icon-info.plist"
 xcrun actool "$ROOT/design/app-icon/trace.icon" \
     --compile "$CONTENTS/Resources" \

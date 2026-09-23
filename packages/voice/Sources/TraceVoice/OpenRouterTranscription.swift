@@ -102,6 +102,15 @@ public struct OpenRouterTranscriptionConfiguration:
                 .deletingLastPathComponent()
                 .appendingPathComponent(".env")
         )
+        // An installed app bundle (e.g. /Applications/Trace.app) is no
+        // longer sitting under a repository checkout, so it carries its
+        // own copy of the repository .env inside Resources.
+        candidates.append(
+            bundleURL
+                .appendingPathComponent("Contents", isDirectory: true)
+                .appendingPathComponent("Resources", isDirectory: true)
+                .appendingPathComponent(".env")
+        )
 
         var visited: Set<String> = []
         for candidate in candidates where visited.insert(
