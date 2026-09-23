@@ -421,6 +421,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     if (temporaryDrawActive) return
     temporaryDrawActive = true
     runHostMutation(() => {
+      editor.selectNone()
       applyTool(editor, temporaryDrawTool())
     })
     postTemporaryTool(lastDrawingTool)
