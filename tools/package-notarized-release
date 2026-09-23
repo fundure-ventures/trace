@@ -46,21 +46,9 @@ if [[ -n "${TRACE_NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
     NOTARY_AUTH=(
         --keychain-profile "$TRACE_NOTARY_KEYCHAIN_PROFILE"
     )
-elif [[ -n "${TRACE_NOTARY_KEY_PATH:-}"
-    && -n "${TRACE_NOTARY_KEY_ID:-}"
-    && -n "${TRACE_NOTARY_ISSUER_ID:-}" ]]; then
-    if [[ ! -f "$TRACE_NOTARY_KEY_PATH" ]]; then
-        echo "error: missing notarization API key: $TRACE_NOTARY_KEY_PATH" >&2
-        exit 66
-    fi
-    NOTARY_AUTH=(
-        --key "$TRACE_NOTARY_KEY_PATH"
-        --key-id "$TRACE_NOTARY_KEY_ID"
-        --issuer "$TRACE_NOTARY_ISSUER_ID"
-    )
 else
     echo \
-        "error: notarization credentials are required; set a keychain profile or API key variables." \
+        "error: notarization credentials are required; set TRACE_NOTARY_KEYCHAIN_PROFILE." \
         >&2
     exit 64
 fi

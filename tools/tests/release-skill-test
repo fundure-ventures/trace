@@ -4,10 +4,15 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 SKILL="$ROOT/.github/skills/trace-release/SKILL.md"
 WORKFLOW="$ROOT/.github/workflows/signed-release-build.yml"
+COMBINED_RELEASE="$ROOT/tools/build-signed-release"
 DEVELOPMENT="$ROOT/DEVELOPMENT.md"
 
 if [[ -e "$WORKFLOW" ]]; then
     echo "expected CI signed-release workflow to be removed" >&2
+    exit 1
+fi
+if [[ -e "$COMBINED_RELEASE" ]]; then
+    echo "expected obsolete combined release wrapper to be removed" >&2
     exit 1
 fi
 
@@ -32,6 +37,10 @@ grep -Fq 'Do not create or push the tag separately' "$SKILL"
 grep -Fq 'Trace release skill' "$DEVELOPMENT"
 if grep -Fq 'Build signed release' "$DEVELOPMENT"; then
     echo "expected CI signed-release workflow documentation to be removed" >&2
+    exit 1
+fi
+if grep -Fq 'build-signed-release' "$DEVELOPMENT"; then
+    echo "expected combined release wrapper documentation to be removed" >&2
     exit 1
 fi
 if grep -Fq 'APPLE_DEVELOPER_ID_CERTIFICATE_BASE64' "$DEVELOPMENT"; then

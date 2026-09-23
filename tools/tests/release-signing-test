@@ -3,7 +3,6 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 SIGN_APP="$ROOT/tools/sign-app"
-BUILD_RELEASE="$ROOT/tools/build-signed-release"
 BUILD_UNSIGNED_RELEASE="$ROOT/tools/build-release"
 SIGN_RELEASE="$ROOT/tools/sign-release"
 PACKAGE_RELEASE="$ROOT/tools/package-notarized-release"
@@ -124,14 +123,10 @@ fi
 grep -Fq "missing code-signing entitlements" "$TEMP_ROOT/sign.err"
 
 : > "$COMMAND_LOG"
-NOTARY_KEY="$TEMP_ROOT/AuthKey_TEST.p8"
-printf 'private key\n' > "$NOTARY_KEY"
 OUTPUT_ZIP="$TEMP_ROOT/output/Trace-1.2.3.zip"
 
 printf 'secret\n' > "$APP/Contents/.env"
-if TRACE_NOTARY_KEY_PATH="$NOTARY_KEY" \
-    TRACE_NOTARY_KEY_ID="KEY123" \
-    TRACE_NOTARY_ISSUER_ID="ISSUER456" \
+if TRACE_NOTARY_KEYCHAIN_PROFILE="trace-notary" \
     "$PACKAGE_RELEASE" "$APP" "$OUTPUT_ZIP" \
     >"$TEMP_ROOT/env-artifact.out" 2>"$TEMP_ROOT/env-artifact.err"; then
     echo "expected packaged environment file to fail" >&2
@@ -142,9 +137,7 @@ rm "$APP/Contents/.env"
 
 printf '%s\n' '-----BEGIN PRIVATE KEY-----' \
     > "$APP/Contents/Resources-private-key.txt"
-if TRACE_NOTARY_KEY_PATH="$NOTARY_KEY" \
-    TRACE_NOTARY_KEY_ID="KEY123" \
-    TRACE_NOTARY_ISSUER_ID="ISSUER456" \
+if TRACE_NOTARY_KEYCHAIN_PROFILE="trace-notary" \
     "$PACKAGE_RELEASE" "$APP" "$OUTPUT_ZIP" \
     >"$TEMP_ROOT/key-artifact.out" 2>"$TEMP_ROOT/key-artifact.err"; then
     echo "expected packaged private key material to fail" >&2
@@ -153,16 +146,14 @@ fi
 grep -Fq "private key material in app bundle" "$TEMP_ROOT/key-artifact.err"
 rm "$APP/Contents/Resources-private-key.txt"
 
-TRACE_NOTARY_KEY_PATH="$NOTARY_KEY" \
-TRACE_NOTARY_KEY_ID="KEY123" \
-TRACE_NOTARY_ISSUER_ID="ISSUER456" \
+TRACE_NOTARY_KEYCHAIN_PROFILE="trace-notary" \
     "$PACKAGE_RELEASE" "$APP" "$OUTPUT_ZIP"
 
 grep -Fq \
     "xcrun <notarytool> <submit>" \
     "$COMMAND_LOG"
 grep -Fq \
-    "<--key> <$NOTARY_KEY> <--key-id> <KEY123> <--issuer> <ISSUER456> <--wait>" \
+    "<--keychain-profile> <trace-notary> <--wait>" \
     "$COMMAND_LOG"
 grep -Fq "xcrun <stapler> <staple> <$APP>" "$COMMAND_LOG"
 grep -Fq "xcrun <stapler> <validate> <$APP>" "$COMMAND_LOG"
@@ -171,16 +162,14 @@ grep -Fq "spctl <--assess> <--type> <execute> <--verbose=4> <$APP>" \
 [[ -f "$OUTPUT_ZIP" ]]
 grep -Fq "0123456789abcdef  Trace-1.2.3.zip" "$OUTPUT_ZIP.sha256"
 
-: > "$COMMAND_LOG"
-TRACE_NOTARY_KEYCHAIN_PROFILE="trace-notary" \
-    "$PACKAGE_RELEASE" "$APP" "$OUTPUT_ZIP"
-grep -Fq \
-    "<--keychain-profile> <trace-notary> <--wait>" \
-    "$COMMAND_LOG"
-
-if "$PACKAGE_RELEASE" "$APP" "$OUTPUT_ZIP" \
+NOTARY_KEY="$TEMP_ROOT/AuthKey_TEST.p8"
+printf 'private key\n' > "$NOTARY_KEY"
+if TRACE_NOTARY_KEY_PATH="$NOTARY_KEY" \
+    TRACE_NOTARY_KEY_ID="KEY123" \
+    TRACE_NOTARY_ISSUER_ID="ISSUER456" \
+    "$PACKAGE_RELEASE" "$APP" "$OUTPUT_ZIP" \
     >"$TEMP_ROOT/notary.out" 2>"$TEMP_ROOT/notary.err"; then
-    echo "expected missing notarization credentials to fail" >&2
+    echo "expected raw notarization API key variables to be rejected" >&2
     exit 1
 fi
 grep -Fq "notarization credentials" "$TEMP_ROOT/notary.err"
@@ -255,30 +244,6 @@ cmp "$TEMP_ROOT/expected-package.args" "$TEMP_ROOT/package.args"
 grep -Fq \
     "<--sign> <Developer ID Application: Trace (TEAMID)>" \
     "$COMMAND_LOG"
-
-FAKE_RELEASE_BUILDER="$TEMP_ROOT/fake-release-builder"
-FAKE_RELEASE_SIGNER="$TEMP_ROOT/fake-release-signer"
-cat > "$FAKE_RELEASE_BUILDER" <<'EOF'
-#!/bin/bash
-set -eu
-printf '%s\n' "$@" > "$TRACE_TEST_BUILD_ARGS"
-EOF
-cat > "$FAKE_RELEASE_SIGNER" <<'EOF'
-#!/bin/bash
-set -eu
-printf '%s\n' "$@" > "$TRACE_TEST_SIGN_ARGS"
-EOF
-chmod +x "$FAKE_RELEASE_BUILDER" "$FAKE_RELEASE_SIGNER"
-TRACE_RELEASE_BUILDER="$FAKE_RELEASE_BUILDER" \
-TRACE_RELEASE_SIGNER="$FAKE_RELEASE_SIGNER" \
-TRACE_TEST_BUILD_ARGS="$TEMP_ROOT/build.args" \
-TRACE_TEST_SIGN_ARGS="$TEMP_ROOT/sign.args" \
-    "$BUILD_RELEASE" 1.2.3 42 "$TEMP_ROOT/release"
-printf '%s\n%s\n' 1.2.3 42 > "$TEMP_ROOT/expected-build.args"
-printf '%s\n%s\n%s\n' 1.2.3 42 "$TEMP_ROOT/release" \
-    > "$TEMP_ROOT/expected-sign.args"
-cmp "$TEMP_ROOT/expected-build.args" "$TEMP_ROOT/build.args"
-cmp "$TEMP_ROOT/expected-sign.args" "$TEMP_ROOT/sign.args"
 
 if "$BUILD_UNSIGNED_RELEASE" 1.2 42 \
     >"$TEMP_ROOT/version.out" 2>"$TEMP_ROOT/version.err"; then

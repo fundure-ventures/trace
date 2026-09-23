@@ -106,8 +106,7 @@ archive checksum without opening Xcode.
 Required local credentials:
 
 - A `Developer ID Application` certificate installed in a keychain.
-- An App Store Connect API key authorized for notarization, or a notarytool
-  keychain profile.
+- A `trace-notary` notarytool keychain profile.
 
 Store API credentials locally once:
 
@@ -133,13 +132,7 @@ When exactly one Developer ID Application identity is installed,
 `trace-notary` keychain profile, so the **Sign Release** quick action works
 after the one-time credential setup above.
 
-Build and sign in one command:
-
-```sh
-./tools/build-signed-release 0.2.0 2
-```
-
-The command writes `.build/release/Trace-0.2.0-2.zip` and its SHA-256 file.
+Signing writes `.build/release/Trace-0.2.0-2.zip` and its SHA-256 file.
 Release artifacts, certificates, API keys, provisioning profiles, `.env`, and
 all `.build/` contents are ignored. Signing scripts, entitlements, and source
 `Info.plist` defaults are versioned. Packaging refuses app bundles containing

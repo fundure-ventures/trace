@@ -67,8 +67,7 @@ fi
 
 export TRACE_CODE_SIGN_IDENTITY
 export TRACE_CODE_SIGN_ENTITLEMENTS="$ENTITLEMENTS"
-if [[ -z "${TRACE_NOTARY_KEYCHAIN_PROFILE:-}"
-    && -z "${TRACE_NOTARY_KEY_PATH:-}" ]]; then
+if [[ -z "${TRACE_NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
     export TRACE_NOTARY_KEYCHAIN_PROFILE=trace-notary
 fi
 
