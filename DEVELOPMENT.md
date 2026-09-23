@@ -117,20 +117,30 @@ xcrun notarytool store-credentials trace-notary \
   --issuer ISSUER_ID
 ```
 
-Build the release product, then sign and notarize it:
+Keep the source `.p8` outside the repository and all worktrees. After
+`store-credentials` succeeds, local notarization reads the saved Keychain
+profile. Raw API key files are not accepted by the release scripts.
+
+The standard manual sequence is:
+
+```sh
+./tools/build-release VERSION BUILD_NUMBER
+./tools/sign-release VERSION BUILD_NUMBER
+```
+
+For example:
 
 ```sh
 ./tools/build-release 0.2.0 2
-
-TRACE_CODE_SIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
-TRACE_NOTARY_KEYCHAIN_PROFILE=trace-notary \
 ./tools/sign-release 0.2.0 2
 ```
 
 When exactly one Developer ID Application identity is installed,
 `tools/sign-release` selects it automatically. It also defaults to the
 `trace-notary` keychain profile, so the **Sign Release** quick action works
-after the one-time credential setup above.
+after the one-time credential setup above. Set `TRACE_CODE_SIGN_IDENTITY` only
+when more than one matching identity is installed, or
+`TRACE_NOTARY_KEYCHAIN_PROFILE` when using a differently named profile.
 
 Signing writes `.build/release/Trace-0.2.0-2.zip` and its SHA-256 file.
 Release artifacts, certificates, API keys, provisioning profiles, `.env`, and
@@ -143,8 +153,10 @@ PEM private-key material.
 
 Production releases are built and signed locally; CI release builds are
 intentionally disabled. Use the repository Trace release skill to publish
-a release. It requires a clean checkout whose current branch is `main` and
-whose `HEAD` exactly matches `origin/main`.
+a release. Its checked-in definition is
+`.github/skills/trace-release/SKILL.md`; ask Copilot to publish or prepare a
+Trace release to activate it. The skill requires a clean checkout whose
+current branch is `main` and whose `HEAD` exactly matches `origin/main`.
 
 The skill:
 
