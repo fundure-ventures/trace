@@ -36,9 +36,8 @@ grep -Fq 'Do not create or push the tag separately' "$SKILL"
 
 grep -Fq 'Trace release skill' "$DEVELOPMENT"
 grep -Fq '.github/skills/trace-release/SKILL.md' "$DEVELOPMENT"
-grep -Fq './tools/build-release VERSION BUILD_NUMBER' "$DEVELOPMENT"
-grep -Fq './tools/sign-release VERSION BUILD_NUMBER' "$DEVELOPMENT"
-grep -Fq 'Raw API key files are not accepted by the release scripts' "$DEVELOPMENT"
+grep -Fq './tools/build-release 0.2.0 2' "$DEVELOPMENT"
+grep -Fq './tools/sign-release 0.2.0 2' "$DEVELOPMENT"
 if grep -Fq 'Build signed release' "$DEVELOPMENT"; then
     echo "expected CI signed-release workflow documentation to be removed" >&2
     exit 1

@@ -98,11 +98,6 @@ bun run build
 
 ## Production signing
 
-The direct-download release path signs the existing `.build/Trace.app` built
-by `tools/build-release`. Signing applies the Developer ID identity, hardened
-runtime entitlements, notarization, stapling, Gatekeeper verification, and
-archive checksum without opening Xcode.
-
 Required local credentials:
 
 - A `Developer ID Application` certificate installed in a keychain.
@@ -117,46 +112,26 @@ xcrun notarytool store-credentials trace-notary \
   --issuer ISSUER_ID
 ```
 
-Keep the source `.p8` outside the repository and all worktrees. After
-`store-credentials` succeeds, local notarization reads the saved Keychain
-profile. Raw API key files are not accepted by the release scripts.
-
-The standard manual sequence is:
-
-```sh
-./tools/build-release VERSION BUILD_NUMBER
-./tools/sign-release VERSION BUILD_NUMBER
-```
-
-For example:
+After `store-credentials` succeeds, local notarization reads the saved Keychain
+profile.
+Then the standard manual sequence is:
 
 ```sh
 ./tools/build-release 0.2.0 2
 ./tools/sign-release 0.2.0 2
 ```
 
-When exactly one Developer ID Application identity is installed,
-`tools/sign-release` selects it automatically. It also defaults to the
-`trace-notary` keychain profile, so the **Sign Release** quick action works
-after the one-time credential setup above. Set `TRACE_CODE_SIGN_IDENTITY` only
+Set `TRACE_CODE_SIGN_IDENTITY` only
 when more than one matching identity is installed, or
 `TRACE_NOTARY_KEYCHAIN_PROFILE` when using a differently named profile.
 
 Signing writes `.build/release/Trace-0.2.0-2.zip` and its SHA-256 file.
-Release artifacts, certificates, API keys, provisioning profiles, `.env`, and
-all `.build/` contents are ignored. Signing scripts, entitlements, and source
-`Info.plist` defaults are versioned. Packaging refuses app bundles containing
-environment files, signing credentials, provisioning profiles, keychains, or
-PEM private-key material.
 
 ## Publishing a GitHub Release
 
-Production releases are built and signed locally; CI release builds are
-intentionally disabled. Use the repository Trace release skill to publish
+Use the repository Trace release skill to publish
 a release. Its checked-in definition is
-`.github/skills/trace-release/SKILL.md`; ask Copilot to publish or prepare a
-Trace release to activate it. The skill requires a clean checkout whose
-current branch is `main` and whose `HEAD` exactly matches `origin/main`.
+`.github/skills/trace-release/SKILL.md`.
 
 The skill:
 
@@ -167,12 +142,6 @@ The skill:
 5. Verifies the embedded version/build and archive checksum.
 6. Creates `vVERSION` on the exact release commit and uploads only the
    notarized ZIP and SHA-256 file to GitHub Releases.
-
-Run it from a dedicated, clean `main` session. It refuses to switch branches,
-merge, stash, or publish from a feature branch.
-
-GitHub secret scanning and push protection are enabled for this public
-repository and should remain enabled.
 
 ## Test
 
