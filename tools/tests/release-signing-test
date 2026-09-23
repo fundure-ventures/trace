@@ -1,0 +1,263 @@
+#!/bin/bash
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+SIGN_APP="$ROOT/tools/sign-app"
+BUILD_UNSIGNED_RELEASE="$ROOT/tools/build-release"
+SIGN_RELEASE="$ROOT/tools/sign-release"
+PACKAGE_RELEASE="$ROOT/tools/package-notarized-release"
+TEMP_ROOT=$(mktemp -d)
+
+cleanup() {
+    rm -rf "$TEMP_ROOT"
+}
+trap cleanup EXIT
+
+FAKE_BIN="$TEMP_ROOT/bin"
+APP="$TEMP_ROOT/Trace.app"
+INFO_PLIST="$APP/Contents/Info.plist"
+ENTITLEMENTS="$TEMP_ROOT/direct.entitlements"
+COMMAND_LOG="$TEMP_ROOT/commands.log"
+mkdir -p "$FAKE_BIN" "$APP/Contents/MacOS"
+
+cat > "$INFO_PLIST" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.traceproject.app</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+</dict>
+</plist>
+EOF
+
+cat > "$ENTITLEMENTS" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict/>
+</plist>
+EOF
+
+cat > "$FAKE_BIN/codesign" <<'EOF'
+#!/bin/bash
+set -eu
+printf 'codesign' >> "$TRACE_TEST_COMMAND_LOG"
+printf ' <%s>' "$@" >> "$TRACE_TEST_COMMAND_LOG"
+printf '\n' >> "$TRACE_TEST_COMMAND_LOG"
+EOF
+
+cat > "$FAKE_BIN/xcrun" <<'EOF'
+#!/bin/bash
+set -eu
+printf 'xcrun' >> "$TRACE_TEST_COMMAND_LOG"
+printf ' <%s>' "$@" >> "$TRACE_TEST_COMMAND_LOG"
+printf '\n' >> "$TRACE_TEST_COMMAND_LOG"
+EOF
+
+cat > "$FAKE_BIN/spctl" <<'EOF'
+#!/bin/bash
+set -eu
+printf 'spctl' >> "$TRACE_TEST_COMMAND_LOG"
+printf ' <%s>' "$@" >> "$TRACE_TEST_COMMAND_LOG"
+printf '\n' >> "$TRACE_TEST_COMMAND_LOG"
+EOF
+
+cat > "$FAKE_BIN/ditto" <<'EOF'
+#!/bin/bash
+set -eu
+printf 'ditto' >> "$TRACE_TEST_COMMAND_LOG"
+printf ' <%s>' "$@" >> "$TRACE_TEST_COMMAND_LOG"
+printf '\n' >> "$TRACE_TEST_COMMAND_LOG"
+for output; do :; done
+mkdir -p "$(dirname "$output")"
+printf 'archive\n' > "$output"
+EOF
+
+cat > "$FAKE_BIN/shasum" <<'EOF'
+#!/bin/bash
+set -eu
+printf '0123456789abcdef  %s\n' "$3"
+EOF
+
+cat > "$FAKE_BIN/security" <<'EOF'
+#!/bin/bash
+set -eu
+[[ "$*" == "find-identity -v -p codesigning" ]]
+printf '%s\n' \
+    '  1) 0123456789ABCDEF0123456789ABCDEF01234567 "Developer ID Application: Trace (TEAMID)"'
+printf '%s\n' '     1 valid identities found'
+EOF
+
+chmod +x "$FAKE_BIN"/*
+export PATH="$FAKE_BIN:$PATH"
+export TRACE_TEST_COMMAND_LOG="$COMMAND_LOG"
+
+TRACE_CODE_SIGN_IDENTITY="Developer ID Application: Trace (TEAMID)" \
+TRACE_CODE_SIGN_ENTITLEMENTS="$ENTITLEMENTS" \
+    "$SIGN_APP" "$APP"
+
+grep -Fq \
+    "codesign <--force> <--sign> <Developer ID Application: Trace (TEAMID)> <--options> <runtime> <--timestamp> <--entitlements> <$ENTITLEMENTS> <$APP>" \
+    "$COMMAND_LOG"
+
+: > "$COMMAND_LOG"
+"$SIGN_APP" "$APP"
+grep -Fq \
+    'codesign <--force> <--sign> <-> <--requirements> <=designated => identifier "com.traceproject.app"> '"<$APP>" \
+    "$COMMAND_LOG"
+if grep -Fq '<--options>' "$COMMAND_LOG"; then
+    echo "expected ad-hoc signing to omit hardened runtime options" >&2
+    exit 1
+fi
+
+if TRACE_CODE_SIGN_IDENTITY="Developer ID Application: Trace (TEAMID)" \
+    TRACE_CODE_SIGN_ENTITLEMENTS="$TEMP_ROOT/missing.entitlements" \
+    "$SIGN_APP" "$APP" >"$TEMP_ROOT/sign.out" 2>"$TEMP_ROOT/sign.err"; then
+    echo "expected missing entitlements to fail" >&2
+    exit 1
+fi
+grep -Fq "missing code-signing entitlements" "$TEMP_ROOT/sign.err"
+
+: > "$COMMAND_LOG"
+OUTPUT_ZIP="$TEMP_ROOT/output/Trace-1.2.3.zip"
+
+printf 'secret\n' > "$APP/Contents/.env"
+if TRACE_NOTARY_KEYCHAIN_PROFILE="trace-notary" \
+    "$PACKAGE_RELEASE" "$APP" "$OUTPUT_ZIP" \
+    >"$TEMP_ROOT/env-artifact.out" 2>"$TEMP_ROOT/env-artifact.err"; then
+    echo "expected packaged environment file to fail" >&2
+    exit 1
+fi
+grep -Fq "sensitive file in app bundle" "$TEMP_ROOT/env-artifact.err"
+rm "$APP/Contents/.env"
+
+printf '%s\n' '-----BEGIN PRIVATE KEY-----' \
+    > "$APP/Contents/Resources-private-key.txt"
+if TRACE_NOTARY_KEYCHAIN_PROFILE="trace-notary" \
+    "$PACKAGE_RELEASE" "$APP" "$OUTPUT_ZIP" \
+    >"$TEMP_ROOT/key-artifact.out" 2>"$TEMP_ROOT/key-artifact.err"; then
+    echo "expected packaged private key material to fail" >&2
+    exit 1
+fi
+grep -Fq "private key material in app bundle" "$TEMP_ROOT/key-artifact.err"
+rm "$APP/Contents/Resources-private-key.txt"
+
+TRACE_NOTARY_KEYCHAIN_PROFILE="trace-notary" \
+    "$PACKAGE_RELEASE" "$APP" "$OUTPUT_ZIP"
+
+grep -Fq \
+    "xcrun <notarytool> <submit>" \
+    "$COMMAND_LOG"
+grep -Fq \
+    "<--keychain-profile> <trace-notary> <--wait>" \
+    "$COMMAND_LOG"
+grep -Fq "xcrun <stapler> <staple> <$APP>" "$COMMAND_LOG"
+grep -Fq "xcrun <stapler> <validate> <$APP>" "$COMMAND_LOG"
+grep -Fq "spctl <--assess> <--type> <execute> <--verbose=4> <$APP>" \
+    "$COMMAND_LOG"
+[[ -f "$OUTPUT_ZIP" ]]
+grep -Fq "0123456789abcdef  Trace-1.2.3.zip" "$OUTPUT_ZIP.sha256"
+
+NOTARY_KEY="$TEMP_ROOT/AuthKey_TEST.p8"
+printf 'private key\n' > "$NOTARY_KEY"
+if TRACE_NOTARY_KEY_PATH="$NOTARY_KEY" \
+    TRACE_NOTARY_KEY_ID="KEY123" \
+    TRACE_NOTARY_ISSUER_ID="ISSUER456" \
+    "$PACKAGE_RELEASE" "$APP" "$OUTPUT_ZIP" \
+    >"$TEMP_ROOT/notary.out" 2>"$TEMP_ROOT/notary.err"; then
+    echo "expected raw notarization API key variables to be rejected" >&2
+    exit 1
+fi
+grep -Fq "notarization credentials" "$TEMP_ROOT/notary.err"
+
+FAKE_LAUNCHER="$TEMP_ROOT/fake-launcher"
+FAKE_PACKAGER="$TEMP_ROOT/fake-packager"
+cat > "$FAKE_LAUNCHER" <<'EOF'
+#!/bin/bash
+set -eu
+printf '%s\n' \
+    "$TRACE_BUILD_CONFIGURATION" \
+    "$TRACE_BUILD_ONLY" \
+    "$TRACE_SKIP_SIGNING" \
+    "${TRACE_VERSION-unset}" \
+    "${TRACE_BUILD_NUMBER-unset}" \
+    > "$TRACE_TEST_BUILD_ENV"
+EOF
+cat > "$FAKE_PACKAGER" <<'EOF'
+#!/bin/bash
+set -eu
+printf '%s\n%s\n%s\n' \
+    "$1" \
+    "$2" \
+    "${TRACE_NOTARY_KEYCHAIN_PROFILE:-}" \
+    > "$TRACE_TEST_PACKAGE_ARGS"
+EOF
+chmod +x "$FAKE_LAUNCHER" "$FAKE_PACKAGER"
+
+TRACE_RELEASE_LAUNCHER="$FAKE_LAUNCHER" \
+TRACE_TEST_BUILD_ENV="$TEMP_ROOT/build.env" \
+    "$BUILD_UNSIGNED_RELEASE" 1.2.3 42
+
+cat > "$TEMP_ROOT/expected-build.env" <<EOF
+release
+1
+1
+1.2.3
+42
+EOF
+cmp "$TEMP_ROOT/expected-build.env" "$TEMP_ROOT/build.env"
+
+TRACE_VERSION=9.9.9 \
+TRACE_BUILD_NUMBER=999 \
+TRACE_RELEASE_LAUNCHER="$FAKE_LAUNCHER" \
+TRACE_TEST_BUILD_ENV="$TEMP_ROOT/default-build.env" \
+    "$BUILD_UNSIGNED_RELEASE"
+cat > "$TEMP_ROOT/expected-default-build.env" <<EOF
+release
+1
+1
+unset
+unset
+EOF
+cmp "$TEMP_ROOT/expected-default-build.env" "$TEMP_ROOT/default-build.env"
+
+plutil -replace CFBundleShortVersionString -string 1.2.3 "$INFO_PLIST"
+plutil -replace CFBundleVersion -string 42 "$INFO_PLIST"
+: > "$COMMAND_LOG"
+TRACE_RELEASE_PACKAGER="$FAKE_PACKAGER" \
+TRACE_RELEASE_APP_PATH="$APP" \
+TRACE_TEST_PACKAGE_ARGS="$TEMP_ROOT/package.args" \
+    "$SIGN_RELEASE" 1.2.3 42 "$TEMP_ROOT/release"
+grep -Fq \
+    "<--entitlements> <$ROOT/config/entitlements/direct.entitlements> <$APP>" \
+    "$COMMAND_LOG"
+cat > "$TEMP_ROOT/expected-package.args" <<EOF
+$APP
+$TEMP_ROOT/release/Trace-1.2.3-42.zip
+trace-notary
+EOF
+cmp "$TEMP_ROOT/expected-package.args" "$TEMP_ROOT/package.args"
+grep -Fq \
+    "<--sign> <Developer ID Application: Trace (TEAMID)>" \
+    "$COMMAND_LOG"
+
+if "$BUILD_UNSIGNED_RELEASE" 1.2 42 \
+    >"$TEMP_ROOT/version.out" 2>"$TEMP_ROOT/version.err"; then
+    echo "expected malformed release version to fail" >&2
+    exit 1
+fi
+grep -Fq "version must use MAJOR.MINOR.PATCH" "$TEMP_ROOT/version.err"
+
+if "$BUILD_UNSIGNED_RELEASE" 1.2.3 build-42 \
+    >"$TEMP_ROOT/build-number.out" 2>"$TEMP_ROOT/build-number.err"; then
+    echo "expected malformed build number to fail" >&2
+    exit 1
+fi
+grep -Fq "build number must be a positive integer" \
+    "$TEMP_ROOT/build-number.err"
+
+echo "release signing tests passed"

@@ -3,15 +3,36 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 CONFIGURATION=${TRACE_BUILD_CONFIGURATION:-debug}
-BUILD_APP="$ROOT/.build/Trace.app"
-APP="${TRACE_APP_INSTALL_DIR:-/Applications}/Trace.app"
+case "$CONFIGURATION" in
+    debug)
+        APP_NAME="Trace Debug.app"
+        PRODUCT_NAME="Trace Debug"
+        BUNDLE_IDENTIFIER_SUFFIX=".debug"
+        BUILD_APP="$ROOT/.build/$APP_NAME"
+        APP="${TRACE_APP_INSTALL_DIR:-/Applications}/$APP_NAME"
+        INCLUDE_LOCAL_ENV=true
+        ;;
+    release)
+        APP_NAME="Trace.app"
+        PRODUCT_NAME="Trace"
+        BUNDLE_IDENTIFIER_SUFFIX=""
+        BUILD_APP="$ROOT/.build/$APP_NAME"
+        APP="$BUILD_APP"
+        INCLUDE_LOCAL_ENV=false
+        ;;
+    *)
+        echo "error: unsupported Trace build configuration: $CONFIGURATION" >&2
+        exit 64
+        ;;
+esac
 CONTENTS="$BUILD_APP/Contents"
 WEB_ROOT="$ROOT/apps/trace-macos/WebCanvas"
 WEB_RESOURCES="$CONTENTS/Resources/WebCanvas"
-BUNDLE_IDENTIFIER=$(
+BASE_BUNDLE_IDENTIFIER=$(
     plutil -extract CFBundleIdentifier raw -o - \
         "$ROOT/apps/trace-macos/Trace-Info.plist"
 )
+BUNDLE_IDENTIFIER="${BASE_BUNDLE_IDENTIFIER}${BUNDLE_IDENTIFIER_SUFFIX}"
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 CLEAR_STATE=false
 
@@ -22,9 +43,10 @@ usage: ./tools/trace [--clear]
   --clear  Reset Trace onboarding, calibration, window state, and macOS
            permissions before launching. Saved .traceboard drawings remain.
 
-Builds Trace and installs it to /Applications/Trace.app (override with
-TRACE_APP_INSTALL_DIR) before launching, so every worktree shares one
-canonical app bundle instead of fighting over Launch Services/TCC state.
+Builds Trace Debug and installs it to /Applications/Trace Debug.app (override
+the parent directory with TRACE_APP_INSTALL_DIR) before launching, so every
+worktree shares one canonical debug app instead of fighting over Launch
+Services/TCC state.
 EOF
 }
 
@@ -158,18 +180,41 @@ BIN_DIRECTORY=$("$SWIFT" build "${BUILD_ARGS[@]}" --show-bin-path)
     "$ROOT/.build/web-canvas" \
     "$ROOT"
 
+rm -rf -- "$BUILD_APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 cp "$BIN_DIRECTORY/trace" "$CONTENTS/MacOS/trace"
 cp "$ROOT/apps/trace-macos/Trace-Info.plist" "$CONTENTS/Info.plist"
+plutil -replace CFBundleDisplayName -string "$PRODUCT_NAME" "$CONTENTS/Info.plist"
+plutil -replace CFBundleName -string "$PRODUCT_NAME" "$CONTENTS/Info.plist"
+plutil -replace CFBundleIdentifier \
+    -string "$BUNDLE_IDENTIFIER" \
+    "$CONTENTS/Info.plist"
+if [[ -n "${TRACE_VERSION:-}" ]]; then
+    if [[ ! "$TRACE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "error: TRACE_VERSION must use MAJOR.MINOR.PATCH." >&2
+        exit 64
+    fi
+    plutil -replace CFBundleShortVersionString \
+        -string "$TRACE_VERSION" \
+        "$CONTENTS/Info.plist"
+fi
+if [[ -n "${TRACE_BUILD_NUMBER:-}" ]]; then
+    if [[ ! "$TRACE_BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+        echo "error: TRACE_BUILD_NUMBER must be a positive integer." >&2
+        exit 64
+    fi
+    plutil -replace CFBundleVersion \
+        -string "$TRACE_BUILD_NUMBER" \
+        "$CONTENTS/Info.plist"
+fi
 rm -rf "$WEB_RESOURCES"
 cp -R "$WEB_ROOT/dist" "$WEB_RESOURCES"
 "$ROOT/tools/copy-swiftpm-resource-bundles" \
     "$BIN_DIRECTORY" \
     "$CONTENTS/Resources"
-if [[ -f "$ROOT/.env" ]]; then
-    # Bake the repository .env into the bundle so an installed app (e.g.
-    # /Applications/Trace.app) can still resolve OPEN_ROUTER_API_KEY without
-    # depending on a repository checkout being nearby.
+if $INCLUDE_LOCAL_ENV && [[ -f "$ROOT/.env" ]]; then
+    # Keep local credentials available to the installed debug product.
+    # Production release bundles must never contain repository environment files.
     cp "$ROOT/.env" "$CONTENTS/Resources/.env"
 fi
 ICON_INFO_PLIST="$ROOT/.build/trace-icon-info.plist"
@@ -183,12 +228,19 @@ xcrun actool "$ROOT/design/app-icon/trace.icon" \
 /usr/libexec/PlistBuddy -c "Merge $ICON_INFO_PLIST" "$CONTENTS/Info.plist"
 
 if [[ "${TRACE_BUILD_ONLY:-0}" == "1" ]]; then
-    "$ROOT/tools/sign-app" "$BUILD_APP"
+    if [[ "${TRACE_SKIP_SIGNING:-0}" != "1" ]]; then
+        "$ROOT/tools/sign-app" "$BUILD_APP"
+    fi
     exit 0
 fi
 
+if [[ "$CONFIGURATION" != "debug" ]]; then
+    echo "error: only the debug product can be launched by tools/trace." >&2
+    exit 64
+fi
+
 # Install into a single, canonical location so every worktree/build launches
-# the same app bundle instead of each staging its own copy under .build,
+# the same debug app instead of each staging its own copy under .build,
 # which confuses TCC (screen recording, etc.) and Launch Services.
 "$ROOT/tools/quit-running-app" "$BUNDLE_IDENTIFIER"
 rm -rf "$APP"

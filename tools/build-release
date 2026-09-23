@@ -1,0 +1,33 @@
+#!/bin/bash
+set -eu
+
+if (($# != 0 && $# != 2)); then
+    echo "usage: tools/build-release [VERSION BUILD_NUMBER]" >&2
+    exit 64
+fi
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+LAUNCHER=${TRACE_RELEASE_LAUNCHER:-"$ROOT/tools/trace"}
+
+if (($# == 2)); then
+    VERSION=$1
+    BUILD_NUMBER=$2
+    if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "error: version must use MAJOR.MINOR.PATCH." >&2
+        exit 64
+    fi
+    if [[ ! "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+        echo "error: build number must be a positive integer." >&2
+        exit 64
+    fi
+    export TRACE_VERSION="$VERSION"
+    export TRACE_BUILD_NUMBER="$BUILD_NUMBER"
+else
+    unset TRACE_VERSION TRACE_BUILD_NUMBER
+fi
+
+export TRACE_BUILD_CONFIGURATION=release
+export TRACE_BUILD_ONLY=1
+export TRACE_SKIP_SIGNING=1
+
+"$LAUNCHER"

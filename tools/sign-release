@@ -1,0 +1,80 @@
+#!/bin/bash
+set -eu
+
+if (($# != 0 && $# != 2 && $# != 3)); then
+    echo "usage: tools/sign-release [VERSION BUILD_NUMBER [OUTPUT_DIR]]" >&2
+    exit 64
+fi
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+APP=${TRACE_RELEASE_APP_PATH:-"$ROOT/.build/Trace.app"}
+PACKAGER=${TRACE_RELEASE_PACKAGER:-"$ROOT/tools/package-notarized-release"}
+ENTITLEMENTS="$ROOT/config/entitlements/direct.entitlements"
+
+if [[ ! -f "$APP/Contents/Info.plist" ]]; then
+    echo "error: missing unsigned release app; run tools/build-release first." >&2
+    exit 66
+fi
+
+ACTUAL_VERSION=$(
+    plutil -extract CFBundleShortVersionString raw -o - \
+        "$APP/Contents/Info.plist"
+)
+ACTUAL_BUILD=$(
+    plutil -extract CFBundleVersion raw -o - \
+        "$APP/Contents/Info.plist"
+)
+
+if (($# >= 2)); then
+    VERSION=$1
+    BUILD_NUMBER=$2
+    if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "error: version must use MAJOR.MINOR.PATCH." >&2
+        exit 64
+    fi
+    if [[ ! "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+        echo "error: build number must be a positive integer." >&2
+        exit 64
+    fi
+    if [[ "$ACTUAL_VERSION" != "$VERSION" || "$ACTUAL_BUILD" != "$BUILD_NUMBER" ]]; then
+        echo \
+            "error: unsigned app is $ACTUAL_VERSION ($ACTUAL_BUILD), expected $VERSION ($BUILD_NUMBER)." \
+            >&2
+        exit 1
+    fi
+else
+    VERSION=$ACTUAL_VERSION
+    BUILD_NUMBER=$ACTUAL_BUILD
+fi
+
+OUTPUT_DIR=${3:-"$ROOT/.build/release"}
+
+if [[ -z "${TRACE_CODE_SIGN_IDENTITY:-}" ]]; then
+    IDENTITIES=$(
+        security find-identity -v -p codesigning 2>/dev/null |
+            sed -nE \
+                's/^[[:space:]]*[0-9]+\) [0-9A-F]+ "(Developer ID Application:[^"]+)"$/\1/p'
+    )
+    IDENTITY_COUNT=$(printf '%s\n' "$IDENTITIES" | grep -c . || true)
+    if [[ "$IDENTITY_COUNT" != "1" ]]; then
+        echo \
+            "error: expected one Developer ID Application identity; set TRACE_CODE_SIGN_IDENTITY explicitly." \
+            >&2
+        exit 64
+    fi
+    TRACE_CODE_SIGN_IDENTITY=$IDENTITIES
+fi
+
+export TRACE_CODE_SIGN_IDENTITY
+export TRACE_CODE_SIGN_ENTITLEMENTS="$ENTITLEMENTS"
+if [[ -z "${TRACE_NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
+    export TRACE_NOTARY_KEYCHAIN_PROFILE=trace-notary
+fi
+
+"$ROOT/tools/sign-app" "$APP"
+codesign --verify --deep --strict --verbose=2 "$APP"
+codesign --display --verbose=4 "$APP"
+
+OUTPUT_ZIP="$OUTPUT_DIR/Trace-$VERSION-$BUILD_NUMBER.zip"
+"$PACKAGER" "$APP" "$OUTPUT_ZIP"
+printf 'Created %s\n' "$OUTPUT_ZIP"

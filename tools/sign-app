@@ -23,10 +23,22 @@ if [[ ! "$BUNDLE_IDENTIFIER" =~ ^[A-Za-z0-9.-]+$ ]]; then
 fi
 
 if [[ -n "${TRACE_CODE_SIGN_IDENTITY:-}" ]]; then
-    codesign \
-        --force \
-        --sign "$TRACE_CODE_SIGN_IDENTITY" \
-        "$APP" >/dev/null
+    SIGN_ARGS=(
+        --force
+        --sign "$TRACE_CODE_SIGN_IDENTITY"
+        --options runtime
+        --timestamp
+    )
+    if [[ -n "${TRACE_CODE_SIGN_ENTITLEMENTS:-}" ]]; then
+        if [[ ! -f "$TRACE_CODE_SIGN_ENTITLEMENTS" ]]; then
+            echo \
+                "error: missing code-signing entitlements: $TRACE_CODE_SIGN_ENTITLEMENTS" \
+                >&2
+            exit 66
+        fi
+        SIGN_ARGS+=(--entitlements "$TRACE_CODE_SIGN_ENTITLEMENTS")
+    fi
+    codesign "${SIGN_ARGS[@]}" "$APP" >/dev/null
 else
     # The default ad-hoc requirement is cdhash-based, so TCC forgets rebuilt apps.
     REQUIREMENT="=designated => identifier \"$BUNDLE_IDENTIFIER\""
