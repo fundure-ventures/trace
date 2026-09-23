@@ -1,13 +1,7 @@
 scripts:
-  - name: Build Trace
-    command: cd "$COPILOT_WORKSPACE_PATH" && TRACE_BUILD_ONLY=1 ./tools/trace
-  - name: Launch Trace
+  - name: Launch Debug
     command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/quit-running-app com.traceproject.app && ./tools/trace
-  - name: Build Drawing Lab
-    command: cd "$COPILOT_WORKSPACE_PATH" && TRACE_BUILD_ONLY=1 ./tools/trace-input-lab
-  - name: Launch Drawing Lab
-    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/trace-input-lab
-  - name: Build Diagnostics
-    command: cd "$COPILOT_WORKSPACE_PATH" && TRACE_BUILD_ONLY=1 ./tools/neo-diagnostics
-  - name: Launch Diagnostics
-    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/neo-diagnostics
+  - name: Build Release
+    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/build-release
+  - name: Sign Release
+    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/sign-release

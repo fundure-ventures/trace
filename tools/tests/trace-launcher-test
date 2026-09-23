@@ -8,6 +8,7 @@ QUIT_APP="$ROOT/tools/quit-running-app"
 WAIT_APP="$ROOT/tools/wait-for-running-app"
 COPY_RESOURCE_BUNDLES="$ROOT/tools/copy-swiftpm-resource-bundles"
 LAUNCHER="$ROOT/tools/trace"
+GITHUB_APP_CONFIG="$ROOT/.github/github-app.yml"
 TEMP_ROOT=$(mktemp -d)
 APP_PID=""
 
@@ -281,6 +282,13 @@ grep -Fq -- '-platform_version' "$LAUNCHER"
 grep -Fq -- '"$MACOS_SDK_VERSION"' "$LAUNCHER"
 grep -Fq 'plutil -replace CFBundleShortVersionString' "$LAUNCHER"
 grep -Fq 'plutil -replace CFBundleVersion' "$LAUNCHER"
+grep -Fq 'APP_NAME="Trace Debug.app"' "$LAUNCHER"
+grep -Fq 'APP_NAME="Trace.app"' "$LAUNCHER"
+grep -Fq 'PRODUCT_NAME="Trace Debug"' "$LAUNCHER"
+grep -Fq 'BUNDLE_IDENTIFIER_SUFFIX=".debug"' "$LAUNCHER"
+grep -Fq 'APP="$ROOT/.build/$APP_NAME"' "$LAUNCHER"
+grep -Fq 'rm -rf -- "$APP"' "$LAUNCHER"
+grep -Fq 'if [[ "${TRACE_SKIP_SIGNING:-0}" != "1" ]]' "$LAUNCHER"
 
 icon_line=$(grep -nF 'xcrun actool' "$LAUNCHER" | head -n 1 | cut -d: -f1)
 icon_merge_line=$(grep -nF 'Merge $ICON_INFO_PLIST' "$LAUNCHER" | head -n 1 | cut -d: -f1)
@@ -293,5 +301,16 @@ grep -Fq '"$ROOT/design/app-icon/trace.icon"' "$LAUNCHER"
 grep -Fq -- '--compile "$CONTENTS/Resources"' "$LAUNCHER"
 grep -Fq -- '--app-icon trace' "$LAUNCHER"
 grep -Fq -- '--minimum-deployment-target 13.0' "$LAUNCHER"
+
+cat > "$TEMP_ROOT/expected-github-app.yml" <<'EOF'
+scripts:
+  - name: Launch Debug
+    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/quit-running-app com.traceproject.app && ./tools/trace
+  - name: Build Release
+    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/build-release
+  - name: Sign Release
+    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/sign-release
+EOF
+cmp "$TEMP_ROOT/expected-github-app.yml" "$GITHUB_APP_CONFIG"
 
 echo "trace launcher tests passed"

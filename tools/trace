@@ -3,14 +3,31 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 CONFIGURATION=${TRACE_BUILD_CONFIGURATION:-debug}
-APP="$ROOT/.build/Trace.app"
+case "$CONFIGURATION" in
+    debug)
+        APP_NAME="Trace Debug.app"
+        PRODUCT_NAME="Trace Debug"
+        BUNDLE_IDENTIFIER_SUFFIX=".debug"
+        ;;
+    release)
+        APP_NAME="Trace.app"
+        PRODUCT_NAME="Trace"
+        BUNDLE_IDENTIFIER_SUFFIX=""
+        ;;
+    *)
+        echo "error: unsupported Trace build configuration: $CONFIGURATION" >&2
+        exit 64
+        ;;
+esac
+APP="$ROOT/.build/$APP_NAME"
 CONTENTS="$APP/Contents"
 WEB_ROOT="$ROOT/apps/trace-macos/WebCanvas"
 WEB_RESOURCES="$CONTENTS/Resources/WebCanvas"
-BUNDLE_IDENTIFIER=$(
+BASE_BUNDLE_IDENTIFIER=$(
     plutil -extract CFBundleIdentifier raw -o - \
         "$ROOT/apps/trace-macos/Trace-Info.plist"
 )
+BUNDLE_IDENTIFIER="${BASE_BUNDLE_IDENTIFIER}${BUNDLE_IDENTIFIER_SUFFIX}"
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 CLEAR_STATE=false
 
@@ -153,9 +170,15 @@ BIN_DIRECTORY=$("$SWIFT" build "${BUILD_ARGS[@]}" --show-bin-path)
     "$ROOT/.build/web-canvas" \
     "$ROOT"
 
+rm -rf -- "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 cp "$BIN_DIRECTORY/trace" "$CONTENTS/MacOS/trace"
 cp "$ROOT/apps/trace-macos/Trace-Info.plist" "$CONTENTS/Info.plist"
+plutil -replace CFBundleDisplayName -string "$PRODUCT_NAME" "$CONTENTS/Info.plist"
+plutil -replace CFBundleName -string "$PRODUCT_NAME" "$CONTENTS/Info.plist"
+plutil -replace CFBundleIdentifier \
+    -string "$BUNDLE_IDENTIFIER" \
+    "$CONTENTS/Info.plist"
 if [[ -n "${TRACE_VERSION:-}" ]]; then
     if [[ ! "$TRACE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "error: TRACE_VERSION must use MAJOR.MINOR.PATCH." >&2
@@ -188,7 +211,9 @@ xcrun actool "$ROOT/design/app-icon/trace.icon" \
     --output-partial-info-plist "$ICON_INFO_PLIST" \
     --output-format human-readable-text
 /usr/libexec/PlistBuddy -c "Merge $ICON_INFO_PLIST" "$CONTENTS/Info.plist"
-"$ROOT/tools/sign-app" "$APP"
+if [[ "${TRACE_SKIP_SIGNING:-0}" != "1" ]]; then
+    "$ROOT/tools/sign-app" "$APP"
+fi
 
 if [[ "${TRACE_BUILD_ONLY:-0}" == "1" ]]; then
     exit 0

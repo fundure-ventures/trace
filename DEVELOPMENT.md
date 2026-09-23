@@ -14,23 +14,50 @@ required macOS 26.5 SDK is not found automatically.
 
 ## Run
 
-Build, package, sign, and launch Trace:
+The repository produces two application bundles:
+
+| Product | Purpose | Output |
+|---|---|---|
+| Trace Debug | Fast local iteration with a separate bundle identity and ad-hoc signature | `.build/Trace Debug.app` |
+| Trace | Production release build, unsigned until the signing step | `.build/Trace.app` |
+
+The app quick actions intentionally contain only **Launch Debug**,
+**Build Release**, and **Sign Release**.
+
+Build, package, ad-hoc sign, and launch the debug product:
 
 ```sh
 ./tools/trace
 ```
 
-Build and package without launching:
+Build the debug product without launching:
 
 ```sh
 TRACE_BUILD_ONLY=1 ./tools/trace
 ```
 
+`Trace Debug.app` uses the `com.traceproject.app.debug` bundle identifier so
+its launch registration, privacy grants, preferences, and ad-hoc signature do
+not replace the production product.
+
+Build the unsigned production product:
+
+```sh
+./tools/build-release
+```
+
+Inject an explicit release version while building:
+
+```sh
+./tools/build-release 0.2.0 2
+```
+
 The build compiles `design/app-icon/trace.icon` with Xcode's `actool`, bundles
 the layered `Assets.car` and fallback `trace.icns`, and merges the generated
-icon metadata before signing. Edit the source in Icon Composer and rebuild;
-the standalone Blender PNGs are not used as the application icon. Use an Xcode
-version that supports the source's Icon Composer features (verified with Xcode 27).
+icon metadata before the optional signing step. Edit the source in Icon
+Composer and rebuild; the standalone Blender PNGs are not used as the
+application icon. Use an Xcode version that supports the source's Icon
+Composer features (verified with Xcode 27).
 
 The editable artwork is `design/app-icon/trace-e.blend`; the Python builder
 and layer exporter live alongside it. Generated `trace-e.png` previews and
@@ -39,7 +66,7 @@ and are the inputs used by every packaged Trace build.
 
 For known issues and fixes, see [Troubleshooting](TROUBLESHOOTING.md).
 
-Reset onboarding, calibration, window state, and Trace privacy grants:
+Reset debug-product onboarding, calibration, window state, and privacy grants:
 
 ```sh
 ./tools/trace --clear
@@ -67,10 +94,10 @@ bun run build
 
 ## Production signing
 
-The direct-download release path uses the same SwiftPM app packager as local
-development, with release optimization, explicit version injection, Developer
-ID signing, hardened runtime, notarization, stapling, and Gatekeeper
-verification. It does not require opening Xcode.
+The direct-download release path signs the existing `.build/Trace.app` built
+by `tools/build-release`. Signing applies the Developer ID identity, hardened
+runtime entitlements, notarization, stapling, Gatekeeper verification, and
+archive checksum without opening Xcode.
 
 Required local credentials:
 
@@ -87,11 +114,24 @@ xcrun notarytool store-credentials trace-notary \
   --issuer ISSUER_ID
 ```
 
-Build a signed and notarized archive:
+Build the release product, then sign and notarize it:
 
 ```sh
+./tools/build-release 0.2.0 2
+
 TRACE_CODE_SIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
 TRACE_NOTARY_KEYCHAIN_PROFILE=trace-notary \
+./tools/sign-release 0.2.0 2
+```
+
+When exactly one Developer ID Application identity is installed,
+`tools/sign-release` selects it automatically. It also defaults to the
+`trace-notary` keychain profile, so the **Sign Release** quick action works
+after the one-time credential setup above.
+
+CI can build and sign in one command:
+
+```sh
 ./tools/build-signed-release 0.2.0 2
 ```
 
@@ -145,7 +185,7 @@ TRACE_GLOBAL_SHORTCUTS_PROBE=1 .build/debug/trace
 TRACE_OPEN_FILE_PROBE=1 .build/debug/trace
 TRACE_HARDWARE_FREE_PROBE=1 .build/debug/trace
 TRACE_BUILD_ONLY=1 ./tools/trace
-TRACE_PRODUCT_TLDRAW_PROBE=1 ".build/Trace.app/Contents/MacOS/trace"
+TRACE_PRODUCT_TLDRAW_PROBE=1 ".build/Trace Debug.app/Contents/MacOS/trace"
 ```
 
 ## Diagnostics
@@ -170,5 +210,7 @@ TRACE_BUILD_ONLY=1 ./tools/trace-input-lab
   drawing and stores its state in `tldraw.json`.
 - `.traceboard` packages contain the source image, `document.json`, and
   optional voice, transcript, and tldraw files.
-- The packaged app must be launched through `./tools/trace` so web resources
-  are embedded and the app is signed consistently.
+- Launch local debug builds through `./tools/trace` so web resources, the
+  debug identity, and the ad-hoc signature are applied consistently.
+- Build production bundles through `./tools/build-release` and sign that exact
+  `.build/Trace.app` through `./tools/sign-release`.

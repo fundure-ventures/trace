@@ -10,55 +10,8 @@ VERSION=$1
 BUILD_NUMBER=$2
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 OUTPUT_DIR=${3:-"$ROOT/.build/release"}
-APP=${TRACE_RELEASE_APP_PATH:-"$ROOT/.build/Trace.app"}
-APP_BUILDER=${TRACE_RELEASE_APP_BUILDER:-"$ROOT/tools/trace"}
-PACKAGER=${TRACE_RELEASE_PACKAGER:-"$ROOT/tools/package-notarized-release"}
-ENTITLEMENTS="$ROOT/config/entitlements/direct.entitlements"
+BUILDER=${TRACE_RELEASE_BUILDER:-"$ROOT/tools/build-release"}
+SIGNER=${TRACE_RELEASE_SIGNER:-"$ROOT/tools/sign-release"}
 
-if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "error: version must use MAJOR.MINOR.PATCH." >&2
-    exit 64
-fi
-if [[ ! "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
-    echo "error: build number must be a positive integer." >&2
-    exit 64
-fi
-if [[ -z "${TRACE_CODE_SIGN_IDENTITY:-}" ]]; then
-    echo "error: TRACE_CODE_SIGN_IDENTITY is required." >&2
-    exit 64
-fi
-
-export TRACE_BUILD_CONFIGURATION=release
-export TRACE_BUILD_ONLY=1
-export TRACE_VERSION="$VERSION"
-export TRACE_BUILD_NUMBER="$BUILD_NUMBER"
-export TRACE_CODE_SIGN_ENTITLEMENTS="$ENTITLEMENTS"
-
-"$APP_BUILDER"
-
-if [[ ! -d "$APP" ]]; then
-    echo "error: release build did not produce $APP" >&2
-    exit 1
-fi
-
-ACTUAL_VERSION=$(
-    plutil -extract CFBundleShortVersionString raw -o - \
-        "$APP/Contents/Info.plist"
-)
-ACTUAL_BUILD=$(
-    plutil -extract CFBundleVersion raw -o - \
-        "$APP/Contents/Info.plist"
-)
-if [[ "$ACTUAL_VERSION" != "$VERSION" || "$ACTUAL_BUILD" != "$BUILD_NUMBER" ]]; then
-    echo \
-        "error: packaged version is $ACTUAL_VERSION ($ACTUAL_BUILD), expected $VERSION ($BUILD_NUMBER)." \
-        >&2
-    exit 1
-fi
-
-codesign --verify --deep --strict --verbose=2 "$APP"
-codesign --display --verbose=4 "$APP"
-
-OUTPUT_ZIP="$OUTPUT_DIR/Trace-$VERSION-$BUILD_NUMBER.zip"
-"$PACKAGER" "$APP" "$OUTPUT_ZIP"
-printf 'Created %s\n' "$OUTPUT_ZIP"
+"$BUILDER" "$VERSION" "$BUILD_NUMBER"
+"$SIGNER" "$VERSION" "$BUILD_NUMBER" "$OUTPUT_DIR"
