@@ -503,6 +503,38 @@ Task {
         )
     }
 
+    await test("installed Trace resolves the env file baked into Resources") {
+        let installRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let bundle = installRoot
+            .appendingPathComponent("Applications", isDirectory: true)
+            .appendingPathComponent("Trace.app", isDirectory: true)
+        let resources = bundle
+            .appendingPathComponent("Contents", isDirectory: true)
+            .appendingPathComponent("Resources", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: resources,
+            withIntermediateDirectories: true
+        )
+        defer {
+            try? FileManager.default.removeItem(at: installRoot)
+        }
+        try "OPEN_ROUTER_API_KEY=installed-secret\n".write(
+            to: resources.appendingPathComponent(".env"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let configuration = try OpenRouterTranscriptionConfiguration.load(
+            environment: [:],
+            currentDirectoryURL: installRoot.appendingPathComponent("elsewhere"),
+            bundleURL: bundle
+        )
+        try expect(
+            configuration.apiKey == "installed-secret",
+            "installed app bundle did not resolve its baked-in Resources/.env"
+        )
+    }
+
     await test("supplied OpenRouter keys take precedence over Keychain") {
         let store = FakeOpenRouterAPIKeyStore(apiKey: "keychain-secret")
         let underscored = try OpenRouterTranscriptionConfiguration.resolve(

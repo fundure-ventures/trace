@@ -1,6 +1,6 @@
 scripts:
   - name: Launch Debug
-    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/quit-running-app com.traceproject.app && ./tools/trace
+    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/trace
   - name: Build Release
     command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/build-release
   - name: Sign Release

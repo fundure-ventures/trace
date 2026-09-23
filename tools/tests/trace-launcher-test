@@ -260,19 +260,21 @@ resolver_line=$(grep -nF 'resolve-xcode-developer-dir' "$LAUNCHER" | head -n 1 |
 build_only_line=$(grep -nF 'if [[ "${TRACE_BUILD_ONLY:-0}" == "1" ]]' "$LAUNCHER" | tail -n 1 | cut -d: -f1)
 resources_line=$(grep -nF 'copy-swiftpm-resource-bundles' "$LAUNCHER" | head -n 1 | cut -d: -f1)
 version_line=$(grep -nF 'plutil -replace CFBundleShortVersionString' "$LAUNCHER" | head -n 1 | cut -d: -f1)
-sign_line=$(grep -nF 'sign-app' "$LAUNCHER" | head -n 1 | cut -d: -f1)
+build_sign_line=$(grep -nF 'sign-app' "$LAUNCHER" | head -n 1 | cut -d: -f1)
+install_sign_line=$(grep -nF 'sign-app' "$LAUNCHER" | tail -n 1 | cut -d: -f1)
 quit_line=$(grep -nF 'quit-running-app' "$LAUNCHER" | head -n 1 | cut -d: -f1)
 open_line=$(grep -nF 'open "$APP"' "$LAUNCHER" | tail -n 1 | cut -d: -f1)
 wait_line=$(grep -nF 'wait-for-running-app' "$LAUNCHER" | head -n 1 | cut -d: -f1)
 
 if ! [[ "$resolver_line" -lt "$resources_line" &&
-    "$resources_line" -lt "$sign_line" &&
-    "$version_line" -lt "$sign_line" &&
-    "$sign_line" -lt "$build_only_line" &&
-    "$build_only_line" -lt "$quit_line" &&
-    "$quit_line" -lt "$open_line" &&
+    "$version_line" -lt "$build_only_line" &&
+    "$resources_line" -lt "$build_only_line" &&
+    "$build_only_line" -lt "$build_sign_line" &&
+    "$build_sign_line" -lt "$quit_line" &&
+    "$quit_line" -lt "$install_sign_line" &&
+    "$install_sign_line" -lt "$open_line" &&
     "$open_line" -lt "$wait_line" ]]; then
-    echo "expected resource copy, sign, build-only, quit, open, and wait ordering" >&2
+    echo "expected build, optional sign, install, sign, open, and wait ordering" >&2
     exit 1
 fi
 grep -Fq 'xcrun --find swift' "$LAUNCHER"
@@ -286,14 +288,19 @@ grep -Fq 'APP_NAME="Trace Debug.app"' "$LAUNCHER"
 grep -Fq 'APP_NAME="Trace.app"' "$LAUNCHER"
 grep -Fq 'PRODUCT_NAME="Trace Debug"' "$LAUNCHER"
 grep -Fq 'BUNDLE_IDENTIFIER_SUFFIX=".debug"' "$LAUNCHER"
-grep -Fq 'APP="$ROOT/.build/$APP_NAME"' "$LAUNCHER"
-grep -Fq 'rm -rf -- "$APP"' "$LAUNCHER"
+grep -Fq 'BUILD_APP="$ROOT/.build/$APP_NAME"' "$LAUNCHER"
+grep -Fq 'APP="${TRACE_APP_INSTALL_DIR:-/Applications}/$APP_NAME"' "$LAUNCHER"
+grep -Fq 'APP="$BUILD_APP"' "$LAUNCHER"
+grep -Fq 'rm -rf -- "$BUILD_APP"' "$LAUNCHER"
 grep -Fq 'if [[ "${TRACE_SKIP_SIGNING:-0}" != "1" ]]' "$LAUNCHER"
+grep -Fq 'if $INCLUDE_LOCAL_ENV && [[ -f "$ROOT/.env" ]]' "$LAUNCHER"
+grep -Fq 'if [[ "$CONFIGURATION" != "debug" ]]' "$LAUNCHER"
 
 icon_line=$(grep -nF 'xcrun actool' "$LAUNCHER" | head -n 1 | cut -d: -f1)
 icon_merge_line=$(grep -nF 'Merge $ICON_INFO_PLIST' "$LAUNCHER" | head -n 1 | cut -d: -f1)
 if ! [[ -n "$icon_line" && -n "$icon_merge_line" &&
-    "$icon_line" -lt "$icon_merge_line" && "$icon_merge_line" -lt "$sign_line" ]]; then
+    "$icon_line" -lt "$icon_merge_line" &&
+    "$icon_merge_line" -lt "$build_sign_line" ]]; then
     echo "expected Icon Composer compilation and metadata merge before signing" >&2
     exit 1
 fi
@@ -305,7 +312,7 @@ grep -Fq -- '--minimum-deployment-target 13.0' "$LAUNCHER"
 cat > "$TEMP_ROOT/expected-github-app.yml" <<'EOF'
 scripts:
   - name: Launch Debug
-    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/quit-running-app com.traceproject.app && ./tools/trace
+    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/trace
   - name: Build Release
     command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/build-release
   - name: Sign Release

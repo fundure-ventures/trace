@@ -8,19 +8,24 @@ case "$CONFIGURATION" in
         APP_NAME="Trace Debug.app"
         PRODUCT_NAME="Trace Debug"
         BUNDLE_IDENTIFIER_SUFFIX=".debug"
+        BUILD_APP="$ROOT/.build/$APP_NAME"
+        APP="${TRACE_APP_INSTALL_DIR:-/Applications}/$APP_NAME"
+        INCLUDE_LOCAL_ENV=true
         ;;
     release)
         APP_NAME="Trace.app"
         PRODUCT_NAME="Trace"
         BUNDLE_IDENTIFIER_SUFFIX=""
+        BUILD_APP="$ROOT/.build/$APP_NAME"
+        APP="$BUILD_APP"
+        INCLUDE_LOCAL_ENV=false
         ;;
     *)
         echo "error: unsupported Trace build configuration: $CONFIGURATION" >&2
         exit 64
         ;;
 esac
-APP="$ROOT/.build/$APP_NAME"
-CONTENTS="$APP/Contents"
+CONTENTS="$BUILD_APP/Contents"
 WEB_ROOT="$ROOT/apps/trace-macos/WebCanvas"
 WEB_RESOURCES="$CONTENTS/Resources/WebCanvas"
 BASE_BUNDLE_IDENTIFIER=$(
@@ -37,6 +42,11 @@ usage: ./tools/trace [--clear]
 
   --clear  Reset Trace onboarding, calibration, window state, and macOS
            permissions before launching. Saved .traceboard drawings remain.
+
+Builds Trace Debug and installs it to /Applications/Trace Debug.app (override
+the parent directory with TRACE_APP_INSTALL_DIR) before launching, so every
+worktree shares one canonical debug app instead of fighting over Launch
+Services/TCC state.
 EOF
 }
 
@@ -60,7 +70,7 @@ done
 
 running_trace_pids() {
     ps -ax -o pid=,command= |
-        awk -v executable="$CONTENTS/MacOS/trace" '
+        awk -v executable="$APP/Contents/MacOS/trace" '
             {
                 pid = $1
                 sub(/^[[:space:]]*[0-9]+[[:space:]]+/, "", $0)
@@ -170,7 +180,7 @@ BIN_DIRECTORY=$("$SWIFT" build "${BUILD_ARGS[@]}" --show-bin-path)
     "$ROOT/.build/web-canvas" \
     "$ROOT"
 
-rm -rf -- "$APP"
+rm -rf -- "$BUILD_APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 cp "$BIN_DIRECTORY/trace" "$CONTENTS/MacOS/trace"
 cp "$ROOT/apps/trace-macos/Trace-Info.plist" "$CONTENTS/Info.plist"
@@ -202,6 +212,11 @@ cp -R "$WEB_ROOT/dist" "$WEB_RESOURCES"
 "$ROOT/tools/copy-swiftpm-resource-bundles" \
     "$BIN_DIRECTORY" \
     "$CONTENTS/Resources"
+if $INCLUDE_LOCAL_ENV && [[ -f "$ROOT/.env" ]]; then
+    # Keep local credentials available to the installed debug product.
+    # Production release bundles must never contain repository environment files.
+    cp "$ROOT/.env" "$CONTENTS/Resources/.env"
+fi
 ICON_INFO_PLIST="$ROOT/.build/trace-icon-info.plist"
 xcrun actool "$ROOT/design/app-icon/trace.icon" \
     --compile "$CONTENTS/Resources" \
@@ -211,15 +226,28 @@ xcrun actool "$ROOT/design/app-icon/trace.icon" \
     --output-partial-info-plist "$ICON_INFO_PLIST" \
     --output-format human-readable-text
 /usr/libexec/PlistBuddy -c "Merge $ICON_INFO_PLIST" "$CONTENTS/Info.plist"
-if [[ "${TRACE_SKIP_SIGNING:-0}" != "1" ]]; then
-    "$ROOT/tools/sign-app" "$APP"
-fi
 
 if [[ "${TRACE_BUILD_ONLY:-0}" == "1" ]]; then
+    if [[ "${TRACE_SKIP_SIGNING:-0}" != "1" ]]; then
+        "$ROOT/tools/sign-app" "$BUILD_APP"
+    fi
     exit 0
 fi
 
+if [[ "$CONFIGURATION" != "debug" ]]; then
+    echo "error: only the debug product can be launched by tools/trace." >&2
+    exit 64
+fi
+
+# Install into a single, canonical location so every worktree/build launches
+# the same debug app instead of each staging its own copy under .build,
+# which confuses TCC (screen recording, etc.) and Launch Services.
 "$ROOT/tools/quit-running-app" "$BUNDLE_IDENTIFIER"
+rm -rf "$APP"
+mkdir -p "$(dirname -- "$APP")"
+cp -R "$BUILD_APP" "$APP"
+"$ROOT/tools/sign-app" "$APP"
+
 register_current_app
 open "$APP"
 "$ROOT/tools/wait-for-running-app" "$BUNDLE_IDENTIFIER"

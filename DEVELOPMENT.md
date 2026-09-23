@@ -18,7 +18,7 @@ The repository produces two application bundles:
 
 | Product | Purpose | Output |
 |---|---|---|
-| Trace Debug | Fast local iteration with a separate bundle identity and ad-hoc signature | `.build/Trace Debug.app` |
+| Trace Debug | Fast local iteration with a separate bundle identity and ad-hoc signature | built at `.build/Trace Debug.app`, launched from `/Applications/Trace Debug.app` |
 | Trace | Production release build, unsigned until the signing step | `.build/Trace.app` |
 
 The app quick actions intentionally contain only **Launch Debug**,
@@ -38,7 +38,9 @@ TRACE_BUILD_ONLY=1 ./tools/trace
 
 `Trace Debug.app` uses the `com.traceproject.app.debug` bundle identifier so
 its launch registration, privacy grants, preferences, and ad-hoc signature do
-not replace the production product.
+not replace the production product. Launching installs it at one canonical
+location (`/Applications/Trace Debug.app`, or `TRACE_APP_INSTALL_DIR`) so
+worktrees share stable Launch Services and TCC state.
 
 Build the unsigned production product:
 
@@ -75,7 +77,9 @@ Reset debug-product onboarding, calibration, window state, and privacy grants:
 Dictation accepts `OPEN_ROUTER_API_KEY` or `OPENROUTER_API_KEY`.
 Keys may also be supplied through `TRACE_ENV_FILE` or an untracked repository
 root `.env`. The same root file supplies `VITE_TLDRAW_LICENSE_KEY` to the web
-renderer. Never commit keys.
+renderer. The local `.env` is copied only into the installed debug product so
+it can resolve credentials away from the repository. It is never copied into
+the unsigned or signed production product. Never commit keys.
 
 ## Build
 
