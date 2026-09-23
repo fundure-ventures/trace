@@ -3,8 +3,9 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 CONFIGURATION=${TRACE_BUILD_CONFIGURATION:-debug}
-APP="$ROOT/.build/Trace.app"
-CONTENTS="$APP/Contents"
+BUILD_APP="$ROOT/.build/Trace.app"
+APP="${TRACE_APP_INSTALL_DIR:-/Applications}/Trace.app"
+CONTENTS="$BUILD_APP/Contents"
 WEB_ROOT="$ROOT/apps/trace-macos/WebCanvas"
 WEB_RESOURCES="$CONTENTS/Resources/WebCanvas"
 BUNDLE_IDENTIFIER=$(
@@ -20,6 +21,10 @@ usage: ./tools/trace [--clear]
 
   --clear  Reset Trace onboarding, calibration, window state, and macOS
            permissions before launching. Saved .traceboard drawings remain.
+
+Builds Trace and installs it to /Applications/Trace.app (override with
+TRACE_APP_INSTALL_DIR) before launching, so every worktree shares one
+canonical app bundle instead of fighting over Launch Services/TCC state.
 EOF
 }
 
@@ -43,7 +48,7 @@ done
 
 running_trace_pids() {
     ps -ax -o pid=,command= |
-        awk -v executable="$CONTENTS/MacOS/trace" '
+        awk -v executable="$APP/Contents/MacOS/trace" '
             {
                 pid = $1
                 sub(/^[[:space:]]*[0-9]+[[:space:]]+/, "", $0)
@@ -170,13 +175,21 @@ xcrun actool "$ROOT/design/app-icon/trace.icon" \
     --output-partial-info-plist "$ICON_INFO_PLIST" \
     --output-format human-readable-text
 /usr/libexec/PlistBuddy -c "Merge $ICON_INFO_PLIST" "$CONTENTS/Info.plist"
-"$ROOT/tools/sign-app" "$APP"
 
 if [[ "${TRACE_BUILD_ONLY:-0}" == "1" ]]; then
+    "$ROOT/tools/sign-app" "$BUILD_APP"
     exit 0
 fi
 
+# Install into a single, canonical location so every worktree/build launches
+# the same app bundle instead of each staging its own copy under .build,
+# which confuses TCC (screen recording, etc.) and Launch Services.
 "$ROOT/tools/quit-running-app" "$BUNDLE_IDENTIFIER"
+rm -rf "$APP"
+mkdir -p "$(dirname -- "$APP")"
+cp -R "$BUILD_APP" "$APP"
+"$ROOT/tools/sign-app" "$APP"
+
 register_current_app
 open "$APP"
 "$ROOT/tools/wait-for-running-app" "$BUNDLE_IDENTIFIER"
