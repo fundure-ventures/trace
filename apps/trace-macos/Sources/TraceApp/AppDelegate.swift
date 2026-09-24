@@ -983,6 +983,7 @@ final class TraceAppDelegate:
         sensitivity.submenu = sensitivityMenu
         penMenu.addItem(sensitivity)
         penSettings.submenu = penMenu
+        penSettings.isHidden = true
         menu.addItem(penSettings)
         penSettingsItem = penSettings
         penStatusItem = penStatus
@@ -1327,6 +1328,7 @@ final class TraceAppDelegate:
         desiredHoverEnabled: Bool?
     ) {
         let enabled = status != nil
+        penSettingsItem?.isHidden = !enabled
         penSettingsItem?.isEnabled = enabled
         penSettingsItem?.title = TracePenMenuPresentation.title(
             deviceInfo: deviceInfo,
