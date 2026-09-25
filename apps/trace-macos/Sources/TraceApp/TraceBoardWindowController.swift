@@ -808,10 +808,7 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         menuImageCount: Int,
         menuOpensBelow: Bool,
         menuGap: CGFloat,
-        totalWidth: CGFloat,
-        hasSeparator: Bool,
-        separatorWidth: CGFloat,
-        copyHoverBoxIsIndependent: Bool
+        totalWidth: CGFloat
     ) {
         annotationToolbar.copyControlForTesting
     }
@@ -935,7 +932,6 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         brushAlpha: CGFloat,
         micAlpha: CGFloat,
         copyAlpha: CGFloat,
-        copyOptionsAlpha: CGFloat,
         closeAlpha: CGFloat,
         cornerRadii: [CGFloat]
     ) {
@@ -961,14 +957,6 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
 
     func setActionHoverForPreview(_ hovered: Bool) {
         annotationToolbar.setActionHoverForTesting(hovered)
-    }
-
-    func setCopyIconHoverForPreview(_ hovered: Bool) {
-        annotationToolbar.setCopyIconHoverForTesting(hovered)
-    }
-
-    func setCopyOptionsHoverForPreview(_ hovered: Bool) {
-        annotationToolbar.setCopyOptionsHoverForTesting(hovered)
     }
 
     func setColorSwatchHoverForPreview(
@@ -3284,9 +3272,7 @@ private final class FloatingAnnotationToolbar:
     private let copyButton = NSButton()
     private let copyOptionsButton = NSButton()
     private let copyGroup = NSStackView()
-    private let copySeparator = NSBox()
     private let copyActionHover = ToolbarActionHoverView()
-    private let copyOptionsActionHover = ToolbarActionHoverView()
     private let copyOptionsMenu = NSMenu(title: "Copy")
     private let closeButton = NSButton()
     private let closeActionHover = ToolbarActionHoverView()
@@ -3544,18 +3530,17 @@ private final class FloatingAnnotationToolbar:
         copyButton.image = symbolImage(
             named: "doc.on.doc",
             fallback: "doc.on.clipboard",
-            description: "Copy trace"
+            description: "Copy options"
         )
         copyButton.isBordered = false
         copyButton.title = ""
         copyButton.imagePosition = .imageOnly
         copyButton.image?.isTemplate = true
         copyButton.contentTintColor = NSColor.white.withAlphaComponent(0.78)
-        copyButton.toolTip = "Copy trace (⌘C)"
-        copyButton.setAccessibilityLabel("Copy trace")
-        copyButton.setAccessibilityHelp("Keyboard shortcut Command-C")
+        copyButton.toolTip = "Copy options"
+        copyButton.setAccessibilityLabel("Copy options")
         copyButton.target = self
-        copyButton.action = #selector(copyDrawing)
+        copyButton.action = #selector(showCopyOptions(_:))
         copyButton.heightAnchor.constraint(equalToConstant: 24).isActive = true
         copyButton.widthAnchor.constraint(equalToConstant: 24).isActive = true
 
@@ -3580,22 +3565,29 @@ private final class FloatingAnnotationToolbar:
         copyOptionsButton.heightAnchor.constraint(equalToConstant: 24)
             .isActive = true
 
-        let copyDictationItem = NSMenuItem(
-            title: "Copy Dictation",
-            action: #selector(copyDictation),
+        let copyImageAndDictationItem = NSMenuItem(
+            title: "Copy image and dictation",
+            action: #selector(copyDrawing),
             keyEquivalent: ""
         )
-        copyDictationItem.target = self
-        copyOptionsMenu.addItem(copyDictationItem)
+        copyImageAndDictationItem.target = self
+        copyOptionsMenu.addItem(copyImageAndDictationItem)
         let copyImageItem = NSMenuItem(
-            title: "Copy Image",
+            title: "Copy image",
             action: #selector(copyImage),
             keyEquivalent: ""
         )
         copyImageItem.target = self
         copyOptionsMenu.addItem(copyImageItem)
+        let copyDictationItem = NSMenuItem(
+            title: "Copy dictation",
+            action: #selector(copyDictation),
+            keyEquivalent: ""
+        )
+        copyDictationItem.target = self
+        copyOptionsMenu.addItem(copyDictationItem)
         let copyDocumentItem = NSMenuItem(
-            title: "Copy as Document",
+            title: "Copy as .pdf",
             action: #selector(copyDocument),
             keyEquivalent: ""
         )
@@ -3604,23 +3596,13 @@ private final class FloatingAnnotationToolbar:
 
         copyGroup.orientation = .horizontal
         copyGroup.alignment = .centerY
-        copyGroup.spacing = 3
-        copySeparator.boxType = .separator
-        copySeparator.heightAnchor.constraint(equalToConstant: 14)
-            .isActive = true
-        copySeparator.widthAnchor.constraint(equalToConstant: 1).isActive =
-            true
+        copyGroup.spacing = 1
+        copyGroup.addArrangedSubview(copyButton)
+        copyGroup.addArrangedSubview(copyOptionsButton)
         copyActionHover.setContent(
-            copyButton,
-            controls: [copyButton]
+            copyGroup,
+            controls: [copyButton, copyOptionsButton]
         )
-        copyOptionsActionHover.setContent(
-            copyOptionsButton,
-            controls: [copyOptionsButton]
-        )
-        copyGroup.addArrangedSubview(copyActionHover)
-        copyGroup.addArrangedSubview(copySeparator)
-        copyGroup.addArrangedSubview(copyOptionsActionHover)
 
         closeButton.image = symbolImage(
             named: "xmark",
@@ -3645,7 +3627,7 @@ private final class FloatingAnnotationToolbar:
         let rightControls: [NSView] = [
             voiceGroup,
             recordingSeparator,
-            copyGroup,
+            copyActionHover,
             actionSeparator,
             closeActionHover,
         ]
@@ -3901,7 +3883,6 @@ private final class FloatingAnnotationToolbar:
         copyButton.isEnabled = enabled
         copyOptionsButton.isEnabled = enabled
         copyActionHover.refreshHoverAppearance()
-        copyOptionsActionHover.refreshHoverAppearance()
     }
 
 #if DEBUG
@@ -3959,7 +3940,7 @@ private final class FloatingAnnotationToolbar:
                 $0 === recordingSeparator
             },
             copyIndex: right.firstIndex {
-                $0 === copyGroup
+                $0 === copyActionHover
             },
             actionSeparatorIndex: right.firstIndex {
                 $0 === actionSeparator
@@ -4075,10 +4056,7 @@ private final class FloatingAnnotationToolbar:
         menuImageCount: Int,
         menuOpensBelow: Bool,
         menuGap: CGFloat,
-        totalWidth: CGFloat,
-        hasSeparator: Bool,
-        separatorWidth: CGFloat,
-        copyHoverBoxIsIndependent: Bool
+        totalWidth: CGFloat
     ) {
         layoutSubtreeIfNeeded()
         let menuAnchor = copyMenuAnchor(for: copyOptionsButton)
@@ -4102,16 +4080,7 @@ private final class FloatingAnnotationToolbar:
                 copyOptionsButton.isFlipped
                     ? menuAnchor.y - buttonBounds.maxY
                     : buttonBounds.minY - menuAnchor.y,
-            totalWidth: copyGroup.bounds.width,
-            hasSeparator:
-                copySeparator.superview === copyGroup
-                    && !copySeparator.isHidden,
-            separatorWidth: copySeparator.bounds.width,
-            copyHoverBoxIsIndependent:
-                copyActionHover !== copyOptionsActionHover
-                    && copyActionHover.subviews.first === copyButton
-                    && copyOptionsActionHover.subviews.first
-                        === copyOptionsButton
+            totalWidth: copyGroup.bounds.width
         )
     }
 
@@ -4223,7 +4192,6 @@ private final class FloatingAnnotationToolbar:
         brushAlpha: CGFloat,
         micAlpha: CGFloat,
         copyAlpha: CGFloat,
-        copyOptionsAlpha: CGFloat,
         closeAlpha: CGFloat,
         cornerRadii: [CGFloat]
     ) {
@@ -4232,36 +4200,20 @@ private final class FloatingAnnotationToolbar:
             brushAlpha: brushActionHover.hoverBackgroundAlphaForTesting,
             micAlpha: voiceActionHover.hoverBackgroundAlphaForTesting,
             copyAlpha: copyActionHover.hoverBackgroundAlphaForTesting,
-            copyOptionsAlpha:
-                copyOptionsActionHover.hoverBackgroundAlphaForTesting,
             closeAlpha: closeActionHover.hoverBackgroundAlphaForTesting,
             cornerRadii: [
                 brushActionHover.hoverCornerRadiusForTesting,
                 voiceActionHover.hoverCornerRadiusForTesting,
                 copyActionHover.hoverCornerRadiusForTesting,
-                copyOptionsActionHover.hoverCornerRadiusForTesting,
                 closeActionHover.hoverCornerRadiusForTesting,
             ]
         )
-    }
-
-    /// Hovers only the copy icon (not the chevron), so tests can confirm
-    /// each half of the split copy button lights up independently.
-    func setCopyIconHoverForTesting(_ hovered: Bool) {
-        copyActionHover.setHoveredForTesting(hovered)
-    }
-
-    /// Hovers only the chevron (not the copy icon), so tests can confirm
-    /// each half of the split copy button lights up independently.
-    func setCopyOptionsHoverForTesting(_ hovered: Bool) {
-        copyOptionsActionHover.setHoveredForTesting(hovered)
     }
 
     func setActionHoverForTesting(_ hovered: Bool) {
         brushActionHover.setHoveredForTesting(hovered)
         voiceActionHover.setHoveredForTesting(hovered)
         copyActionHover.setHoveredForTesting(hovered)
-        copyOptionsActionHover.setHoveredForTesting(hovered)
         closeActionHover.setHoveredForTesting(hovered)
     }
 

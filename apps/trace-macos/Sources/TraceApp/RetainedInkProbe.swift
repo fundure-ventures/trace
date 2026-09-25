@@ -1463,7 +1463,6 @@ enum TraceRetainedInkProbe {
               hoveredActions.brushAlpha >= 0.08,
               hoveredActions.micAlpha >= 0.08,
               hoveredActions.copyAlpha >= 0.08,
-              hoveredActions.copyOptionsAlpha >= 0.08,
               hoveredActions.closeAlpha >= 0.08,
               hoveredActions.cornerRadii.allSatisfy({
                   $0 >= 6
@@ -1473,32 +1472,6 @@ enum TraceRetainedInkProbe {
                 "toolbar actions did not expose rounded hover feedback"
             )
         }
-        board.setActionHoverForPreview(false)
-        board.setCopyIconHoverForPreview(true)
-        let copyOnlyHover = board.actionHoverPresentationForPreview
-        guard copyOnlyHover.copyAlpha >= 0.08,
-              copyOnlyHover.copyOptionsAlpha == 0
-        else {
-            throw probeError(
-                "copy icon hover leaked into the chevron's hover box "
-                    + "copyAlpha=\(copyOnlyHover.copyAlpha) "
-                    + "copyOptionsAlpha=\(copyOnlyHover.copyOptionsAlpha)"
-            )
-        }
-        board.setCopyIconHoverForPreview(false)
-        board.setCopyOptionsHoverForPreview(true)
-        let copyOptionsOnlyHover = board.actionHoverPresentationForPreview
-        guard copyOptionsOnlyHover.copyOptionsAlpha >= 0.08,
-              copyOptionsOnlyHover.copyAlpha == 0
-        else {
-            throw probeError(
-                "chevron hover leaked into the copy icon's hover box "
-                    + "copyAlpha=\(copyOptionsOnlyHover.copyAlpha) "
-                    + "copyOptionsAlpha="
-                    + "\(copyOptionsOnlyHover.copyOptionsAlpha)"
-            )
-        }
-        board.setCopyOptionsHoverForPreview(false)
         board.setColorSwatchHoverForPreview(index: 1, hovered: true)
         guard let hoveredSwatch =
                   board.colorSwatchPresentationForPreview(index: 1),
@@ -4861,24 +4834,21 @@ enum TraceRetainedInkProbe {
         board.triggerCopyForPreview(.document)
         guard copyControl.title.isEmpty,
               copyControl.hasImage,
-              copyControl.toolTip == "Copy trace (⌘C)",
+              copyControl.toolTip == "Copy options",
               !copyControl.isBordered,
               !copyControl.hasCustomBackground,
               abs(copyControl.width - 24) < 0.5,
               copyControl.hasChevron,
               copyControl.menuTitles == [
-                  "Copy Dictation",
-                  "Copy Image",
-                  "Copy as Document",
+                  "Copy image and dictation",
+                  "Copy image",
+                  "Copy dictation",
+                  "Copy as .pdf",
               ],
               copyControl.menuImageCount == 0,
               copyControl.menuOpensBelow,
               abs(copyControl.menuGap - 4) < 0.5,
               copyControl.totalWidth > 34,
-              copyControl.hasSeparator,
-              copyControl.separatorWidth > 0,
-              copyControl.separatorWidth < 8,
-              copyControl.copyHoverBoxIsIndependent,
               copyActions == [.all, .dictation, .image, .document]
         else {
             throw probeError(
@@ -4889,12 +4859,7 @@ enum TraceRetainedInkProbe {
                     + "width=\(copyControl.width) "
                     + "menu=\(copyControl.menuTitles) "
                     + "below=\(copyControl.menuOpensBelow) "
-                    + "gap=\(copyControl.menuGap) "
-                    + "hasSeparator=\(copyControl.hasSeparator) "
-                    + "separatorWidth=\(copyControl.separatorWidth) "
-                    + "totalWidth=\(copyControl.totalWidth) "
-                    + "independentHover=\(copyControl.copyHoverBoxIsIndependent) "
-                    + "copyActions=\(copyActions)"
+                    + "gap=\(copyControl.menuGap)"
             )
         }
         guard abs(size.width - Double(width)) < 0.5,
