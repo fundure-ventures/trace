@@ -517,6 +517,17 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         )
     }
 
+    func copyDocument(
+        _ image: NSImage,
+        transcript: String?
+    ) -> Bool {
+        TraceClipboardPayload.writeDocument(
+            image: image,
+            transcript: transcript,
+            to: .general
+        )
+    }
+
     func hideBoard() {
         transitionController.cancel()
         blankCanvasRevealPending = false
@@ -3566,6 +3577,13 @@ private final class FloatingAnnotationToolbar:
         )
         copyImageItem.target = self
         copyOptionsMenu.addItem(copyImageItem)
+        let copyDocumentItem = NSMenuItem(
+            title: "Copy as Document",
+            action: #selector(copyDocument),
+            keyEquivalent: ""
+        )
+        copyDocumentItem.target = self
+        copyOptionsMenu.addItem(copyDocumentItem)
 
         copyGroup.orientation = .horizontal
         copyGroup.alignment = .centerY
@@ -4467,6 +4485,8 @@ private final class FloatingAnnotationToolbar:
             copyDictation()
         case .image:
             copyImage()
+        case .document:
+            copyDocument()
         }
     }
 #endif
@@ -4657,6 +4677,10 @@ private final class FloatingAnnotationToolbar:
 
     @objc private func copyImage() {
         onCopy?(.image)
+    }
+
+    @objc private func copyDocument() {
+        onCopy?(.document)
     }
 
     @objc private func toggleVoiceRecording() {

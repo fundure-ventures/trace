@@ -1788,6 +1788,30 @@ final class TraceAppDelegate:
                 )
             }
             return
+        case .document:
+            board.compositeImage { [weak self] image in
+                guard let self else {
+                    return
+                }
+                guard self.model.snapshot.currentDocument?.manifest.id
+                        == documentID
+                else {
+                    self.endCopyProgress(for: documentID)
+                    return
+                }
+                guard let image else {
+                    self.failCopy(for: documentID)
+                    return
+                }
+                self.finishCopy(
+                    self.board.copyDocument(
+                        image,
+                        transcript: transcript
+                    ),
+                    documentID: documentID
+                )
+            }
+            return
         }
     }
 

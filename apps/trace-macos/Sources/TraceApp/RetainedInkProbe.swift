@@ -3,6 +3,7 @@ import AppKit
 import KeyboardShortcuts
 import NeoInput
 import NeoTransport
+import PDFKit
 import TraceAppCore
 import TraceCalibration
 import TraceGeometry
@@ -4777,6 +4778,7 @@ enum TraceRetainedInkProbe {
         board.triggerCopyForPreview(.all)
         board.triggerCopyForPreview(.dictation)
         board.triggerCopyForPreview(.image)
+        board.triggerCopyForPreview(.document)
         guard copyControl.title.isEmpty,
               copyControl.hasImage,
               copyControl.toolTip == "Copy trace (⌘C)",
@@ -4787,12 +4789,13 @@ enum TraceRetainedInkProbe {
               copyControl.menuTitles == [
                   "Copy Dictation",
                   "Copy Image",
+                  "Copy as Document",
               ],
               copyControl.menuImageCount == 0,
               copyControl.menuOpensBelow,
               abs(copyControl.menuGap - 4) < 0.5,
               copyControl.totalWidth > 34,
-              copyActions == [.all, .dictation, .image]
+              copyActions == [.all, .dictation, .image, .document]
         else {
             throw probeError(
                 "copy control is not an icon with its shortcut tooltip "
@@ -4957,6 +4960,29 @@ enum TraceRetainedInkProbe {
         else {
             throw probeError(
                 "split Copy did not isolate transcript and image payloads"
+            )
+        }
+        guard TraceClipboardPayload.writeDocument(
+                  image: composite,
+                  transcript: "Dictation",
+                  to: isolatedPasteboard
+              ),
+              let pdfData = isolatedPasteboard.data(forType: .pdf),
+              let pdfDocument = PDFDocument(data: pdfData),
+              pdfDocument.pageCount == 1,
+              let pdfPage = pdfDocument.page(at: 0),
+              let pdfPageText = pdfPage.string,
+              pdfPageText.contains("Dictation")
+        else {
+            throw probeError(
+                "Copy as Document did not produce a readable PDF with text"
+            )
+        }
+        guard isolatedPasteboard.string(forType: .string) == nil,
+              isolatedPasteboard.data(forType: .png) == nil
+        else {
+            throw probeError(
+                "Copy as Document leaked image/text pasteboard types"
             )
         }
     }

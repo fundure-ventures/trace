@@ -6,6 +6,7 @@ enum TraceCopyContent: Equatable {
     case all
     case dictation
     case image
+    case document
 }
 
 enum TraceClipboardPayload {
@@ -115,6 +116,139 @@ enum TraceClipboardPayload {
         }
         let item = NSPasteboardItem()
         item.setString(transcript, forType: .string)
+        pasteboard.clearContents()
+        return pasteboard.writeObjects([item])
+    }
+
+    /// US Letter page, in points, used to lay out the "Copy as Document" PDF.
+    private static let documentPageSize = CGSize(width: 612, height: 792)
+    private static let documentMargin: CGFloat = 48
+    private static let documentTextImageSpacing: CGFloat = 16
+
+    static func makeDocumentData(
+        image: NSImage,
+        transcript: String?
+    ) -> Data? {
+        var proposedRect = NSRect(origin: .zero, size: image.size)
+        guard let cgImage = image.cgImage(
+            forProposedRect: &proposedRect,
+            context: nil,
+            hints: nil
+        ) else {
+            return nil
+        }
+        let transcript = transcript?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let data = NSMutableData()
+        guard let consumer = CGDataConsumer(
+            data: data as CFMutableData
+        ) else {
+            return nil
+        }
+        var mediaBox = CGRect(origin: .zero, size: documentPageSize)
+        guard let context = CGContext(
+            consumer: consumer,
+            mediaBox: &mediaBox,
+            nil
+        ) else {
+            return nil
+        }
+        context.beginPDFPage(nil)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(
+            cgContext: context,
+            flipped: false
+        )
+        drawDocumentPage(
+            cgImage: cgImage,
+            transcript: transcript,
+            in: context
+        )
+        NSGraphicsContext.restoreGraphicsState()
+        context.endPDFPage()
+        context.closePDF()
+        return data as Data
+    }
+
+    private static func drawDocumentPage(
+        cgImage: CGImage,
+        transcript: String?,
+        in context: CGContext
+    ) {
+        let contentWidth = documentPageSize.width - documentMargin * 2
+        var imageTopY = documentPageSize.height - documentMargin
+        if let transcript, !transcript.isEmpty {
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 12),
+                .foregroundColor: NSColor.black,
+            ]
+            let maxHeight = documentPageSize.height
+                - documentMargin * 2
+            let measuredHeight = (transcript as NSString).boundingRect(
+                with: CGSize(
+                    width: contentWidth,
+                    height: .greatestFiniteMagnitude
+                ),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes
+            ).height
+            let textHeight = min(measuredHeight, maxHeight)
+            let textRect = CGRect(
+                x: documentMargin,
+                y: imageTopY - textHeight,
+                width: contentWidth,
+                height: textHeight
+            )
+            (transcript as NSString).draw(
+                in: textRect,
+                withAttributes: attributes
+            )
+            imageTopY = textRect.minY - documentTextImageSpacing
+        }
+        let availableHeight = max(imageTopY - documentMargin, 0)
+        guard availableHeight > 0 else {
+            return
+        }
+        let imageSize = CGSize(
+            width: cgImage.width,
+            height: cgImage.height
+        )
+        guard imageSize.width > 0, imageSize.height > 0 else {
+            return
+        }
+        // Never upscale past native resolution, only shrink to fit.
+        let scale = min(
+            contentWidth / imageSize.width,
+            availableHeight / imageSize.height,
+            1
+        )
+        let drawSize = CGSize(
+            width: imageSize.width * scale,
+            height: imageSize.height * scale
+        )
+        let drawOrigin = CGPoint(
+            x: documentMargin + (contentWidth - drawSize.width) / 2,
+            y: imageTopY - drawSize.height
+        )
+        context.draw(
+            cgImage,
+            in: CGRect(origin: drawOrigin, size: drawSize)
+        )
+    }
+
+    static func writeDocument(
+        image: NSImage,
+        transcript: String?,
+        to pasteboard: NSPasteboard
+    ) -> Bool {
+        guard let pdfData = makeDocumentData(
+            image: image,
+            transcript: transcript
+        ) else {
+            return false
+        }
+        let item = NSPasteboardItem()
+        item.setData(pdfData, forType: .pdf)
         pasteboard.clearContents()
         return pasteboard.writeObjects([item])
     }
