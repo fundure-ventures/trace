@@ -1978,6 +1978,7 @@ final class TraceAppModel {
                         .captureSucceeded(document.manifest.id)
                     )
                     self.lastError = nil
+                    self.autoStartDictationIfEnabled()
                     self.presentDocument(
                         TraceDocumentPresentation(
                             document: document,
