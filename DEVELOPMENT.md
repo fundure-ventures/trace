@@ -168,6 +168,11 @@ TRACE_BUILD_ONLY=1 ./tools/trace
 TRACE_PRODUCT_TLDRAW_PROBE=1 ".build/Trace Debug.app/Contents/MacOS/trace"
 ```
 
+For focused text-entry, toolbar, and tool-width checks, use
+`TRACE_PRODUCT_TLDRAW_PROBE=text` with the same debug executable. This checks
+double-click text creation, the Text tool and shortcut, spaces, editing through
+color changes, snapshot persistence, and the Pen/Highlighter minimum widths.
+
 ## Diagnostics
 
 ```sh

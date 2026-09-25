@@ -87,12 +87,12 @@ export type TraceRendererHostMessage =
   | {
       type: 'product-tool-change'
       documentId: string
-      tool: 'select' | 'pen' | 'highlighter' | 'rectangle'
+      tool: 'select' | 'pen' | 'highlighter' | 'rectangle' | 'text'
     }
   | {
       type: 'product-tool-preview'
       documentId: string
-      tool: 'select' | 'pen' | 'highlighter' | 'rectangle' | null
+      tool: 'select' | 'pen' | 'highlighter' | 'rectangle' | 'text' | null
     }
   | {
       type: 'product-history'

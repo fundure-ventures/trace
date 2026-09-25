@@ -41,6 +41,7 @@ export type ProductCanvasTool =
   | 'pen'
   | 'highlighter'
   | 'rectangle'
+  | 'text'
 export type ProductGrid =
   | 'none'
   | 'dots'
@@ -213,6 +214,9 @@ export interface TraceProductRendererBridge {
     timedAnnotationCount: number
     timedAnnotationTexts: string[]
     selectedTool: string
+    toolPath: string
+    isEditingText: boolean
+    textOpacities: number[]
     color: TLDefaultColorStyle
     opacity: number
     width: number
@@ -414,11 +418,15 @@ export function installTraceProductRenderer(editor: Editor): () => void {
   // The inverse of activateTemporarySelect/releaseTemporarySelect: when the
   // persistent tool is select, holding Cmd temporarily switches to whichever
   // drawing tool was last used, so Cmd always toggles select<>draw.
-  const temporaryDrawTool = (): ProductTool => ({
-    ...currentTool,
-    tool: lastDrawingTool,
-    brush: lastDrawingTool === 'highlighter' ? 'highlighter' : 'pen',
-  })
+  const temporaryDrawTool = (): ProductTool => {
+    const brush = lastDrawingTool === 'highlighter' ? 'highlighter' : 'pen'
+    return {
+      ...currentTool,
+      tool: lastDrawingTool,
+      brush,
+      width: clampToolWidth(currentTool.width, brush),
+    }
+  }
 
   const activateTemporaryDraw = () => {
     if (temporaryDrawActive) return
@@ -472,15 +480,16 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     tool: ProductCanvasTool,
     notifyHost: boolean,
   ) => {
+    const brush = tool === 'highlighter'
+      ? 'highlighter'
+      : tool === 'select'
+        ? currentTool.brush
+        : 'pen'
     currentTool = {
       ...currentTool,
       tool,
-      brush:
-        tool === 'highlighter'
-          ? 'highlighter'
-          : tool === 'pen' || tool === 'rectangle'
-            ? 'pen'
-            : currentTool.brush,
+      brush,
+      width: clampToolWidth(currentTool.width, brush),
     }
     if (tool !== 'select') {
       lastDrawingTool = tool
@@ -504,6 +513,19 @@ export function installTraceProductRenderer(editor: Editor): () => void {
         documentId: currentDocumentId,
         tool,
       })
+    }
+  }
+
+  const reconcileTextTool = () => {
+    if (
+      hostMutationDepth === 0
+      && !temporarySelectActive
+      && !temporaryDrawActive
+      && currentTool.tool === 'text'
+      && editor.isIn('select.idle')
+      && !editor.getEditingShapeId()
+    ) {
+      selectProductTool('select', true)
     }
   }
 
@@ -607,10 +629,16 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     },
   )
   const removeSessionListener = editor.store.listen(
-    reconcileTemporarySelect,
+    () => {
+      reconcileTemporarySelect()
+      reconcileTextTool()
+    },
     { scope: 'session' },
   )
   const handleEditorEvent = (event: TLEventInfo) => {
+    if (currentTool.tool === 'text') {
+      queueMicrotask(reconcileTextTool)
+    }
     if (event.type !== 'pointer' || event.isPen) return
     if (
       event.name === 'pointer_down'
@@ -778,18 +806,22 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       if (
         hostMutationDepth > 0
         || source !== 'user'
-        || shape.type !== 'draw'
       ) {
         return shape
       }
+      if (shape.type === 'text') {
+        return { ...shape, opacity: 1 }
+      }
+      if (shape.type !== 'draw') return shape
+      const tool = temporaryDrawActive ? temporaryDrawTool() : currentTool
       return {
         ...shape,
-        opacity: opacityForProductTool(currentTool),
+        opacity: opacityForProductTool(tool),
         props: {
           ...shape.props,
-          color: currentTool.color,
+          color: tool.color,
           size: 'm',
-          scale: scaleForWidth(currentTool.width),
+          scale: scaleForWidth(tool.width),
         },
       }
     },
@@ -978,11 +1010,16 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     },
 
     setTool(tool) {
+      const preserveTextEditing =
+        tool.tool === currentTool.tool && editor.getEditingShape()?.type === 'text'
+      if (!preserveTextEditing && editor.getEditingShapeId()) {
+        editor.complete()
+      }
       currentTool = {
         tool: tool.tool,
         color: tool.color,
         brush: tool.brush,
-        width: positive(tool.width, 5.25),
+        width: clampToolWidth(tool.width, tool.brush),
         gridStyle: tool.gridStyle,
         gridSpacing: positive(tool.gridSpacing, 8),
       }
@@ -992,13 +1029,13 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       runHostMutation(() => {
         // Manually switching to a drawing tool must clear the current
         // selection so a selected shape can't keep blocking drawing.
-        if (tool.tool !== 'select') {
+        if (tool.tool !== 'select' && !preserveTextEditing) {
           editor.selectNone()
         }
         applyTool(
           editor,
           currentTool,
-          !temporarySelectActive && !temporaryDrawActive,
+          !temporarySelectActive && !temporaryDrawActive && !preserveTextEditing,
         )
       })
       postDocumentChange()
@@ -1467,6 +1504,11 @@ export function installTraceProductRenderer(editor: Editor): () => void {
           )
           .map((shape) => shape.props.label),
         selectedTool: editor.getCurrentToolId(),
+        toolPath: editor.getPath(),
+        isEditingText: editor.getEditingShape()?.type === 'text',
+        textOpacities: sortedShapes
+          .filter((shape) => shape.type === 'text')
+          .map((shape) => shape.opacity),
         color: currentTool.color,
         opacity: opacityForProductTool(currentTool),
         width: currentTool.width,
@@ -1573,6 +1615,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     )
   }
   const handleKeyDown = (event: KeyboardEvent) => {
+    if (isEditableTarget(event.target)) return
     if (event.code === 'Space') {
       event.preventDefault()
       return
@@ -1611,7 +1654,6 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       )
       return
     }
-    if (isEditableTarget(event.target)) return
     if (event.key === 'Meta') {
       commandSelectHeld = true
       if (
@@ -1639,6 +1681,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       d: 'pen',
       h: 'highlighter',
       r: 'rectangle',
+      t: 'text',
     }[event.key.toLowerCase()] as ProductCanvasTool | undefined
     if (!tool) return
     event.preventDefault()
@@ -1646,7 +1689,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     selectProductTool(tool, true)
   }
   const handleKeyUp = (event: KeyboardEvent) => {
-    if (event.code === 'Space') {
+    if (event.code === 'Space' && !isEditableTarget(event.target)) {
       event.preventDefault()
       return
     }
@@ -1739,6 +1782,9 @@ function setEditorTool(
   switch (tool) {
     case 'select':
       editor.setCurrentTool('select')
+      break
+    case 'text':
+      editor.setCurrentTool('text')
       break
     case 'rectangle':
       editor.setStyleForNextShapes(
@@ -2432,6 +2478,14 @@ function opacityForProductTool(tool: ProductTool): number {
 
 function scaleForWidth(width: number): number {
   return positive(width, 5.25) / (STROKE_SIZES.m + 1)
+}
+
+function clampToolWidth(width: number, brush: ProductBrush): number {
+  return clamp(
+    Number.isFinite(width) ? width : 5.25,
+    brush === 'highlighter' ? 8 : 1,
+    12,
+  )
 }
 
 function isBackgroundShape(id: TLShapeId): boolean {

@@ -319,7 +319,8 @@ final class TldrawProductCanvasView:
         type: String,
         key: String,
         code: String,
-        metaKey: Bool = false
+        metaKey: Bool = false,
+        inTextEditor: Bool = false
     ) async -> [String: Any]? {
         do {
             return try await webView.callAsyncJavaScript(
@@ -331,7 +332,11 @@ final class TldrawProductCanvasView:
                   bubbles: true,
                   cancelable: true,
                 })
-                window.dispatchEvent(event)
+                const target = inTextEditor
+                  ? document.querySelector('.tl-container [contenteditable="true"]')
+                  : window
+                if (!target) throw new Error('No tldraw text editor')
+                target.dispatchEvent(event)
                 return {
                   defaultPrevented: event.defaultPrevented,
                   selectedTool:
@@ -347,6 +352,7 @@ final class TldrawProductCanvasView:
                     "key": key,
                     "code": code,
                     "metaKey": metaKey,
+                    "inTextEditor": inTextEditor,
                 ],
                 in: nil,
                 contentWorld: .page
@@ -354,6 +360,48 @@ final class TldrawProductCanvasView:
         } catch {
             return nil
         }
+    }
+
+    func typeTextForTesting(_ text: String) async throws -> String {
+        let result = try await webView.callAsyncJavaScript(
+            """
+            const target = document.querySelector(
+              '.tl-container [contenteditable="true"]'
+            )
+            if (!target) throw new Error('No tldraw text editor')
+            target.focus()
+            for (const key of text) {
+              const code = key === ' ' ? 'Space' : `Key${key.toUpperCase()}`
+              for (const type of ['keydown', 'keyup']) {
+                const event = new KeyboardEvent(type, {
+                  key, code, bubbles: true, cancelable: true,
+                })
+                target.dispatchEvent(event)
+                if (event.defaultPrevented) {
+                  throw new Error(`${type} consumed text character: ${key}`)
+                }
+                if (type === 'keydown'
+                    && !document.execCommand('insertText', false, key)) {
+                  throw new Error(`Could not insert text character: ${key}`)
+                }
+              }
+            }
+            return target.textContent
+            """,
+            arguments: ["text": text],
+            in: nil,
+            contentWorld: .page
+        )
+        guard let result = result as? String else {
+            throw NSError(
+                domain: "TraceProductTldrawProbe",
+                code: 1,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Text editor returned no text",
+                ]
+            )
+        }
+        return result
     }
 
     func emitPointerForTesting(

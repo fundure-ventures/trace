@@ -914,9 +914,19 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     var drawingToolPresentationForPreview: (
         selectedSegment: Int,
         toolTips: [String?],
-        closeToolTip: String?
+        closeToolTip: String?,
+        minimumWidth: Double,
+        width: Double
     ) {
         annotationToolbar.drawingToolPresentationForTesting
+    }
+
+    func selectDrawingToolForPreview(at index: Int) {
+        annotationToolbar.selectDrawingToolForTesting(at: index)
+    }
+
+    func setStrokeWidthForPreview(_ width: Double) {
+        annotationToolbar.setStrokeWidthForTesting(width)
     }
 
     var controlAccentPresentationForPreview: (
@@ -3016,11 +3026,15 @@ private final class DrawingBoardViewController: NSViewController {
             }
             var state = toolState
             state.canvasTool = tool
-            if tool == .pen || tool == .rectangle {
+            if tool == .pen || tool == .rectangle || tool == .text {
                 state.brush = .pen
             } else if tool == .highlighter {
                 state.brush = .highlighter
             }
+            state.width = TraceStrokeWidthPolicy.clamped(
+                state.width,
+                brush: state.brush
+            )
             toolState = state
             onTldrawToolChange?(state)
         }
@@ -3229,7 +3243,7 @@ private final class FloatingAnnotationToolbar:
     var onPreferredSizeChange: (() -> Void)?
 
     private let brushControl = NSSegmentedControl(
-        labels: ["", "", "", ""],
+        labels: ["", "", "", "", ""],
         trackingMode: .selectOne,
         target: nil,
         action: nil
@@ -3330,6 +3344,7 @@ private final class FloatingAnnotationToolbar:
                 "Highlighter (H)"
             ),
             ("rectangle", "square", "Rectangle", "Rectangle (R)"),
+            ("textformat", "character", "Text", "Text (T)"),
         ]
         for (index, tool) in drawingTools.enumerated() {
             brushControl.setImage(
@@ -3337,7 +3352,7 @@ private final class FloatingAnnotationToolbar:
                     named: tool.0,
                     fallback: tool.1,
                     description: tool.2,
-                    pointSize: Self.drawingToolSymbolPointSize
+                    pointSize: index == 4 ? 22 : Self.drawingToolSymbolPointSize
                 ),
                 forSegment: index
             )
@@ -4161,15 +4176,29 @@ private final class FloatingAnnotationToolbar:
     var drawingToolPresentationForTesting: (
         selectedSegment: Int,
         toolTips: [String?],
-        closeToolTip: String?
+        closeToolTip: String?,
+        minimumWidth: Double,
+        width: Double
     ) {
         (
             selectedSegment: brushControl.selectedSegment,
             toolTips: (0..<brushControl.segmentCount).map {
                 brushControl.toolTip(forSegment: $0)
             },
-            closeToolTip: closeButton.toolTip
+            closeToolTip: closeButton.toolTip,
+            minimumWidth: widthSlider.minValue,
+            width: widthSlider.doubleValue
         )
+    }
+
+    func selectDrawingToolForTesting(at index: Int) {
+        brushControl.selectedSegment = index
+        changeBrush()
+    }
+
+    func setStrokeWidthForTesting(_ width: Double) {
+        widthSlider.doubleValue = width
+        changeWidth()
     }
 
     var controlAccentPresentationForTesting: (
@@ -4520,10 +4549,14 @@ private final class FloatingAnnotationToolbar:
         case 3:
             toolState.canvasTool = .rectangle
             toolState.brush = .pen
+        case 4:
+            toolState.canvasTool = .text
+            toolState.brush = .pen
         default:
             toolState.canvasTool = .pen
             toolState.brush = .pen
         }
+        syncControls()
         onToolChange?(toolState)
     }
 
@@ -4713,6 +4746,8 @@ private final class FloatingAnnotationToolbar:
             brushControl.selectedSegment = 2
         case .rectangle:
             brushControl.selectedSegment = 3
+        case .text:
+            brushControl.selectedSegment = 4
         }
         if let index = gridControl.itemArray.firstIndex(where: {
             ($0.representedObject as? String)
@@ -4722,6 +4757,11 @@ private final class FloatingAnnotationToolbar:
         }
         gridSpacingField.isHidden = toolState.gridStyle == .none
         gridSpacingField.stringValue = String(toolState.gridSpacingPoints)
+        toolState.width = TraceStrokeWidthPolicy.clamped(
+            toolState.width,
+            brush: toolState.brush
+        )
+        widthSlider.minValue = TraceStrokeWidthPolicy.minimum(for: toolState.brush)
         widthSlider.doubleValue = toolState.width
         widthLabel.stringValue = String(format: "%.1f", toolState.width)
     }

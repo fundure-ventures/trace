@@ -15,6 +15,17 @@ enum TraceRetainedInkProbe {
         try verifyOnboardingPresentation()
     }
 
+    static func runDrawingToolChecks(document: TraceDrawingSession) throws {
+        try verifyAppSettings()
+        let board = TraceBoardWindowController()
+        board.configureInvisibleProbeWindows()
+        defer {
+            board.hideBoard()
+        }
+        board.prepareDocumentForPreview(document, toolState: TraceToolState())
+        try verifyDrawingToolControls(board)
+    }
+
     static func writeToolbarSnapshot(to url: URL) throws {
         try TraceBoardWindowController()
             .writeVoiceToolbarSnapshotForPreview(to: url)
@@ -1245,13 +1256,63 @@ enum TraceRetainedInkProbe {
         }
     }
 
+    private static func verifyDrawingToolControls(
+        _ board: TraceBoardWindowController
+    ) throws {
+        let tools = board.drawingToolPresentationForPreview
+        guard tools.selectedSegment == 1,
+              tools.toolTips == [
+                  "Select (V or hold ⌘)",
+                  "Pen (D)",
+                  "Highlighter (H)",
+                  "Rectangle (R)",
+                  "Text (T)",
+              ],
+              tools.closeToolTip == "Close trace (⌘W)",
+              board.toolbarIconMetricsForPreview.brushHeights.count == 5,
+              (19...22).contains(
+                  board.toolbarIconMetricsForPreview.brushHeights[4]
+              )
+        else {
+            throw probeError("Drawing tools do not expose their icons and shortcuts")
+        }
+        var selectedToolState: TraceToolState?
+        board.onToolChange = { selectedToolState = $0 }
+        board.selectDrawingToolForPreview(at: 1)
+        board.setStrokeWidthForPreview(1)
+        guard selectedToolState?.width == 1,
+              board.drawingToolPresentationForPreview.minimumWidth == 1
+        else {
+            throw probeError("Pen toolbar did not allow a 1 pt stroke")
+        }
+        board.selectDrawingToolForPreview(at: 2)
+        guard selectedToolState?.canvasTool == .highlighter,
+              selectedToolState?.width == 8,
+              board.drawingToolPresentationForPreview.minimumWidth == 8,
+              board.drawingToolPresentationForPreview.width == 8
+        else {
+            throw probeError("Highlighter toolbar did not clamp to 8 pt")
+        }
+        board.selectDrawingToolForPreview(at: 4)
+        guard selectedToolState?.canvasTool.rawValue == "text",
+              selectedToolState?.brush == .pen,
+              board.drawingToolPresentationForPreview.selectedSegment == 4
+        else {
+            throw probeError("Text toolbar action did not select opaque text")
+        }
+        board.selectDrawingToolForPreview(at: 1)
+        board.setStrokeWidthForPreview(1)
+        guard selectedToolState?.width == 1 else {
+            throw probeError("Switching back to Pen kept the highlighter minimum")
+        }
+    }
+
     private static func verifyToolbarGroupLayout(
         _ board: TraceBoardWindowController
     ) throws {
         let layout = board.toolbarGroupLayoutForPreview
         board.updateVoiceState(.recording(transcribedChunks: 0))
         let icons = board.toolbarIconMetricsForPreview
-        let tools = board.drawingToolPresentationForPreview
         let accents = board.controlAccentPresentationForPreview
         let spacing = board.gridSpacingPresentationForPreview
         let sizing = board.toolbarSizingForPreview
@@ -1283,7 +1344,7 @@ enum TraceRetainedInkProbe {
                     + "separator-gaps=\(layout.separatorNeighborGaps)"
             )
         }
-        guard icons.brushHeights.count == 4,
+        guard icons.brushHeights.count == 5,
               icons.gridHeights.count == 5,
               icons.voiceHeight >= 18,
               icons.copyHeight >= 20,
@@ -1355,19 +1416,7 @@ enum TraceRetainedInkProbe {
                 "Grid selector did not apply its selected option"
             )
         }
-        guard tools.selectedSegment == 1,
-              tools.toolTips == [
-                  "Select (V or hold ⌘)",
-                  "Pen (D)",
-                  "Highlighter (H)",
-                  "Rectangle (R)",
-              ],
-              tools.closeToolTip == "Close trace (⌘W)"
-        else {
-            throw probeError(
-                "drawing tools do not expose their shortcuts"
-            )
-        }
+        try verifyDrawingToolControls(board)
         guard accents.brush,
               accents.grid,
               !accents.slider
@@ -2909,6 +2958,26 @@ enum TraceRetainedInkProbe {
             throw probeError(
                 "stroke width did not survive model recreation"
             )
+        }
+        for (brush, requested, expected) in [
+            (TraceBrushKind.pen, 0.0, 1.0),
+            (.pen, 1.0, 1.0),
+            (.highlighter, 1.0, 8.0),
+            (.highlighter, 8.0, 8.0),
+            (.highlighter, 20.0, 12.0),
+            (.highlighter, Double.nan, 8.0),
+            (.pen, 20.0, 12.0),
+        ] {
+            var state = previewModel.toolState
+            state.canvasTool = brush == .highlighter ? .highlighter : .pen
+            state.brush = brush
+            state.width = requested
+            previewModel.updateToolState(state)
+            guard previewModel.toolState.width == expected else {
+                throw probeError(
+                    "\(brush) width \(requested) did not clamp to \(expected)"
+                )
+            }
         }
         guard TracePenPreferences.hoverEnabled(from: defaults) == nil else {
             throw probeError("untouched hover preference was not optional")

@@ -6,7 +6,7 @@ import TraceVoice
 
 enum ProductTldrawProbe {
     @MainActor
-    static func run() async throws {
+    static func run(textToolsOnly: Bool = false) async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(
@@ -112,6 +112,11 @@ enum ProductTldrawProbe {
             ),
             packageURL: directory
         )
+        if textToolsOnly {
+            try TraceRetainedInkProbe.runDrawingToolChecks(document: document)
+            try await verifyTextEditing(surface, document: document)
+            return
+        }
         var tool = TraceToolState()
         tool.canvasTool = .highlighter
         tool.color = .green
@@ -188,7 +193,7 @@ enum ProductTldrawProbe {
               ) < 0.001,
               abs(
                   ((state["width"] as? NSNumber)?.doubleValue ?? 0)
-                      - 7.5
+                      - 8
               ) < 0.001,
               (state["drawWidths"] as? [NSNumber])?.contains(where: {
                   abs($0.doubleValue - 7.5) < 0.001
@@ -2018,6 +2023,7 @@ enum ProductTldrawProbe {
             )
         }
         board.hideBoard()
+        try await verifyTextEditing(surface, document: cleanDocument)
         surface.showErrorForTesting("Synthetic bridge failure")
         let errorPresentation = surface.errorPresentationForTesting
         guard errorPresentation.visible,
@@ -2029,6 +2035,172 @@ enum ProductTldrawProbe {
             throw probeError(
                 "tldraw failure did not surface an explicit error"
             )
+        }
+    }
+
+    @MainActor
+    private static func verifyTextEditing(
+        _ surface: TldrawProductCanvasView,
+        document: TraceDrawingSession
+    ) async throws {
+        var state = TraceToolState()
+        state.canvasTool = .select
+        state.brush = .highlighter
+        surface.setDocument(document, toolState: state)
+        try await waitUntil("text test document") {
+            let value = await surface.stateForTesting()
+            return value?["productTool"] as? String == "select"
+                && (value?["pageWidth"] as? NSNumber)?.intValue
+                    == document.manifest.screenshotPixelWidth
+        }
+        for _ in 0..<2 {
+            guard await surface.emitPointerForTesting(
+                      phase: "began", x: 0.8, y: 0.8
+                  ),
+                  await surface.emitPointerForTesting(
+                      phase: "ended", x: 0.8, y: 0.8
+                  )
+            else {
+                throw probeError("Could not double-click to create text")
+            }
+        }
+        try await waitUntil("double-click text editing") {
+            await surface.stateForTesting()?["isEditingText"] as? Bool == true
+        }
+        let firstText = "Text with spaces dhvrt"
+        let typedText: String
+        do {
+            typedText = try await surface.typeTextForTesting(firstText)
+        } catch {
+            throw probeError("Double-click text input failed: \(error)")
+        }
+        guard typedText == firstText else {
+            throw probeError("Double-click text did not preserve spaces")
+        }
+        state.canvasTool = .pen
+        state.brush = .pen
+        state.width = 1
+        surface.setToolState(state)
+        try await waitUntil("one point Pen") {
+            let value = await surface.stateForTesting()
+            return value?["selectedTool"] as? String == "draw"
+                && (value?["width"] as? NSNumber)?.doubleValue == 1
+        }
+        try await verifyDrawnWidth(surface, width: 1, y: 0.15)
+        guard let shortcut = await surface.keyboardEventForTesting(
+                  type: "keydown", key: "h", code: "KeyH"
+              ),
+              shortcut["productTool"] as? String == "highlighter",
+              let highlighter = await surface.stateForTesting(),
+              (highlighter["width"] as? NSNumber)?.doubleValue == 8
+        else {
+            throw probeError("Highlighter shortcut did not clamp to 8 pt")
+        }
+        try await verifyDrawnWidth(surface, width: 8, y: 0.5)
+        guard let textTool = TraceCanvasTool(rawValue: "text") else {
+            throw probeError("Text tool is missing from the native bridge")
+        }
+        state.canvasTool = textTool
+        state.brush = .pen
+        surface.setToolState(state)
+        try await waitUntil("native Text tool") {
+            await surface.stateForTesting()?["selectedTool"] as? String == "text"
+        }
+        guard await surface.emitPointerForTesting(
+                  phase: "began", x: 0.2, y: 0.3
+              ),
+              await surface.emitPointerForTesting(
+                  phase: "ended", x: 0.2, y: 0.3
+              )
+        else {
+            throw probeError("Could not create text with the Text tool")
+        }
+        try await waitUntil("Text tool editing") {
+            await surface.stateForTesting()?["isEditingText"] as? Bool == true
+        }
+        let secondText = "More text with spaces"
+        guard try await surface.typeTextForTesting(secondText) == secondText else {
+            throw probeError("Text tool did not preserve spaces")
+        }
+        state.color = .blue
+        surface.setToolState(state)
+        try await waitUntil("text color change preserves editing") {
+            let value = await surface.stateForTesting()
+            return value?["isEditingText"] as? Bool == true
+                && value?["color"] as? String == "blue"
+        }
+        let suffix = " after color"
+        guard try await surface.typeTextForTesting(suffix) == secondText + suffix else {
+            throw probeError("Updating text style interrupted typing")
+        }
+        guard await surface.keyboardEventForTesting(
+            type: "keydown", key: "Escape", code: "Escape", inTextEditor: true
+        ) != nil else {
+            throw probeError("Could not finish text editing with Escape")
+        }
+        do {
+            try await waitUntil("text editing finished") {
+                let value = await surface.stateForTesting()
+                return value?["isEditingText"] as? Bool == false
+                    && value?["productTool"] as? String == "select"
+            }
+        } catch {
+            throw probeError(
+                "Text editing did not finish: \(String(describing: await surface.stateForTesting()))"
+            )
+        }
+        guard let value = await surface.stateForTesting(),
+              value["textOpacities"] as? [Double] == [1, 1],
+              let snapshot = await surface.snapshotForTesting(),
+              snapshot.contains(firstText),
+              snapshot.contains(secondText + suffix)
+        else {
+            throw probeError("Text was not saved in the tldraw snapshot")
+        }
+        state.canvasTool = .select
+        state.color = .green
+        document.tldrawSnapshotJSON = snapshot
+        surface.setDocument(document, toolState: state)
+        try await waitUntil("restored text") {
+            guard let value = await surface.stateForTesting(),
+                  value["color"] as? String == "green",
+                  let restored = await surface.snapshotForTesting()
+            else {
+                return false
+            }
+            return restored.contains(firstText) && restored.contains(secondText + suffix)
+        }
+        guard let shortcut = await surface.keyboardEventForTesting(
+                  type: "keydown", key: "t", code: "KeyT"
+              ),
+              shortcut["defaultPrevented"] as? Bool == true,
+              shortcut["selectedTool"] as? String == "text",
+              shortcut["productTool"] as? String == "text",
+              let textState = await surface.stateForTesting(),
+              (textState["opacity"] as? NSNumber)?.doubleValue == 1
+        else {
+            throw probeError("T did not select opaque text")
+        }
+    }
+
+    @MainActor
+    private static func verifyDrawnWidth(
+        _ surface: TldrawProductCanvasView,
+        width: Double,
+        y: Double
+    ) async throws {
+        for (phase, x) in [("began", 0.15), ("moved", 0.3), ("ended", 0.4)] {
+            guard await surface.emitPointerForTesting(phase: phase, x: x, y: y) else {
+                throw probeError("Could not draw a \(width) pt stroke")
+            }
+        }
+        try await waitUntil("rendered \(width) pt stroke") {
+            guard let value = await surface.stateForTesting(),
+                  let widths = value["drawWidths"] as? [NSNumber]
+            else {
+                return false
+            }
+            return widths.contains { abs($0.doubleValue - width) < 0.001 }
         }
     }
 

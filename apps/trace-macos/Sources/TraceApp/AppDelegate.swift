@@ -387,11 +387,14 @@ final class TraceAppDelegate:
     func applicationDidFinishLaunching(_ notification: Notification) {
 #if DEBUG
         let environment = ProcessInfo.processInfo.environment
+        let runsProductProbe = ["1", "text"].contains(
+            environment["TRACE_PRODUCT_TLDRAW_PROBE"] ?? ""
+        )
         let isUIPreview = environment["TRACE_UI_SNAPSHOT"] != nil
             || environment["TRACE_UI_COMPOSITE"] != nil
             || environment["TRACE_UI_NO_HARDWARE"] == "1"
             || environment["TRACE_RETAINED_INK_PROBE"] == "1"
-            || environment["TRACE_PRODUCT_TLDRAW_PROBE"] == "1"
+            || runsProductProbe
 #else
         let isUIPreview = false
 #endif
@@ -405,11 +408,14 @@ final class TraceAppDelegate:
             startOpenFileForwardingListener()
         }
 #if DEBUG
-        if environment["TRACE_PRODUCT_TLDRAW_PROBE"] == "1" {
+        if runsProductProbe {
             NSApp.setActivationPolicy(.accessory)
             Task { @MainActor in
                 do {
-                    try await ProductTldrawProbe.run()
+                    try await ProductTldrawProbe.run(
+                        textToolsOnly:
+                            environment["TRACE_PRODUCT_TLDRAW_PROBE"] == "text"
+                    )
                     print("product tldraw probe passed")
                     NSApp.terminate(nil)
                 } catch {

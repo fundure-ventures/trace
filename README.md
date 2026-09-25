@@ -62,13 +62,18 @@ To repeat onboarding without deleting saved `.traceboard` documents:
 
 1. Create a screenshot trace with `Cmd+N`, create a blank trace with
    `Shift+Cmd+N`, or open one or more images from Finder.
-2. Draw with the Neo pen or the Select, Pen, Highlighter, and Rectangle tools.
+2. Annotate with the Neo pen or the Select, Pen, Highlighter, Rectangle, and
+   Text tools.
 3. Use Dictation when a spoken explanation helps.
 4. Press `Cmd+C` to copy the annotated image and transcript, save the trace,
    and close the board.
 
 Finder **Open With** accepts an image batch and places the images together on
 one blank canvas.
+
+Use **Text** (`T`) and click the canvas to add a text box, or double-click an
+empty area with **Select** (`V`). Pen strokes can be as thin as **1 pt**;
+Highlighter starts at **8 pt**. Both tools retain a maximum width of **12 pt**.
 
 ## More detail
 

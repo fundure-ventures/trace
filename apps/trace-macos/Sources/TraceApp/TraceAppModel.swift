@@ -289,18 +289,24 @@ enum TraceCanvasTool: String, Equatable {
     case pen
     case highlighter
     case rectangle
+    case text
 }
 
 enum TraceStrokeWidthPolicy {
-    static let minimum = 2.0
+    static let minimum = 1.0
     static let maximum = 12.0
     static let defaultValue = 5.25
 
-    static func clamped(_ width: Double) -> Double {
-        guard width.isFinite else {
-            return defaultValue
-        }
-        return min(maximum, max(minimum, width))
+    static func minimum(for brush: TraceBrushKind) -> Double {
+        brush == .highlighter ? 8 : minimum
+    }
+
+    static func clamped(
+        _ width: Double,
+        brush: TraceBrushKind = .pen
+    ) -> Double {
+        let finiteWidth = width.isFinite ? width : defaultValue
+        return min(maximum, max(minimum(for: brush), finiteWidth))
     }
 }
 
@@ -1288,7 +1294,10 @@ final class TraceAppModel {
 
     func updateToolState(_ state: TraceToolState) {
         var state = state
-        state.width = TraceStrokeWidthPolicy.clamped(state.width)
+        state.width = TraceStrokeWidthPolicy.clamped(
+            state.width,
+            brush: state.brush
+        )
         state.gridSpacingPoints = TraceGridPolicy.clampedSpacing(
             state.gridSpacingPoints
         )
