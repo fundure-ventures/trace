@@ -1305,6 +1305,19 @@ enum TraceRetainedInkProbe {
         guard selectedToolState?.width == 1 else {
             throw probeError("Switching back to Pen kept the highlighter minimum")
         }
+        board.setStrokeWidthForPreview(2.25)
+        board.selectDrawingToolForPreview(at: 2)
+        board.setStrokeWidthForPreview(11)
+        for (index, width) in [(1, 2.25), (2, 11.0), (3, 2.25), (2, 11.0), (4, 2.25)] {
+            board.selectDrawingToolForPreview(at: index)
+            guard selectedToolState?.width == width,
+                  board.drawingToolPresentationForPreview.width == width
+            else {
+                throw probeError("Toolbar tool \(index) did not restore its own \(width) pt width")
+            }
+        }
+        board.selectDrawingToolForPreview(at: 1)
+        board.setStrokeWidthForPreview(1)
     }
 
     private static func verifyToolbarGroupLayout(
@@ -2928,6 +2941,12 @@ enum TraceRetainedInkProbe {
                 "tool preferences did not restore without Bluetooth"
             )
         }
+        var firstHighlighter = previewModel.toolState
+        firstHighlighter.canvasTool = .highlighter
+        firstHighlighter.brush = .highlighter
+        guard firstHighlighter.width == 8 else {
+            throw probeError("Highlighter inherited the legacy Drawing width")
+        }
         var updatedToolState = previewModel.toolState
         updatedToolState.width = 10.25
         previewModel.updateToolState(updatedToolState)
@@ -2958,6 +2977,38 @@ enum TraceRetainedInkProbe {
             throw probeError(
                 "stroke width did not survive model recreation"
             )
+        }
+        var separateWidths = previewModel.toolState
+        separateWidths.width = 2.25
+        previewModel.updateToolState(separateWidths)
+        separateWidths.canvasTool = .highlighter
+        separateWidths.brush = .highlighter
+        separateWidths.width = 11
+        previewModel.updateToolState(separateWidths)
+        guard defaults.double(forKey: "TraceStrokeWidth") == 2.25,
+              defaults.double(forKey: "TraceHighlighterStrokeWidth") == 11
+        else {
+            throw probeError("Drawing and Highlighter did not persist independently")
+        }
+        let separateWidthsModel = TraceAppModel(
+            drawingStore: TraceDrawingStore(directoryURL: modelDirectory),
+            defaults: defaults,
+            transportFactory: { HardwareFreeNeoTransport() }
+        )
+        defer {
+            separateWidthsModel.stop()
+        }
+        guard separateWidthsModel.toolState.width == 2.25 else {
+            throw probeError("Drawing width was overwritten by Highlighter after restart")
+        }
+        var restoredHighlighter = separateWidthsModel.toolState
+        restoredHighlighter.canvasTool = .highlighter
+        restoredHighlighter.brush = .highlighter
+        separateWidthsModel.updateToolState(restoredHighlighter)
+        guard separateWidthsModel.toolState.width == 11,
+              separateWidthsModel.toolState.resettingCanvasToPen.width == 2.25
+        else {
+            throw probeError("Separate tool widths did not survive restart and tool reset")
         }
         for (brush, requested, expected) in [
             (TraceBrushKind.pen, 0.0, 1.0),

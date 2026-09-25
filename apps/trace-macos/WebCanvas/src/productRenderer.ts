@@ -70,7 +70,8 @@ export interface ProductTool {
   tool: ProductCanvasTool
   color: TLDefaultColorStyle
   brush: ProductBrush
-  width: number
+  penWidth: number
+  highlighterWidth: number
   gridStyle: ProductGrid
   gridSpacing: number
 }
@@ -300,7 +301,8 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     tool: 'pen',
     color: 'red',
     brush: 'pen',
-    width: 5.25,
+    penWidth: 5.25,
+    highlighterWidth: 8,
     gridStyle: 'none',
     gridSpacing: 8,
   }
@@ -426,7 +428,6 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       ...currentTool,
       tool: lastDrawingTool,
       brush,
-      width: clampToolWidth(currentTool.width, brush),
     }
   }
 
@@ -496,7 +497,6 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       ...currentTool,
       tool,
       brush,
-      width: clampToolWidth(currentTool.width, brush),
     }
     if (tool !== 'select') {
       lastDrawingTool = tool
@@ -831,7 +831,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
           ...shape.props,
           color: tool.color,
           size: 'm',
-          scale: scaleForWidth(tool.width),
+          scale: scaleForWidth(widthForProductTool(tool)),
         },
       }
     },
@@ -1030,7 +1030,8 @@ export function installTraceProductRenderer(editor: Editor): () => void {
         tool: tool.tool,
         color: tool.color,
         brush: tool.brush,
-        width: clampToolWidth(tool.width, tool.brush),
+        penWidth: clampToolWidth(tool.penWidth, 'pen'),
+        highlighterWidth: clampToolWidth(tool.highlighterWidth, 'highlighter'),
         gridStyle: tool.gridStyle,
         gridSpacing: positive(tool.gridSpacing, 8),
       }
@@ -1536,7 +1537,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
           .map((shape) => shape.opacity),
         color: currentTool.color,
         opacity: opacityForProductTool(currentTool),
-        width: currentTool.width,
+        width: widthForProductTool(currentTool),
         gridStyle: currentTool.gridStyle,
         gridSpacing: currentTool.gridSpacing,
         drawWidths: drawShapes.map(
@@ -1780,7 +1781,7 @@ function applyTool(
   editor.setStyleForSelectedShapes(DefaultColorStyle, tool.color)
   editor.setStyleForSelectedShapes(DefaultSizeStyle, 'm')
   editor.setOpacityForSelectedShapes(opacityForProductTool(tool))
-  const scale = scaleForWidth(tool.width)
+  const scale = scaleForWidth(widthForProductTool(tool))
   const selectedDrawShapes = editor
     .getSelectedShapes()
     .filter((shape): shape is TLDrawShape => shape.type === 'draw')
@@ -2499,6 +2500,10 @@ function opacityForBrush(brush: ProductBrush): number {
 
 function opacityForProductTool(tool: ProductTool): number {
   return tool.tool === 'highlighter' ? 0.5 : 1
+}
+
+function widthForProductTool(tool: ProductTool): number {
+  return tool.brush === 'highlighter' ? tool.highlighterWidth : tool.penWidth
 }
 
 function scaleForWidth(width: number): number {

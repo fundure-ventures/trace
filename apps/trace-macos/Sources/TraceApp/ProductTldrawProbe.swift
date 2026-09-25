@@ -115,6 +115,7 @@ enum ProductTldrawProbe {
         if textToolsOnly {
             try TraceRetainedInkProbe.runDrawingToolChecks(document: document)
             try await verifyTextEditing(surface, document: document)
+            try await verifyIndependentStrokeWidths(surface)
             try await verifySelectionCopy(surface)
             return
         }
@@ -502,7 +503,7 @@ enum ProductTldrawProbe {
         let style = TraceToolState(
             color: .red,
             brush: .pen,
-            width: 5,
+            penWidth: 5,
             gridStyle: .none,
             gridSpacingPoints: TraceGridPolicy.defaultSpacingPoints
         )
@@ -2025,6 +2026,7 @@ enum ProductTldrawProbe {
         }
         board.hideBoard()
         try await verifyTextEditing(surface, document: cleanDocument)
+        try await verifyIndependentStrokeWidths(surface)
         try await verifySelectionCopy(surface)
         surface.showErrorForTesting("Synthetic bridge failure")
         let errorPresentation = surface.errorPresentationForTesting
@@ -2206,6 +2208,74 @@ enum ProductTldrawProbe {
     }
 
     @MainActor
+    private static func verifyIndependentStrokeWidths(_ surface: TldrawProductCanvasView) async throws {
+        var state = TraceToolState()
+        state.width = 2.25
+        state.canvasTool = .highlighter
+        state.brush = .highlighter
+        state.width = 11
+        surface.setToolState(state)
+        try await waitUntil("native independent widths") {
+            let value = await surface.stateForTesting()
+            return value?["productTool"] as? String == "highlighter"
+                && (value?["width"] as? NSNumber)?.doubleValue == 11
+        }
+        for (key, code, width, y) in [("d", "KeyD", 2.25, 0.6), ("h", "KeyH", 11.0, 0.65)] {
+            guard await surface.keyboardEventForTesting(type: "keydown", key: key, code: code) != nil,
+                  let value = await surface.stateForTesting(),
+                  (value["width"] as? NSNumber)?.doubleValue == width
+            else {
+                throw probeError("\(key.uppercased()) did not restore its own \(width) pt width")
+            }
+            try await verifyDrawnWidth(surface, width: width, y: y)
+        }
+        state.canvasTool = .pen
+        state.brush = .pen
+        state.width = 3.5
+        surface.setToolState(state)
+        try await waitUntil("updated Drawing width") {
+            (await surface.stateForTesting()?["width"] as? NSNumber)?.doubleValue == 3.5
+        }
+        guard await surface.keyboardEventForTesting(type: "keydown", key: "h", code: "KeyH") != nil,
+              let value = await surface.stateForTesting(),
+              (value["width"] as? NSNumber)?.doubleValue == 11
+        else {
+            throw probeError("Updating Drawing changed the remembered Highlighter width")
+        }
+        for (key, code, brush, width, y) in [
+            ("h", "KeyH", TraceBrushKind.pen, 11.0, 0.72),
+            ("d", "KeyD", TraceBrushKind.highlighter, 3.5, 0.78),
+        ] {
+            guard await surface.keyboardEventForTesting(
+                type: "keydown", key: key, code: code
+            ) != nil else {
+                throw probeError("Could not set the last-used drawing tool")
+            }
+            state.canvasTool = .select
+            state.brush = brush
+            surface.setToolState(state)
+            try await waitUntil("Select before temporary drawing") {
+                await surface.stateForTesting()?["productTool"] as? String == "select"
+            }
+            guard await surface.keyboardEventForTesting(
+                type: "keydown", key: "Meta", code: "MetaLeft", metaKey: true
+            ) != nil else {
+                throw probeError("Could not hold Command for temporary drawing")
+            }
+            try await verifyDrawnWidth(surface, width: width, y: y)
+            guard await surface.keyboardEventForTesting(
+                      type: "keyup", key: "Meta", code: "MetaLeft"
+                  ) != nil,
+                  let restored = await surface.stateForTesting(),
+                  restored["selectedTool"] as? String == "select",
+                  (restored["width"] as? NSNumber)?.doubleValue == state.width
+            else {
+                throw probeError("Temporary drawing changed the persistent tool width")
+            }
+        }
+    }
+
+    @MainActor
     private static func verifySelectionCopy(_ surface: TldrawProductCanvasView) async throws {
         guard surface.insertImage(solidImage(color: .red, size: NSSize(width: 40, height: 40))) else {
             throw probeError("Could not create the copy-selection fixture")
@@ -2279,6 +2349,14 @@ enum ProductTldrawProbe {
         width: Double,
         y: Double
     ) async throws {
+        guard let initial = await surface.stateForTesting(),
+              let initialWidths = initial["drawWidths"] as? [NSNumber]
+        else {
+            throw probeError("Could not read strokes before drawing")
+        }
+        let initialMatchingCount = initialWidths.filter {
+            abs($0.doubleValue - width) < 0.001
+        }.count
         for (phase, x) in [("began", 0.15), ("moved", 0.3), ("ended", 0.4)] {
             guard await surface.emitPointerForTesting(phase: phase, x: x, y: y) else {
                 throw probeError("Could not draw a \(width) pt stroke")
@@ -2290,7 +2368,10 @@ enum ProductTldrawProbe {
             else {
                 return false
             }
-            return widths.contains { abs($0.doubleValue - width) < 0.001 }
+            return widths.count == initialWidths.count + 1
+                && widths.filter {
+                    abs($0.doubleValue - width) < 0.001
+                }.count == initialMatchingCount + 1
         }
     }
 

@@ -78,6 +78,8 @@ one blank canvas.
 Use **Text** (`T`) and click the canvas to add a text box, or double-click an
 empty area with **Select** (`V`). Pen strokes can be as thin as **1 pt**;
 Highlighter starts at **8 pt**. Both tools retain a maximum width of **12 pt**.
+Drawing and Highlighter each remember their own last-used width across tool
+switches and app restarts.
 
 ## More detail
 
