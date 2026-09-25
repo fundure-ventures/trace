@@ -116,17 +116,19 @@ struct TraceGlobalShortcutsSnapshot: Equatable {
 enum TraceGlobalShortcutMenuPresentation {
     static func apply(
         _ snapshot: TraceGlobalShortcutsSnapshot,
-        to items: [TraceGlobalShortcutAction: NSMenuItem]
+        to items: [TraceGlobalShortcutAction: [NSMenuItem]]
     ) {
         for action in TraceGlobalShortcutAction.allCases {
-            guard let item = items[action] else {
+            guard let actionItems = items[action] else {
                 continue
             }
-            apply(
-                snapshot.assignment(for: action),
-                action: action,
-                to: item
-            )
+            for item in actionItems {
+                apply(
+                    snapshot.assignment(for: action),
+                    action: action,
+                    to: item
+                )
+            }
         }
     }
 
