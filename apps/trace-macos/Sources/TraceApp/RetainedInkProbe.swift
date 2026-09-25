@@ -2946,8 +2946,10 @@ enum TraceRetainedInkProbe {
         let customized = TraceAppSettings(
             captureScreenshotOnCapOff: false,
             copyTraceAndCloseOnDisconnect: true,
+            copyTraceAndCloseOnCopy: false,
             autoAnnotateDictation: false,
-            transcriptAnnotationScale: .large
+            transcriptAnnotationScale: .large,
+            launchInMenuBarAtLogin: false
         )
         TraceAppSettingsPreferences.save(customized, to: defaults)
         guard let reloadedDefaults = UserDefaults(suiteName: suite),
@@ -2985,12 +2987,16 @@ enum TraceRetainedInkProbe {
                 == "When pen is disconnected",
             TraceAppSettingsMenuPresentation.copyTraceAndClose
                 == "Copy trace and close app",
+            TraceAppSettingsMenuPresentation.onCopySection
+                == "On copy (cmd+c)",
             TraceAppSettingsMenuPresentation.dictationSection
                 == "Dictation",
             TraceAppSettingsMenuPresentation.autoAnnotateDictation
-                == "Annotate dictation automatically",
+                == "Start dictation automatically",
             TraceAppSettingsMenuPresentation.annotationScale
                 == "Annotation scale",
+            TraceAppSettingsMenuPresentation.launchInMenuBarAtLogin
+                == "Launch in menu bar at login",
             TraceAppSettingsMenuPresentation.annotationScaleTitle(.small)
                 == "Small (75%)",
             TraceAppSettingsMenuPresentation.annotationScaleTitle(.medium)
@@ -2999,6 +3005,25 @@ enum TraceRetainedInkProbe {
                 == "Large (150%)"
         else {
             throw probeError("app settings menu labels changed")
+        }
+        let penAppSettingItems = (0..<6).map { _ in NSMenuItem() }
+        TraceAppSettingsMenuPresentation.applyPenVisibility(
+            isConnected: false,
+            to: penAppSettingItems
+        )
+        guard penAppSettingItems.allSatisfy(\.isHidden) else {
+            throw probeError(
+                "pen-related app settings remained visible while disconnected"
+            )
+        }
+        TraceAppSettingsMenuPresentation.applyPenVisibility(
+            isConnected: true,
+            to: penAppSettingItems
+        )
+        guard penAppSettingItems.allSatisfy({ !$0.isHidden }) else {
+            throw probeError(
+                "pen-related app settings did not return after connection"
+            )
         }
         guard TraceAppMenuPresentation.newBlankTrace
             == "New Blank trace",
@@ -3021,6 +3046,12 @@ enum TraceRetainedInkProbe {
         TraceAppBehaviorPolicy.shouldCaptureScreenshot(
             settings: customized,
             force: true
+        ),
+        TraceAppBehaviorPolicy.shouldCloseAfterManualCopy(
+            settings: initial
+        ),
+        !TraceAppBehaviorPolicy.shouldCloseAfterManualCopy(
+            settings: customized
         ) else {
             throw probeError(
                 "app settings were not applied to copy/capture"
@@ -3266,9 +3297,19 @@ enum TraceRetainedInkProbe {
             .f18,
             modifiers: [.control, .shift]
         )
-        let items: [TraceGlobalShortcutAction: NSMenuItem] = [
-            .newBlankTrace: blankItem,
-            .captureFrontmostApp: captureItem,
+        let fileBlankItem = NSMenuItem(
+            title: TraceAppMenuPresentation.newBlankTrace,
+            action: nil,
+            keyEquivalent: ""
+        )
+        let fileCaptureItem = NSMenuItem(
+            title: TraceAppMenuPresentation.newScreenshotTrace,
+            action: nil,
+            keyEquivalent: ""
+        )
+        let items: [TraceGlobalShortcutAction: [NSMenuItem]] = [
+            .newBlankTrace: [blankItem, fileBlankItem],
+            .captureFrontmostApp: [captureItem, fileCaptureItem],
         ]
         let assigned = TraceGlobalShortcutsSnapshot(states: [
             .newBlankTrace: TraceGlobalShortcutActionState(
@@ -3294,6 +3335,14 @@ enum TraceRetainedInkProbe {
               captureItem.keyEquivalent
                   == captureShortcut.nsMenuItemKeyEquivalent,
               captureItem.keyEquivalentModifierMask
+                  == captureShortcut.modifiers,
+              fileBlankItem.keyEquivalent
+                  == blankShortcut.nsMenuItemKeyEquivalent,
+              fileBlankItem.keyEquivalentModifierMask
+                  == blankShortcut.modifiers,
+              fileCaptureItem.keyEquivalent
+                  == captureShortcut.nsMenuItemKeyEquivalent,
+              fileCaptureItem.keyEquivalentModifierMask
                   == captureShortcut.modifiers
         else {
             throw probeError(
@@ -3308,7 +3357,11 @@ enum TraceRetainedInkProbe {
         guard blankItem.keyEquivalent.isEmpty,
               blankItem.keyEquivalentModifierMask.isEmpty,
               captureItem.keyEquivalent == "n",
-              captureItem.keyEquivalentModifierMask == [.command]
+              captureItem.keyEquivalentModifierMask == [.command],
+              fileBlankItem.keyEquivalent.isEmpty,
+              fileBlankItem.keyEquivalentModifierMask.isEmpty,
+              fileCaptureItem.keyEquivalent == "n",
+              fileCaptureItem.keyEquivalentModifierMask == [.command]
         else {
             throw probeError(
                 "unassigned menu shortcuts did not restore action defaults"
