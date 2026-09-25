@@ -4965,6 +4965,7 @@ enum TraceRetainedInkProbe {
         guard TraceClipboardPayload.writeDocument(
                   image: composite,
                   transcript: "Dictation",
+                  suggestedFileName: "Existing.traceboard",
                   to: isolatedPasteboard
               ),
               let pdfData = isolatedPasteboard.data(forType: .pdf),
@@ -4976,6 +4977,19 @@ enum TraceRetainedInkProbe {
         else {
             throw probeError(
                 "Copy as Document did not produce a readable PDF with text"
+            )
+        }
+        guard let fileURLString = isolatedPasteboard.string(
+                  forType: .fileURL
+              ),
+              let fileURL = URL(string: fileURLString),
+              fileURL.lastPathComponent == "Existing.pdf",
+              let onDiskData = try? Data(contentsOf: fileURL),
+              onDiskData == pdfData
+        else {
+            throw probeError(
+                "Copy as Document did not name its promised file after "
+                    + "the matching .traceboard document"
             )
         }
         guard isolatedPasteboard.string(forType: .string) == nil,

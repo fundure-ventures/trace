@@ -1789,6 +1789,12 @@ final class TraceAppDelegate:
             }
             return
         case .document:
+            let suggestedFileName = model.snapshot.currentDocument.map {
+                $0.packageURL
+                    .deletingPathExtension()
+                    .appendingPathExtension("pdf")
+                    .lastPathComponent
+            } ?? TraceClipboardPayload.defaultDocumentFileName
             board.compositeImage { [weak self] image in
                 guard let self else {
                     return
@@ -1806,7 +1812,8 @@ final class TraceAppDelegate:
                 self.finishCopy(
                     self.board.copyDocument(
                         image,
-                        transcript: transcript
+                        transcript: transcript,
+                        suggestedFileName: suggestedFileName
                     ),
                     documentID: documentID
                 )

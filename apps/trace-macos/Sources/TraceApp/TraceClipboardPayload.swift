@@ -236,9 +236,14 @@ enum TraceClipboardPayload {
         )
     }
 
+    /// Fallback used when there is no `.traceboard` document to name the
+    /// PDF after (e.g. the isolated pasteboard tests).
+    static let defaultDocumentFileName = "Trace Document.pdf"
+
     static func writeDocument(
         image: NSImage,
         transcript: String?,
+        suggestedFileName: String = defaultDocumentFileName,
         to pasteboard: NSPasteboard
     ) -> Bool {
         guard let pdfData = makeDocumentData(
@@ -249,8 +254,32 @@ enum TraceClipboardPayload {
         }
         let item = NSPasteboardItem()
         item.setData(pdfData, forType: .pdf)
+        let fileName = pdfFileName(from: suggestedFileName)
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(fileName)
+        if (try? pdfData.write(to: tempURL, options: .atomic)) != nil {
+            item.setString(tempURL.absoluteString, forType: .fileURL)
+        }
         pasteboard.clearContents()
         return pasteboard.writeObjects([item])
+    }
+
+    /// Swaps whatever extension `suggestedFileName` carries (e.g. the
+    /// matching `.traceboard` document's own name) for `.pdf`, so a
+    /// paste into Finder/Mail/etc. shows the same base name as the
+    /// document this copy came from.
+    private static func pdfFileName(from suggestedFileName: String) -> String {
+        let trimmed = suggestedFileName.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !trimmed.isEmpty else {
+            return defaultDocumentFileName
+        }
+        let base = (trimmed as NSString).deletingPathExtension
+        guard !base.isEmpty else {
+            return defaultDocumentFileName
+        }
+        return "\(base).pdf"
     }
 
     private static func encode(

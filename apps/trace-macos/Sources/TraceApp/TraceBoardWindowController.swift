@@ -519,11 +519,14 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
 
     func copyDocument(
         _ image: NSImage,
-        transcript: String?
+        transcript: String?,
+        suggestedFileName: String = TraceClipboardPayload
+            .defaultDocumentFileName
     ) -> Bool {
         TraceClipboardPayload.writeDocument(
             image: image,
             transcript: transcript,
+            suggestedFileName: suggestedFileName,
             to: .general
         )
     }
