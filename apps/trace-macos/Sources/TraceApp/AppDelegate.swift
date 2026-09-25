@@ -179,6 +179,16 @@ enum TraceAppSettingsMenuPresentation {
     static let annotationScale = "Annotation scale"
     static let launchInMenuBarAtLogin = "Launch in menu bar at login"
 
+    @MainActor
+    static func applyPenVisibility(
+        isConnected: Bool,
+        to items: [NSMenuItem]
+    ) {
+        for item in items {
+            item.isHidden = !isConnected
+        }
+    }
+
     static func annotationScaleTitle(
         _ scale: TraceTranscriptAnnotationScale
     ) -> String {
@@ -348,6 +358,7 @@ final class TraceAppDelegate:
     private var penSensitivityItems: [NSMenuItem] = []
     private var captureOnCapOffItem: NSMenuItem?
     private var copyOnDisconnectItem: NSMenuItem?
+    private var penAppSettingsItems: [NSMenuItem] = []
     private var copyOnCopyItem: NSMenuItem?
     private var autoAnnotateDictationItem: NSMenuItem?
     private var launchInMenuBarAtLoginItem: NSMenuItem?
@@ -1012,7 +1023,8 @@ final class TraceAppDelegate:
             action: #selector(toggleCaptureOnCapOff(_:))
         )
         appSettingsMenu.addItem(captureOnCapOff)
-        appSettingsMenu.addItem(.separator())
+        let connectedSeparator = NSMenuItem.separator()
+        appSettingsMenu.addItem(connectedSeparator)
         let disconnectedSection = NSMenuItem(
             title: TraceAppSettingsMenuPresentation.disconnectedSection,
             action: nil,
@@ -1025,7 +1037,8 @@ final class TraceAppDelegate:
             action: #selector(toggleCopyOnDisconnect(_:))
         )
         appSettingsMenu.addItem(copyOnDisconnect)
-        appSettingsMenu.addItem(.separator())
+        let disconnectedSeparator = NSMenuItem.separator()
+        appSettingsMenu.addItem(disconnectedSeparator)
         let onCopySection = NSMenuItem(
             title: TraceAppSettingsMenuPresentation.onCopySection,
             action: nil,
@@ -1088,6 +1101,18 @@ final class TraceAppDelegate:
         menu.addItem(appSettings)
         captureOnCapOffItem = captureOnCapOff
         copyOnDisconnectItem = copyOnDisconnect
+        penAppSettingsItems = [
+            connectedSection,
+            captureOnCapOff,
+            connectedSeparator,
+            disconnectedSection,
+            copyOnDisconnect,
+            disconnectedSeparator,
+        ]
+        TraceAppSettingsMenuPresentation.applyPenVisibility(
+            isConnected: false,
+            to: penAppSettingsItems
+        )
         copyOnCopyItem = copyOnCopy
         autoAnnotateDictationItem = autoAnnotateDictation
         launchInMenuBarAtLoginItem = launchInMenuBarAtLogin
@@ -1330,6 +1355,10 @@ final class TraceAppDelegate:
         let enabled = status != nil
         penSettingsItem?.isHidden = !enabled
         penSettingsItem?.isEnabled = enabled
+        TraceAppSettingsMenuPresentation.applyPenVisibility(
+            isConnected: enabled,
+            to: penAppSettingsItems
+        )
         penSettingsItem?.title = TracePenMenuPresentation.title(
             deviceInfo: deviceInfo,
             batteryPercent: status?.batteryPercent
