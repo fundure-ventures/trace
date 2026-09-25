@@ -175,7 +175,7 @@ enum TraceAppSettingsMenuPresentation {
     static let copyTraceAndClose = "Copy trace and close app"
     static let onCopySection = "On copy (cmd+c)"
     static let dictationSection = "Dictation"
-    static let autoAnnotateDictation = "Annotate dictation automatically"
+    static let autoAnnotateDictation = "Start dictation automatically"
     static let annotationScale = "Annotation scale"
     static let launchInMenuBarAtLogin = "Launch in menu bar at login"
     static let copyEditMenuItemClosing = "Copy trace and close"

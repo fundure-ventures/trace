@@ -2992,7 +2992,7 @@ enum TraceRetainedInkProbe {
             TraceAppSettingsMenuPresentation.dictationSection
                 == "Dictation",
             TraceAppSettingsMenuPresentation.autoAnnotateDictation
-                == "Annotate dictation automatically",
+                == "Start dictation automatically",
             TraceAppSettingsMenuPresentation.annotationScale
                 == "Annotation scale",
             TraceAppSettingsMenuPresentation.launchInMenuBarAtLogin

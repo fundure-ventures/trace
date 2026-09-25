@@ -1798,11 +1798,12 @@ final class TraceAppModel {
         }
     }
 
-    /// Auto-arms dictation for a newly created blank trace when the user has
-    /// "Annotate dictation automatically" enabled, so they don't have to
-    /// press the mic button manually. Silently does nothing if the
-    /// microphone isn't authorized/configured yet; the user can still start
-    /// it manually and onboarding covers first-time setup.
+    /// Auto-arms dictation for a newly created trace (blank or captured via
+    /// screenshot) when the user has "Start dictation automatically"
+    /// enabled, so they don't have to press the mic button manually.
+    /// Silently does nothing if the microphone isn't authorized/configured
+    /// yet; the user can still start it manually and onboarding covers
+    /// first-time setup.
     private func autoStartDictationIfEnabled() {
         guard appSettings.autoAnnotateDictation,
               voiceController.microphoneAuthorization == .authorized,
