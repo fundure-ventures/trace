@@ -172,6 +172,8 @@ For focused text-entry, toolbar, and tool-width checks, use
 `TRACE_PRODUCT_TLDRAW_PROBE=text` with the same debug executable. This checks
 double-click text creation, the Text tool and shortcut, spaces, editing through
 color changes, snapshot persistence, and the Pen/Highlighter minimum widths.
+It also checks native Copy routing for selected text, a text caret, and objects
+selected before holding Command, without writing to the system clipboard.
 
 ## Diagnostics
 

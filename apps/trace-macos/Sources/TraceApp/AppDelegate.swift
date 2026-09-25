@@ -1694,13 +1694,36 @@ final class TraceAppDelegate:
     }
 
     @objc private func copyDrawing(_ sender: Any?) {
-        copyCurrentDrawing(
-            model.snapshot.appSettings.copyFormatOnCopy,
-            closesDocument:
-                TraceAppBehaviorPolicy.shouldCloseAfterManualCopy(
-                    settings: model.snapshot.appSettings
+        if let textView = NSApp.keyWindow?.firstResponder as? NSTextView,
+           textView.isSelectable
+        {
+            textView.copy(sender)
+            return
+        }
+        let documentID = model.snapshot.currentDocument?.manifest.id
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            do {
+                if try await board.copySelectionIfAvailable() {
+                    return
+                }
+                guard model.snapshot.currentDocument?.manifest.id == documentID else {
+                    return
+                }
+                copyCurrentDrawing(
+                    model.snapshot.appSettings.copyFormatOnCopy,
+                    closesDocument:
+                        TraceAppBehaviorPolicy.shouldCloseAfterManualCopy(
+                            settings: model.snapshot.appSettings
+                        )
                 )
-        )
+            } catch {
+                NSLog("Trace Copy rejected: %@", error.localizedDescription)
+                NSSound.beep()
+            }
+        }
     }
 
     @objc private func undoDrawing(_ sender: Any?) {

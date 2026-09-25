@@ -65,8 +65,12 @@ To repeat onboarding without deleting saved `.traceboard` documents:
 2. Annotate with the Neo pen or the Select, Pen, Highlighter, Rectangle, and
    Text tools.
 3. Use Dictation when a spoken explanation helps.
-4. Press `Cmd+C` to copy the annotated image and transcript, save the trace,
-   and close the board.
+4. With nothing selected, press `Cmd+C` to copy the annotated image and
+   transcript, save the trace, and close the board.
+
+With objects or text selected, `Cmd+C` copies that selection and keeps the
+board open. While editing text, it stays a text-copy command even with only a
+caret. The toolbar's Copy action always copies the trace.
 
 Finder **Open With** accepts an image batch and places the images together on
 one blank canvas.

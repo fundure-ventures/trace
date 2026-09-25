@@ -404,6 +404,78 @@ final class TldrawProductCanvasView:
         return result
     }
 
+    func captureSelectionCopyForTesting(selectText: Bool = false) async throws -> [String: Any] {
+        _ = try await webView.callAsyncJavaScript(
+            """
+            const target = document.querySelector('.tl-container [contenteditable="true"]')
+            if (target) {
+              target.focus()
+              const selection = window.getSelection()
+              if (selectText) {
+                const node = document.createTreeWalker(target, NodeFilter.SHOW_TEXT).nextNode()
+                if (!node) throw new Error('Text editor has no text')
+                const range = document.createRange()
+                range.setStart(node, 0)
+                range.setEnd(node, 4)
+                selection.removeAllRanges()
+                selection.addRange(range)
+              } else {
+                selection.collapseToEnd()
+              }
+            }
+            const probe = { events: 0, text: '', shapeCount: 0 }
+            probe.completion = new Promise(resolve => {
+              probe.listener = event => {
+                event.preventDefault()
+                event.stopImmediatePropagation()
+                probe.events += 1
+                probe.text = window.getSelection()?.toString() ?? ''
+                probe.shapeCount = window.traceProductRenderer
+                  .getStateForTesting().selectedShapeCount
+                resolve()
+              }
+            })
+            document.addEventListener('copy', probe.listener, true)
+            window.traceCopyProbe = probe
+            """,
+            arguments: ["selectText": selectText],
+            in: nil,
+            contentWorld: .page
+        )
+        let handled = try await copySelectionIfAvailable()
+        let result = try await webView.callAsyncJavaScript(
+            """
+            const probe = window.traceCopyProbe
+            let timeout
+            try {
+              if (handled) {
+                await Promise.race([
+                  probe.completion,
+                  new Promise((_, reject) => {
+                    timeout = setTimeout(() => reject(new Error('Native Copy did not reach WebKit')), 2000)
+                  }),
+                ])
+              }
+              return {
+                handled, events: probe.events, text: probe.text, shapeCount: probe.shapeCount,
+                supportsClipboard: Boolean(navigator.clipboard?.write),
+              }
+            } finally {
+              clearTimeout(timeout)
+              document.removeEventListener('copy', probe.listener, true)
+              delete window.traceCopyProbe
+            }
+            """,
+            arguments: ["handled": handled],
+            in: nil,
+            contentWorld: .page
+        )
+        guard let result = result as? [String: Any] else {
+            throw CocoaError(.coderReadCorrupt)
+        }
+        return result
+    }
+
     func emitPointerForTesting(
         phase: String,
         x: Double,
@@ -583,6 +655,43 @@ final class TldrawProductCanvasView:
 
     func focusCanvas() {
         window?.makeFirstResponder(webView)
+    }
+
+    func copySelectionIfAvailable() async throws -> Bool {
+        guard isReady, let documentID = currentDocumentID else {
+            throw NSError(
+                domain: "TraceCanvasCopy", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Canvas is not ready to copy."]
+            )
+        }
+        let generation = documentGeneration
+        let response = try await webView.callAsyncJavaScript(
+            "return window.traceProductRenderer.prepareSelectionCopy()",
+            arguments: [:],
+            in: nil,
+            contentWorld: .page
+        )
+        guard let result = response as? [String: Any],
+              result["documentId"] as? String == documentID.uuidString.lowercased(),
+              currentDocumentID == documentID,
+              documentGeneration == generation,
+              let hasSelection = result["hasSelection"] as? Bool
+        else {
+            throw NSError(
+                domain: "TraceCanvasCopy", code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Canvas Copy state is no longer available."]
+            )
+        }
+        guard hasSelection else {
+            return false
+        }
+        guard webView.tryToPerform(#selector(NSText.copy(_:)), with: nil) else {
+            throw NSError(
+                domain: "TraceCanvasCopy", code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Could not copy the selected canvas content."]
+            )
+        }
+        return true
     }
 
     func syncStrokes(_ document: TraceDrawingSession) {

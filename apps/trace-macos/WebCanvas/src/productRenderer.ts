@@ -139,6 +139,7 @@ export interface TraceProductRendererBridge {
     timedShapes: ProductTimedShape[]
   }
   getSnapshotJson(): string
+  prepareSelectionCopy(): { documentId: string; hasSelection: boolean }
   exportPng(
     pixelRatio: number,
     expectedDocumentId: string,
@@ -270,6 +271,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
   let lastExportPlan: TraceImageExportPlan | null = null
   let temporarySelectActive = false
   let temporaryDrawActive = false
+  let temporaryDrawSelection: TLShapeId[] = []
   let commandSelectHeld = false
   let lastDrawingTool: Exclude<ProductCanvasTool, 'select'> = 'pen'
   let activeTimedGesture: {
@@ -431,6 +433,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
   const activateTemporaryDraw = () => {
     if (temporaryDrawActive) return
     temporaryDrawActive = true
+    temporaryDrawSelection = editor.getSelectedShapeIds().slice()
     runHostMutation(() => {
       editor.selectNone()
       applyTool(editor, temporaryDrawTool())
@@ -443,7 +446,11 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     temporaryDrawActive = false
     runHostMutation(() => {
       applyTool(editor, currentTool)
+      if (currentTool.tool === 'select' && temporaryDrawSelection.length > 0) {
+        editor.select(...temporaryDrawSelection.filter((id) => editor.getShape(id)))
+      }
     })
+    temporaryDrawSelection = []
     postTemporaryTool(null)
   }
 
@@ -640,6 +647,9 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       queueMicrotask(reconcileTextTool)
     }
     if (event.type !== 'pointer' || event.isPen) return
+    if (event.name === 'pointer_down' && temporaryDrawActive) {
+      temporaryDrawSelection = []
+    }
     if (
       event.name === 'pointer_down'
       && event.button === 0
@@ -878,6 +888,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       commandSelectHeld = false
       temporarySelectActive = false
       temporaryDrawActive = false
+      temporaryDrawSelection = []
       activeTimedGesture = null
       recentlyCompletedGesture = null
       explicitlyReportedRecordIds.clear()
@@ -1100,6 +1111,20 @@ export function installTraceProductRenderer(editor: Editor): () => void {
 
     getSnapshotJson() {
       return snapshotJson(editor)
+    },
+
+    prepareSelectionCopy() {
+      if (temporaryDrawActive && temporaryDrawSelection.length > 0) {
+        releaseTemporaryDraw()
+      }
+      return {
+        documentId: currentDocumentId,
+        hasSelection:
+          editor.getSelectedShapeIds().length > 0
+          || editor.getEditingShapeId() !== null
+          || isEditableTarget(document.activeElement)
+          || window.getSelection()?.isCollapsed === false,
+      }
     },
 
     async waitForIdle() {

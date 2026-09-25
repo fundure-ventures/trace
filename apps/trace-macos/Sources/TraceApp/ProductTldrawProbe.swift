@@ -115,6 +115,7 @@ enum ProductTldrawProbe {
         if textToolsOnly {
             try TraceRetainedInkProbe.runDrawingToolChecks(document: document)
             try await verifyTextEditing(surface, document: document)
+            try await verifySelectionCopy(surface)
             return
         }
         var tool = TraceToolState()
@@ -2024,6 +2025,7 @@ enum ProductTldrawProbe {
         }
         board.hideBoard()
         try await verifyTextEditing(surface, document: cleanDocument)
+        try await verifySelectionCopy(surface)
         surface.showErrorForTesting("Synthetic bridge failure")
         let errorPresentation = surface.errorPresentationForTesting
         guard errorPresentation.visible,
@@ -2076,6 +2078,20 @@ enum ProductTldrawProbe {
         }
         guard typedText == firstText else {
             throw probeError("Double-click text did not preserve spaces")
+        }
+        let textCopy = try await surface.captureSelectionCopyForTesting(selectText: true)
+        guard textCopy["handled"] as? Bool == true,
+              (textCopy["events"] as? NSNumber)?.intValue == 1,
+              textCopy["text"] as? String == "Text"
+        else {
+            throw probeError("Copy did not target only the selected text: \(textCopy)")
+        }
+        let caretCopy = try await surface.captureSelectionCopyForTesting()
+        guard caretCopy["handled"] as? Bool == true,
+              (caretCopy["events"] as? NSNumber)?.intValue == 1,
+              caretCopy["text"] as? String == ""
+        else {
+            throw probeError("Copy at the text caret would export and close the canvas")
         }
         state.canvasTool = .pen
         state.brush = .pen
@@ -2149,6 +2165,12 @@ enum ProductTldrawProbe {
                 "Text editing did not finish: \(String(describing: await surface.stateForTesting()))"
             )
         }
+        let textBoxCopy = try await surface.captureSelectionCopyForTesting()
+        guard textBoxCopy["handled"] as? Bool == true,
+              (textBoxCopy["shapeCount"] as? NSNumber)?.intValue == 1
+        else {
+            throw probeError("Copy did not target the selected text box")
+        }
         guard let value = await surface.stateForTesting(),
               value["textOpacities"] as? [Double] == [1, 1],
               let snapshot = await surface.snapshotForTesting(),
@@ -2180,6 +2202,74 @@ enum ProductTldrawProbe {
               (textState["opacity"] as? NSNumber)?.doubleValue == 1
         else {
             throw probeError("T did not select opaque text")
+        }
+    }
+
+    @MainActor
+    private static func verifySelectionCopy(_ surface: TldrawProductCanvasView) async throws {
+        guard surface.insertImage(solidImage(color: .red, size: NSSize(width: 40, height: 40))) else {
+            throw probeError("Could not create the copy-selection fixture")
+        }
+        try await waitUntil("copy-selection image") {
+            (await surface.stateForTesting()?["userImageCount"] as? NSNumber)?.intValue == 1
+        }
+        guard await surface.keyboardEventForTesting(
+                  type: "keydown", key: "v", code: "KeyV"
+              ) != nil,
+              await surface.selectFirstUserShapeForTesting()
+        else {
+            throw probeError("Could not select an object for Copy")
+        }
+        for releaseBeforeCopy in [false, true] {
+            guard await surface.keyboardEventForTesting(
+                type: "keydown", key: "Meta", code: "MetaLeft", metaKey: true
+            ) != nil else {
+                throw probeError("Could not hold Command before Copy")
+            }
+            if releaseBeforeCopy {
+                _ = await surface.keyboardEventForTesting(
+                    type: "keyup", key: "Meta", code: "MetaLeft"
+                )
+            }
+            let copy = try await surface.captureSelectionCopyForTesting()
+            guard copy["handled"] as? Bool == true,
+                  (copy["events"] as? NSNumber)?.intValue == 1,
+                  (copy["shapeCount"] as? NSNumber)?.intValue == 1,
+                  copy["supportsClipboard"] as? Bool == true
+            else {
+                throw probeError("Command-C lost object selection: \(copy)")
+            }
+            _ = await surface.keyboardEventForTesting(
+                type: "keyup", key: "Meta", code: "MetaLeft"
+            )
+        }
+        let menuCopy = try await surface.captureSelectionCopyForTesting()
+        guard menuCopy["handled"] as? Bool == true,
+              (menuCopy["shapeCount"] as? NSNumber)?.intValue == 1
+        else {
+            throw probeError("Copy without Command did not target the selected object")
+        }
+        _ = await surface.keyboardEventForTesting(
+            type: "keydown", key: "Meta", code: "MetaLeft", metaKey: true
+        )
+        for (phase, x) in [("began", 0.1), ("moved", 0.2), ("ended", 0.3)] {
+            guard await surface.emitPointerForTesting(phase: phase, x: x, y: 0.7) else {
+                throw probeError("Could not draw while holding Command")
+            }
+        }
+        _ = await surface.keyboardEventForTesting(
+            type: "keyup", key: "Meta", code: "MetaLeft"
+        )
+        let afterDrawing = await surface.stateForTesting()
+        guard (afterDrawing?["selectedUserImageCount"] as? NSNumber)?.intValue == 0 else {
+            throw probeError("Drawing resurrected the old object selection")
+        }
+        await surface.clearSelectionForTesting()
+        let canvasCopy = try await surface.captureSelectionCopyForTesting()
+        guard canvasCopy["handled"] as? Bool == false,
+              (canvasCopy["events"] as? NSNumber)?.intValue == 0
+        else {
+            throw probeError("Copy without selection no longer allows canvas export")
         }
     }
 

@@ -506,6 +506,10 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         drawingController.flushTldrawSnapshot(completion: completion)
     }
 
+    func copySelectionIfAvailable() async throws -> Bool {
+        try await drawingController.copySelectionIfAvailable()
+    }
+
     func copyComposite(
         _ image: NSImage,
         transcript: String?
@@ -2901,6 +2905,13 @@ private final class DrawingBoardViewController: NSViewController {
             return
         }
         tldrawCanvas.flushSnapshot(completion: completion)
+    }
+
+    func copySelectionIfAvailable() async throws -> Bool {
+        guard let tldrawCanvas else {
+            return false
+        }
+        return try await tldrawCanvas.copySelectionIfAvailable()
     }
 
     func setToolState(_ state: TraceToolState) {
