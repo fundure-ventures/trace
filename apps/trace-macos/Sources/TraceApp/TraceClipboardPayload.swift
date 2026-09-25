@@ -9,7 +9,7 @@ enum TraceCopyContent: String, Equatable, CaseIterable {
     case document
 
     /// Title shared by the toolbar's copy-options menu and the
-    /// "On copy (cmd+c)" format setting, so both surfaces stay in sync.
+    /// "Copy" format setting, so both surfaces stay in sync.
     var menuTitle: String {
         switch self {
         case .all:

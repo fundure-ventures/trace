@@ -2988,9 +2988,9 @@ enum TraceRetainedInkProbe {
             TraceAppSettingsMenuPresentation.disconnectedSection
                 == "When pen is disconnected",
             TraceAppSettingsMenuPresentation.copyTraceAndClose
-                == "Copy trace and close app",
+                == "Close window after copy",
             TraceAppSettingsMenuPresentation.onCopySection
-                == "On copy (cmd+c)",
+                == "Copy",
             TraceAppSettingsMenuPresentation.copyFormat
                 == "Format",
             TraceAppSettingsMenuPresentation.dictationSection
