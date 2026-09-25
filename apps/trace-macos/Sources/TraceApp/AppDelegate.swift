@@ -178,6 +178,12 @@ enum TraceAppSettingsMenuPresentation {
     static let autoAnnotateDictation = "Annotate dictation automatically"
     static let annotationScale = "Annotation scale"
     static let launchInMenuBarAtLogin = "Launch in menu bar at login"
+    static let copyEditMenuItemClosing = "Copy trace and close"
+    static let copyEditMenuItemKeepingOpen = "Copy trace"
+
+    static func copyEditMenuItemTitle(closesDocument: Bool) -> String {
+        closesDocument ? copyEditMenuItemClosing : copyEditMenuItemKeepingOpen
+    }
 
     @MainActor
     static func applyPenVisibility(
@@ -362,6 +368,7 @@ final class TraceAppDelegate:
     private var copyOnCopyItem: NSMenuItem?
     private var autoAnnotateDictationItem: NSMenuItem?
     private var launchInMenuBarAtLoginItem: NSMenuItem?
+    private var copyEditItem: NSMenuItem?
     private var transcriptAnnotationScaleItems:
         [TraceTranscriptAnnotationScale: NSMenuItem] = [:]
     private var copyProgress = TraceDocumentCopyProgress()
@@ -498,7 +505,13 @@ final class TraceAppDelegate:
             NSApp.setActivationPolicy(.accessory)
         }
         model.onCopyRequested = { [weak self] in
-            self?.copyCurrentDrawing()
+            guard let self else { return }
+            self.copyCurrentDrawing(
+                closesDocument:
+                    TraceAppBehaviorPolicy.shouldCloseAfterManualCopy(
+                        settings: self.model.snapshot.appSettings
+                    )
+            )
         }
         model.onAnnotationUpdate = { [weak self] update in
             self?.board.apply(update)
@@ -802,7 +815,14 @@ final class TraceAppDelegate:
             }
         }
         board.onCopy = { [weak self] content in
-            self?.copyCurrentDrawing(content)
+            guard let self else { return }
+            self.copyCurrentDrawing(
+                content,
+                closesDocument:
+                    TraceAppBehaviorPolicy.shouldCloseAfterManualCopy(
+                        settings: self.model.snapshot.appSettings
+                    )
+            )
         }
         board.onCompleteOnboarding = { [weak self] in
             self?.model.completeOnboarding()
@@ -1217,12 +1237,18 @@ final class TraceAppDelegate:
         editMenu.addItem(redoItem)
         editMenu.addItem(.separator())
         let copyItem = NSMenuItem(
-            title: "Copy trace and close",
+            title: TraceAppSettingsMenuPresentation.copyEditMenuItemTitle(
+                closesDocument:
+                    TraceAppBehaviorPolicy.shouldCloseAfterManualCopy(
+                        settings: model.snapshot.appSettings
+                    )
+            ),
             action: #selector(copyDrawing),
             keyEquivalent: "c"
         )
         copyItem.target = self
         editMenu.addItem(copyItem)
+        copyEditItem = copyItem
         let pasteItem = NSMenuItem(
             title: "Paste image",
             action: #selector(pasteImage(_:)),
@@ -1410,6 +1436,13 @@ final class TraceAppDelegate:
             settings.autoAnnotateDictation ? .on : .off
         launchInMenuBarAtLoginItem?.state =
             settings.launchInMenuBarAtLogin ? .on : .off
+        copyEditItem?.title =
+            TraceAppSettingsMenuPresentation.copyEditMenuItemTitle(
+                closesDocument:
+                    TraceAppBehaviorPolicy.shouldCloseAfterManualCopy(
+                        settings: settings
+                    )
+            )
         for (scale, item) in transcriptAnnotationScaleItems {
             item.state = settings.transcriptAnnotationScale == scale
                 ? .on
@@ -1548,7 +1581,10 @@ final class TraceAppDelegate:
         enabled: Bool
     ) throws {
         if enabled {
-            if SMAppService.mainApp.status != .enabled {
+            // .requiresApproval means the service is already registered and
+            // pending the user's action in System Settings; calling
+            // register() again throws "already registered".
+            if SMAppService.mainApp.status == .notRegistered {
                 try SMAppService.mainApp.register()
             }
         } else if SMAppService.mainApp.status != .notRegistered {
