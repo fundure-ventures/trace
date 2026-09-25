@@ -103,6 +103,7 @@ struct TraceAppSettings: Equatable {
     var captureScreenshotOnCapOff = true
     var copyTraceAndCloseOnDisconnect = false
     var copyTraceAndCloseOnCopy = true
+    var copyFormatOnCopy: TraceCopyContent = .all
     var autoAnnotateDictation = true
     var transcriptAnnotationScale: TraceTranscriptAnnotationScale = .medium
     var launchInMenuBarAtLogin = true
@@ -114,6 +115,7 @@ enum TraceAppSettingsPreferences {
     private static let copyOnDisconnectKey =
         "TraceCopyTraceAndCloseOnDisconnect"
     private static let copyOnCopyKey = "TraceCopyTraceAndCloseOnCopy"
+    private static let copyFormatOnCopyKey = "TraceCopyFormatOnCopy"
     private static let autoAnnotateDictationKey =
         "TraceAutoAnnotateTranscriptions"
     private static let transcriptAnnotationScaleKey =
@@ -142,6 +144,9 @@ enum TraceAppSettingsPreferences {
                 defaultValue: true,
                 defaults: defaults
             ),
+            copyFormatOnCopy: defaults.string(
+                forKey: copyFormatOnCopyKey
+            ).flatMap(TraceCopyContent.init(rawValue:)) ?? .all,
             autoAnnotateDictation: bool(
                 forKey: autoAnnotateDictationKey,
                 defaultValue: true,
@@ -174,6 +179,10 @@ enum TraceAppSettingsPreferences {
         defaults.set(
             settings.copyTraceAndCloseOnCopy,
             forKey: copyOnCopyKey
+        )
+        defaults.set(
+            settings.copyFormatOnCopy.rawValue,
+            forKey: copyFormatOnCopyKey
         )
         defaults.set(
             settings.autoAnnotateDictation,
@@ -1014,6 +1023,14 @@ final class TraceAppModel {
             return
         }
         appSettings.copyTraceAndCloseOnCopy = enabled
+        persistAppSettings()
+    }
+
+    func setCopyFormatOnCopy(_ format: TraceCopyContent) {
+        guard appSettings.copyFormatOnCopy != format else {
+            return
+        }
+        appSettings.copyFormatOnCopy = format
         persistAppSettings()
     }
 

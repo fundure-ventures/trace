@@ -174,6 +174,7 @@ enum TraceAppSettingsMenuPresentation {
     static let disconnectedSection = "When pen is disconnected"
     static let copyTraceAndClose = "Copy trace and close app"
     static let onCopySection = "On copy (cmd+c)"
+    static let copyFormat = "Format"
     static let dictationSection = "Dictation"
     static let autoAnnotateDictation = "Start dictation automatically"
     static let annotationScale = "Annotation scale"
@@ -371,6 +372,7 @@ final class TraceAppDelegate:
     private var copyEditItem: NSMenuItem?
     private var transcriptAnnotationScaleItems:
         [TraceTranscriptAnnotationScale: NSMenuItem] = [:]
+    private var copyFormatOnCopyItems: [TraceCopyContent: NSMenuItem] = [:]
     private var copyProgress = TraceDocumentCopyProgress()
     private var undoEditSources: [DrawingEditSource] = []
     private var redoEditSources: [DrawingEditSource] = []
@@ -1071,6 +1073,27 @@ final class TraceAppDelegate:
             action: #selector(toggleCopyOnCopy(_:))
         )
         appSettingsMenu.addItem(copyOnCopy)
+        let copyFormat = NSMenuItem(
+            title: TraceAppSettingsMenuPresentation.copyFormat,
+            action: nil,
+            keyEquivalent: ""
+        )
+        let copyFormatMenu = NSMenu(
+            title: TraceAppSettingsMenuPresentation.copyFormat
+        )
+        for format in TraceCopyContent.allCases {
+            let item = NSMenuItem(
+                title: format.menuTitle,
+                action: #selector(changeCopyFormatOnCopy(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = format.rawValue
+            copyFormatMenu.addItem(item)
+            copyFormatOnCopyItems[format] = item
+        }
+        copyFormat.submenu = copyFormatMenu
+        appSettingsMenu.addItem(copyFormat)
         appSettingsMenu.addItem(.separator())
         let dictationSection = NSMenuItem(
             title: TraceAppSettingsMenuPresentation.dictationSection,
@@ -1432,6 +1455,9 @@ final class TraceAppDelegate:
             settings.copyTraceAndCloseOnDisconnect ? .on : .off
         copyOnCopyItem?.state =
             settings.copyTraceAndCloseOnCopy ? .on : .off
+        for (format, item) in copyFormatOnCopyItems {
+            item.state = settings.copyFormatOnCopy == format ? .on : .off
+        }
         autoAnnotateDictationItem?.state =
             settings.autoAnnotateDictation ? .on : .off
         launchInMenuBarAtLoginItem?.state =
@@ -1541,6 +1567,15 @@ final class TraceAppDelegate:
 
     @objc private func toggleCopyOnCopy(_ sender: NSMenuItem) {
         model.setCopyTraceAndCloseOnCopy(sender.state != .on)
+    }
+
+    @objc private func changeCopyFormatOnCopy(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let format = TraceCopyContent(rawValue: rawValue)
+        else {
+            return
+        }
+        model.setCopyFormatOnCopy(format)
     }
 
     @objc private func toggleAutoAnnotateDictation(
@@ -1654,7 +1689,7 @@ final class TraceAppDelegate:
 
     @objc private func copyDrawing(_ sender: Any?) {
         copyCurrentDrawing(
-            .all,
+            model.snapshot.appSettings.copyFormatOnCopy,
             closesDocument:
                 TraceAppBehaviorPolicy.shouldCloseAfterManualCopy(
                     settings: model.snapshot.appSettings

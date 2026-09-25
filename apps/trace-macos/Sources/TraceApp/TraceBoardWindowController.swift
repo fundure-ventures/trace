@@ -3566,28 +3566,28 @@ private final class FloatingAnnotationToolbar:
             .isActive = true
 
         let copyImageAndDictationItem = NSMenuItem(
-            title: "Copy image and dictation",
+            title: TraceCopyContent.all.menuTitle,
             action: #selector(copyDrawing),
             keyEquivalent: ""
         )
         copyImageAndDictationItem.target = self
         copyOptionsMenu.addItem(copyImageAndDictationItem)
         let copyImageItem = NSMenuItem(
-            title: "Copy image",
+            title: TraceCopyContent.image.menuTitle,
             action: #selector(copyImage),
             keyEquivalent: ""
         )
         copyImageItem.target = self
         copyOptionsMenu.addItem(copyImageItem)
         let copyDictationItem = NSMenuItem(
-            title: "Copy dictation",
+            title: TraceCopyContent.dictation.menuTitle,
             action: #selector(copyDictation),
             keyEquivalent: ""
         )
         copyDictationItem.target = self
         copyOptionsMenu.addItem(copyDictationItem)
         let copyDocumentItem = NSMenuItem(
-            title: "Copy as .pdf",
+            title: TraceCopyContent.document.menuTitle,
             action: #selector(copyDocument),
             keyEquivalent: ""
         )

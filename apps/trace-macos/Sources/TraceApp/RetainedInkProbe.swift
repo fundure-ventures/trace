@@ -2948,6 +2948,7 @@ enum TraceRetainedInkProbe {
             captureScreenshotOnCapOff: false,
             copyTraceAndCloseOnDisconnect: true,
             copyTraceAndCloseOnCopy: false,
+            copyFormatOnCopy: .document,
             autoAnnotateDictation: false,
             transcriptAnnotationScale: .large,
             launchInMenuBarAtLogin: false
@@ -2990,6 +2991,8 @@ enum TraceRetainedInkProbe {
                 == "Copy trace and close app",
             TraceAppSettingsMenuPresentation.onCopySection
                 == "On copy (cmd+c)",
+            TraceAppSettingsMenuPresentation.copyFormat
+                == "Format",
             TraceAppSettingsMenuPresentation.dictationSection
                 == "Dictation",
             TraceAppSettingsMenuPresentation.autoAnnotateDictation

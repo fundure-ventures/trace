@@ -2,11 +2,26 @@ import AppKit
 import ImageIO
 import UniformTypeIdentifiers
 
-enum TraceCopyContent: Equatable {
+enum TraceCopyContent: String, Equatable, CaseIterable {
     case all
-    case dictation
     case image
+    case dictation
     case document
+
+    /// Title shared by the toolbar's copy-options menu and the
+    /// "On copy (cmd+c)" format setting, so both surfaces stay in sync.
+    var menuTitle: String {
+        switch self {
+        case .all:
+            return "Copy image and dictation"
+        case .image:
+            return "Copy image"
+        case .dictation:
+            return "Copy dictation"
+        case .document:
+            return "Copy as .pdf"
+        }
+    }
 }
 
 enum TraceClipboardPayload {
