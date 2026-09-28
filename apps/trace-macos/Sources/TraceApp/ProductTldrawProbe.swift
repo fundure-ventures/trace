@@ -117,6 +117,7 @@ enum ProductTldrawProbe {
             try await verifyTextEditing(surface, document: document)
             try await verifyIndependentStrokeWidths(surface)
             try await verifySelectionCopy(surface)
+            try await verifyCapturedScreenshotOpacity(surface, document: document)
             return
         }
         var tool = TraceToolState()
@@ -2028,6 +2029,7 @@ enum ProductTldrawProbe {
         try await verifyTextEditing(surface, document: cleanDocument)
         try await verifyIndependentStrokeWidths(surface)
         try await verifySelectionCopy(surface)
+        try await verifyCapturedScreenshotOpacity(surface, document: cleanDocument)
         surface.showErrorForTesting("Synthetic bridge failure")
         let errorPresentation = surface.errorPresentationForTesting
         guard errorPresentation.visible,
@@ -2272,6 +2274,67 @@ enum ProductTldrawProbe {
             else {
                 throw probeError("Temporary drawing changed the persistent tool width")
             }
+        }
+    }
+
+    @MainActor
+    private static func verifyCapturedScreenshotOpacity(
+        _ surface: TldrawProductCanvasView,
+        document: TraceDrawingSession
+    ) async throws {
+        var highlighter = TraceToolState()
+        highlighter.canvasTool = .highlighter
+        highlighter.brush = .highlighter
+        surface.setToolState(highlighter)
+        try await waitUntil("Highlighter before screenshot capture") {
+            let state = await surface.stateForTesting()
+            return state?["productTool"] as? String == "highlighter"
+                && (state?["opacity"] as? NSNumber)?.doubleValue == 0.5
+        }
+
+        let manifest = TraceDrawingManifest(
+            id: UUID(),
+            createdAt: Date(),
+            updatedAt: Date(),
+            sourceApplicationName: "Trace Probe",
+            sourceWindowTitle: "Screenshot opacity",
+            screenshotFileName: "opacity-probe-screenshot.png",
+            screenshotPixelWidth: document.manifest.screenshotPixelWidth,
+            screenshotPixelHeight: document.manifest.screenshotPixelHeight,
+            sourceWindowBounds: TraceRect(
+                x: 0,
+                y: 0,
+                width: Double(document.manifest.screenshotPixelWidth),
+                height: Double(document.manifest.screenshotPixelHeight)
+            ),
+            pageKind: .screenshot,
+            backgroundColor: TraceRGBAColor(red: 1, green: 1, blue: 1),
+            viewport: TracePageViewport.full,
+            strokes: []
+        )
+        let capture = TraceDrawingSession(
+            manifest: manifest,
+            screenshot: solidImage(color: .red, size: document.screenshot.size),
+            packageURL: document.packageURL
+        )
+        surface.setDocument(capture, toolState: highlighter)
+        try await waitUntil("screenshot after Highlighter") {
+            (await surface.stateForTesting()?["userImageCount"] as? NSNumber)?.intValue == 1
+        }
+        let screenshotState = await surface.stateForTesting()
+        let opacity = (screenshotState?["captureImageOpacity"] as? NSNumber)?.doubleValue
+        guard opacity == 1 else {
+            throw probeError(
+                "Screenshot inherited Highlighter opacity: \(String(describing: opacity))"
+            )
+        }
+        guard let exported = await surface.exportImageForTesting(pixelRatio: 1),
+              let pixel = bitmapColor(exported, x: 512, y: 360),
+              pixel.redComponent > 0.9,
+              pixel.greenComponent < 0.25,
+              pixel.blueComponent < 0.1
+        else {
+            throw probeError("Screenshot export is faded")
         }
     }
 

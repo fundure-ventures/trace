@@ -1440,6 +1440,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
           (shape) => shape.isLocked,
         ),
         userImageCount: userImages.length,
+        captureImageOpacity: captureShape?.opacity ?? null,
         selectedUserImageCount: userImages.filter((shape) =>
           editor.getSelectedShapeIds().includes(shape.id),
         ).length,
@@ -2447,6 +2448,7 @@ function insertImage(
     type: 'image',
     x,
     y,
+    opacity: 1,
     isLocked: locked,
     props: {
       w: locked ? pageWidth : width,

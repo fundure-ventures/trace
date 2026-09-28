@@ -173,7 +173,8 @@ For focused text-entry, toolbar, and tool-width checks, use
 double-click text creation, the Text tool and shortcut, spaces, editing through
 color changes, snapshot persistence, and the Pen/Highlighter minimum widths.
 It verifies independent Drawing and Highlighter widths across toolbar and
-keyboard switches, rendered strokes, and app-model recreation.
+keyboard switches, rendered strokes, and app-model recreation, plus opaque
+screenshot capture after using Highlighter.
 It also checks native Copy routing for selected text, a text caret, and objects
 selected before holding Command, without writing to the system clipboard.
 
