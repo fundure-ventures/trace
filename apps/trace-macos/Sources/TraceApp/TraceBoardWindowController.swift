@@ -3376,7 +3376,7 @@ private final class FloatingAnnotationToolbar:
                 ),
                 forSegment: index
             )
-            brushControl.setWidth(28, forSegment: index)
+            brushControl.setWidth(36, forSegment: index)
             brushControl.setToolTip(tool.3, forSegment: index)
         }
         brushControl.setAccessibilityLabel("Drawing tool")

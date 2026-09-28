@@ -1284,7 +1284,7 @@ enum TraceRetainedInkProbe {
               appearance.usesSeparatedStyle,
               appearance.segmentWidths.count == 5,
               appearance.segmentWidths.allSatisfy({
-                  (27.5...28.5).contains($0)
+                  (35.5...36.5).contains($0)
               }),
               appearance.selectedCount == 1,
               board.controlAccentPresentationForPreview.brush,
