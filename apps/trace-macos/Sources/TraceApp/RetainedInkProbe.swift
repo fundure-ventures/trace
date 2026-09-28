@@ -23,7 +23,6 @@ enum TraceRetainedInkProbe {
             board.hideBoard()
         }
         board.prepareDocumentForPreview(document, toolState: TraceToolState())
-        try verifyBackgroundControlLayout(board, visible: true)
         try verifyDrawingToolControls(board)
     }
 
@@ -1236,8 +1235,10 @@ enum TraceRetainedInkProbe {
         let swatch = board.backgroundSwatchPresentationForPreview
         guard layout.backgroundIndex == 0,
               layout.gridIndex == 1,
-              layout.colorsIndex == 2,
-              layout.backgroundHidden == !visible
+              layout.separatorIndex == 2,
+              layout.colorsIndex == 3,
+              layout.backgroundHidden == !visible,
+              !layout.separatorHidden
         else {
             throw probeError(
                 "background control is not the leading toolbar group"
@@ -1260,8 +1261,9 @@ enum TraceRetainedInkProbe {
     ) throws {
         let tools = board.drawingToolPresentationForPreview
         let icons = board.toolbarIconMetricsForPreview
-        let layout = board.toolbarGroupLayoutForPreview
+        let separatorGaps = board.toolbarGroupLayoutForPreview.separatorNeighborGaps
         let sizing = board.toolbarSizingForPreview
+        let appearance = board.drawingToolAppearanceForPreview
         guard tools.selectedSegment == 1,
               tools.toolTips == [
                   "Select (V or hold ⌘)",
@@ -1275,33 +1277,32 @@ enum TraceRetainedInkProbe {
               icons.brushWidths.count == 5,
               (17...19).contains(icons.brushHeights[4]),
               icons.brushWidths[4] <= 28,
-              layout.dividerCount == 0,
-              layout.groupGaps.count == 5,
-              layout.groupGaps.allSatisfy({
-                  (23.5...24.5).contains($0)
+              separatorGaps.count == 10,
+              separatorGaps.allSatisfy({
+                  (13.5...14.5).contains($0)
               }),
-              layout.swatchNeighborGaps.count == 3,
-              layout.swatchNeighborGaps.allSatisfy({
-                  (7.5...8.5).contains($0)
+              !appearance.hasSegmentDividers,
+              appearance.itemWidths.count == 5,
+              appearance.itemWidths.allSatisfy({
+                  (29.5...30.5).contains($0)
               }),
-              layout.brushSegmentWidths.count == 5,
-              layout.brushSegmentWidths.allSatisfy({
-                  (33.5...34.5).contains($0)
+              appearance.itemGaps.count == 4,
+              appearance.itemGaps.allSatisfy({
+                  (3.5...4.5).contains($0)
               }),
-              (11.5...12.5).contains(layout.brushToStrokeGap),
-              (23...25).contains(sizing.active.gridToColorsGap),
+              appearance.selectedFillCount == 1,
+              board.controlAccentPresentationForPreview.brush,
+              (32...34).contains(sizing.active.gridToColorsGap),
               abs(
                   sizing.active.toolbarWidth - sizing.inactive.toolbarWidth
               ) < 0.5
         else {
             throw probeError(
-                "Drawing tools need divider-free group spacing "
+                "Drawing tools need spaced, divider-free buttons "
                     + "text=\(icons.brushWidths.last ?? 0)x"
                     + "\(icons.brushHeights.last ?? 0) "
-                    + "dividers=\(layout.dividerCount) groups=\(layout.groupGaps) "
-                    + "swatches=\(layout.swatchNeighborGaps) "
-                    + "segments=\(layout.brushSegmentWidths) "
-                    + "stroke=\(layout.brushToStrokeGap) sizing=\(sizing)"
+                    + "separators=\(separatorGaps) buttons=\(appearance) "
+                    + "sizing=\(sizing)"
             )
         }
         var selectedToolState: TraceToolState?
@@ -1324,9 +1325,42 @@ enum TraceRetainedInkProbe {
         board.selectDrawingToolForPreview(at: 4)
         guard selectedToolState?.canvasTool.rawValue == "text",
               selectedToolState?.brush == .pen,
-              board.drawingToolPresentationForPreview.selectedSegment == 4
+              board.drawingToolPresentationForPreview.selectedSegment == 4,
+              board.drawingToolAppearanceForPreview.selectedFillCount == 1
         else {
             throw probeError("Text toolbar action did not select opaque text")
+        }
+        board.setTemporaryDrawingToolForPreview(.highlighter)
+        guard board.drawingToolPresentationForPreview.selectedSegment == 2,
+              board.drawingToolAppearanceForPreview.selectedFillCount == 1
+        else {
+            throw probeError("Temporary Highlighter did not update the selected button")
+        }
+        board.setTemporaryDrawingToolForPreview(nil)
+        guard board.drawingToolPresentationForPreview.selectedSegment == 4,
+              board.drawingToolAppearanceForPreview.selectedFillCount == 1
+        else {
+            throw probeError("Releasing the temporary tool did not restore Text")
+        }
+        board.selectDrawingToolForPreview(at: 4)
+        guard board.drawingToolPresentationForPreview.selectedSegment == 4,
+              board.drawingToolAppearanceForPreview.selectedFillCount == 1
+        else {
+            throw probeError("Clicking the selected Text button deselected every tool")
+        }
+        board.selectDrawingToolForPreview(at: 0)
+        guard selectedToolState?.canvasTool == .select,
+              board.drawingToolPresentationForPreview.selectedSegment == 0,
+              board.drawingToolAppearanceForPreview.selectedFillCount == 1
+        else {
+            throw probeError("Select button lost its tool selection")
+        }
+        board.selectDrawingToolForPreview(at: 3)
+        guard selectedToolState?.canvasTool == .rectangle,
+              board.drawingToolPresentationForPreview.selectedSegment == 3,
+              board.drawingToolAppearanceForPreview.selectedFillCount == 1
+        else {
+            throw probeError("Rectangle button lost its tool selection")
         }
         board.selectDrawingToolForPreview(at: 1)
         board.setStrokeWidthForPreview(1)
@@ -1360,22 +1394,29 @@ enum TraceRetainedInkProbe {
         let gridSelector = board.gridSelectorPresentationForPreview
         guard layout.contentCenterOffset < 0.5,
               layout.gridAccessoryGap >= 5,
-              layout.dividerCount == 0,
-              layout.brushIndex == 3,
-              layout.strokeIndex == 4,
+              layout.gridDividerVisible,
+              layout.toolSeparatorIndex == 4,
+              layout.brushIndex == 5,
+              layout.strokeIndex == 6,
+              layout.voiceSeparatorIndex == 1,
               layout.voiceIndex == 0,
-              layout.copyIndex == 1,
-              layout.closeIndex == 2,
-              layout.groupGaps.count == 5,
-              layout.groupGaps.allSatisfy({
-                  (23.5...24.5).contains($0)
-              })
+              layout.recordingSeparatorIndex == 1,
+              layout.copyIndex == 2,
+              layout.actionSeparatorIndex == 3,
+              layout.closeIndex == 4,
+              layout.separatorNeighborGaps.count == 10,
+              (
+                  layout.separatorNeighborGaps.allSatisfy {
+                      (13.5...14.5).contains($0)
+                  }
+              )
         else {
             throw probeError(
                 "toolbar groups are not packed in the requested order "
                     + "center=\(layout.contentCenterOffset) "
-                    + "dividers=\(layout.dividerCount) "
-                    + "group-gaps=\(layout.groupGaps)"
+                    + "voice-divider=\(String(describing: layout.voiceSeparatorIndex)) "
+                    + "grid-divider=\(layout.gridDividerVisible) "
+                    + "separator-gaps=\(layout.separatorNeighborGaps)"
             )
         }
         guard icons.brushHeights.count == 5,
@@ -1525,8 +1566,8 @@ enum TraceRetainedInkProbe {
                       (6...10).contains($0)
                   } == true
               ),
-              sizing.active.gridToColorsGap >= 23,
-              sizing.active.gridToColorsGap <= 25,
+              sizing.active.gridToColorsGap >= 32,
+              sizing.active.gridToColorsGap <= 34,
               abs(
                   sizing.active.gridToColorsGap
                     - sizing.inactive.gridToColorsGap

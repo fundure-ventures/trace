@@ -717,8 +717,10 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     var backgroundControlLayoutForPreview: (
         backgroundIndex: Int?,
         gridIndex: Int?,
+        separatorIndex: Int?,
         colorsIndex: Int?,
-        backgroundHidden: Bool
+        backgroundHidden: Bool,
+        separatorHidden: Bool
     ) {
         annotationToolbar.backgroundControlLayoutForTesting
     }
@@ -818,16 +820,17 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     var toolbarGroupLayoutForPreview: (
         contentCenterOffset: CGFloat,
         gridAccessoryGap: CGFloat,
+        gridDividerVisible: Bool,
+        toolSeparatorIndex: Int?,
         brushIndex: Int?,
         strokeIndex: Int?,
+        voiceSeparatorIndex: Int?,
         voiceIndex: Int?,
+        recordingSeparatorIndex: Int?,
         copyIndex: Int?,
+        actionSeparatorIndex: Int?,
         closeIndex: Int?,
-        swatchNeighborGaps: [CGFloat],
-        brushSegmentWidths: [CGFloat],
-        brushToStrokeGap: CGFloat,
-        dividerCount: Int,
-        groupGaps: [CGFloat]
+        separatorNeighborGaps: [CGFloat]
     ) {
         annotationToolbar.toolbarGroupLayoutForTesting
     }
@@ -921,6 +924,15 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         width: Double
     ) {
         annotationToolbar.drawingToolPresentationForTesting
+    }
+
+    var drawingToolAppearanceForPreview: (
+        hasSegmentDividers: Bool,
+        itemWidths: [CGFloat],
+        itemGaps: [CGFloat],
+        selectedFillCount: Int
+    ) {
+        annotationToolbar.drawingToolAppearanceForTesting
     }
 
     func selectDrawingToolForPreview(at index: Int) {
@@ -3233,7 +3245,7 @@ private final class FloatingAnnotationToolbar:
 {
     private static let preferredHeight: CGFloat = 48
     private static let horizontalPadding: CGFloat = 12
-    private static let groupSpacing: CGFloat = 24
+    private static let separatorSpacing: CGFloat = 16
     private static let gridAccessoryGap: CGFloat = 6
     private static let gridAccessoryWidth: CGFloat = 32
     private static let gridSelectorWidth: CGFloat = 42
@@ -3251,12 +3263,8 @@ private final class FloatingAnnotationToolbar:
     var onBackgroundColorChange: ((TraceRGBAColor) -> Void)?
     var onPreferredSizeChange: (() -> Void)?
 
-    private let brushControl = NSSegmentedControl(
-        labels: ["", "", "", "", ""],
-        trackingMode: .selectOne,
-        target: nil,
-        action: nil
-    )
+    private let brushStack = NSStackView()
+    private var brushButtons: [NSButton] = []
     private let brushActionHover = ToolbarActionHoverView()
     private let gridControl = NSPopUpButton(
         frame: .zero,
@@ -3277,6 +3285,11 @@ private final class FloatingAnnotationToolbar:
     )
     private let widthLabel = NSTextField(labelWithString: "5.2")
     private let backgroundColorWell = PageBackgroundColorWell()
+    private let backgroundSeparator = NSBox()
+    private let toolSeparator = NSBox()
+    private let voiceSeparator = NSBox()
+    private let recordingSeparator = NSBox()
+    private let actionSeparator = NSBox()
     private let swatchStack = NSStackView()
     private let leftStack = NSStackView()
     private let gridStack = NSStackView()
@@ -3326,13 +3339,11 @@ private final class FloatingAnnotationToolbar:
             swatchStack.addArrangedSubview(swatch)
         }
         swatchStack.orientation = .horizontal
-        swatchStack.spacing = 8
+        swatchStack.spacing = 5
 
-        brushControl.segmentStyle = .rounded
-        brushControl.controlSize = .small
-        brushControl.selectedSegmentBezelColor = .controlAccentColor
-        brushControl.target = self
-        brushControl.action = #selector(changeBrush)
+        brushStack.orientation = .horizontal
+        brushStack.alignment = .centerY
+        brushStack.spacing = 4
         let drawingTools = [
             (
                 "cursorarrow",
@@ -3351,22 +3362,36 @@ private final class FloatingAnnotationToolbar:
             ("textformat", "character", "Text", "Text (T)"),
         ]
         for (index, tool) in drawingTools.enumerated() {
-            brushControl.setImage(
-                symbolImage(
-                    named: tool.0,
-                    fallback: tool.1,
-                    description: tool.2,
-                    pointSize: index == 4 ? 20 : Self.drawingToolSymbolPointSize
-                ),
-                forSegment: index
+            let button = NSButton()
+            button.title = ""
+            button.isBordered = false
+            button.setButtonType(.toggle)
+            button.imagePosition = .imageOnly
+            button.image = symbolImage(
+                named: tool.0,
+                fallback: tool.1,
+                description: tool.2,
+                pointSize: index == 4 ? 20 : Self.drawingToolSymbolPointSize
             )
-            brushControl.setWidth(34, forSegment: index)
-            brushControl.setToolTip(tool.3, forSegment: index)
+            button.wantsLayer = true
+            button.layer?.cornerRadius = 6
+            button.layer?.cornerCurve = .continuous
+            button.target = self
+            button.action = #selector(changeBrush(_:))
+            button.tag = index
+            button.toolTip = tool.3
+            button.setAccessibilityLabel(tool.2)
+            button.setAccessibilityRole(.radioButton)
+            button.widthAnchor.constraint(equalToConstant: 30).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 24).isActive = true
+            brushButtons.append(button)
+            brushStack.addArrangedSubview(button)
         }
-        brushControl.setAccessibilityLabel("Drawing tool")
+        brushStack.setAccessibilityLabel("Drawing tool")
+        brushStack.setAccessibilityRole(.radioGroup)
         brushActionHover.setContent(
-            brushControl,
-            controls: [brushControl]
+            brushStack,
+            controls: brushButtons
         )
 
         gridControl.controlSize = .small
@@ -3506,6 +3531,16 @@ private final class FloatingAnnotationToolbar:
             .isActive = true
         backgroundColorWell.setAccessibilityLabel("Page background color")
         backgroundColorWell.toolTip = "Page background color"
+        for separator in [
+            backgroundSeparator,
+            toolSeparator,
+            voiceSeparator,
+            recordingSeparator,
+            actionSeparator,
+        ] {
+            configureSeparator(separator)
+        }
+
         voiceWaveform.translatesAutoresizingMaskIntoConstraints = false
         voiceWaveform.widthAnchor.constraint(equalToConstant: 42).isActive =
             true
@@ -3635,7 +3670,9 @@ private final class FloatingAnnotationToolbar:
 
         let rightControls: [NSView] = [
             voiceGroup,
+            recordingSeparator,
             copyActionHover,
+            actionSeparator,
             closeActionHover,
         ]
         gridStack.addArrangedSubview(gridControl)
@@ -3643,7 +3680,9 @@ private final class FloatingAnnotationToolbar:
         let leftControls: [NSView] = [
             backgroundColorWell,
             gridStack,
+            backgroundSeparator,
             swatchStack,
+            toolSeparator,
             brushActionHover,
             widthSlider,
             widthLabel,
@@ -3661,18 +3700,31 @@ private final class FloatingAnnotationToolbar:
             stack.spacing = 8
         }
         gridStack.spacing = Self.gridAccessoryGap
-        leftStack.setCustomSpacing(Self.groupSpacing, after: gridStack)
-        leftStack.setCustomSpacing(Self.groupSpacing, after: swatchStack)
-        leftStack.setCustomSpacing(12, after: brushActionHover)
-        rightStack.setCustomSpacing(Self.groupSpacing, after: voiceGroup)
-        rightStack.setCustomSpacing(Self.groupSpacing, after: copyActionHover)
+        configureSeparatorSpacing(
+            around: [
+                backgroundSeparator,
+                toolSeparator,
+            ],
+            in: leftStack
+        )
+        configureSeparatorSpacing(
+            around: [
+                recordingSeparator,
+                actionSeparator,
+            ],
+            in: rightStack
+        )
         toolbarStack.translatesAutoresizingMaskIntoConstraints = false
         toolbarStack.orientation = .horizontal
         toolbarStack.alignment = .centerY
         toolbarStack.spacing = 8
         toolbarStack.addArrangedSubview(leftStack)
+        toolbarStack.addArrangedSubview(voiceSeparator)
         toolbarStack.addArrangedSubview(rightStack)
-        toolbarStack.setCustomSpacing(Self.groupSpacing, after: leftStack)
+        configureSeparatorSpacing(
+            around: [voiceSeparator],
+            in: toolbarStack
+        )
         addSubview(toolbarStack)
 
         NSLayoutConstraint.activate([
@@ -3881,20 +3933,22 @@ private final class FloatingAnnotationToolbar:
     var toolbarGroupLayoutForTesting: (
         contentCenterOffset: CGFloat,
         gridAccessoryGap: CGFloat,
+        gridDividerVisible: Bool,
+        toolSeparatorIndex: Int?,
         brushIndex: Int?,
         strokeIndex: Int?,
+        voiceSeparatorIndex: Int?,
         voiceIndex: Int?,
+        recordingSeparatorIndex: Int?,
         copyIndex: Int?,
+        actionSeparatorIndex: Int?,
         closeIndex: Int?,
-        swatchNeighborGaps: [CGFloat],
-        brushSegmentWidths: [CGFloat],
-        brushToStrokeGap: CGFloat,
-        dividerCount: Int,
-        groupGaps: [CGFloat]
+        separatorNeighborGaps: [CGFloat]
     ) {
         layoutSubtreeIfNeeded()
         let left = leftStack.arrangedSubviews
         let right = rightStack.arrangedSubviews
+        let toolbar = toolbarStack.arrangedSubviews
         let gridControlFrame = convert(
             gridControl.bounds,
             from: gridControl
@@ -3903,54 +3957,87 @@ private final class FloatingAnnotationToolbar:
             gridSpacingGroup.bounds,
             from: gridSpacingGroup
         )
-        let neighboringGroups: [(NSView, NSView)] = [
-            (gridStack, swatchStack),
-            (swatchStack, brushActionHover),
-            (leftStack, rightStack),
-            (voiceGroup, copyActionHover),
-            (copyActionHover, closeActionHover),
-        ]
         return (
             contentCenterOffset:
                 abs(toolbarStack.frame.midX - bounds.midX),
             gridAccessoryGap:
                 gridAccessoryFrame.minX - gridControlFrame.maxX,
+            gridDividerVisible:
+                backgroundSeparator.superview != nil
+                    && !backgroundSeparator.isHidden,
+            toolSeparatorIndex: left.firstIndex {
+                $0 === toolSeparator
+            },
             brushIndex: left.firstIndex {
                 $0 === brushActionHover
             },
             strokeIndex: left.firstIndex {
                 $0 === widthSlider
             },
+            voiceSeparatorIndex: toolbar.firstIndex {
+                $0 === voiceSeparator
+            },
             voiceIndex: right.firstIndex {
                 $0 === voiceGroup
+            },
+            recordingSeparatorIndex: right.firstIndex {
+                $0 === recordingSeparator
             },
             copyIndex: right.firstIndex {
                 $0 === copyActionHover
             },
+            actionSeparatorIndex: right.firstIndex {
+                $0 === actionSeparator
+            },
             closeIndex: right.firstIndex {
                 $0 === closeActionHover
             },
-            swatchNeighborGaps: zip(
-                swatchStack.arrangedSubviews,
-                swatchStack.arrangedSubviews.dropFirst()
-            ).map { previous, next in
-                let previousFrame = convert(previous.bounds, from: previous)
-                let nextFrame = convert(next.bounds, from: next)
-                return nextFrame.minX - previousFrame.maxX
-            },
-            brushSegmentWidths: (0..<brushControl.segmentCount).map {
-                brushControl.width(forSegment: $0)
-            },
-            brushToStrokeGap: convert(widthSlider.bounds, from: widthSlider).minX
-                - convert(brushActionHover.bounds, from: brushActionHover).maxX,
-            dividerCount: [leftStack, rightStack, toolbarStack]
-                .flatMap(\.arrangedSubviews)
-                .filter { $0 is NSBox }.count,
-            groupGaps: neighboringGroups.map { previous, next in
-                convert(next.bounds, from: next).minX
-                    - convert(previous.bounds, from: previous).maxX
-            }
+            separatorNeighborGaps:
+                separatorNeighborGaps(
+                    around: [
+                        backgroundSeparator,
+                        toolSeparator,
+                    ],
+                    in: leftStack
+                )
+                + separatorNeighborGaps(
+                    around: [
+                        recordingSeparator,
+                        actionSeparator,
+                    ],
+                    in: rightStack
+                )
+                + separatorNeighborGaps(
+                    around: [voiceSeparator],
+                    in: toolbarStack
+                )
         )
+    }
+
+    private func separatorNeighborGaps(
+        around separators: [NSBox],
+        in stack: NSStackView
+    ) -> [CGFloat] {
+        let views = stack.arrangedSubviews
+        return separators.flatMap { separator -> [CGFloat] in
+            guard let index = views.firstIndex(where: {
+                $0 === separator
+            }),
+                  index > views.startIndex,
+                  index < views.index(before: views.endIndex)
+            else {
+                return []
+            }
+            let previous = views[views.index(before: index)]
+            let next = views[views.index(after: index)]
+            let previousFrame = convert(previous.bounds, from: previous)
+            let separatorFrame = convert(separator.bounds, from: separator)
+            let nextFrame = convert(next.bounds, from: next)
+            return [
+                separatorFrame.minX - previousFrame.maxX,
+                nextFrame.minX - separatorFrame.maxX,
+            ]
+        }
     }
 
     var toolbarSizingForTesting: (
@@ -4097,16 +4184,12 @@ private final class FloatingAnnotationToolbar:
             voiceHeight: voiceToggleButton.image?.size.height ?? 0,
             copyHeight: copyButton.image?.size.height ?? 0,
             closeHeight: closeButton.image?.size.height ?? 0,
-            brushWidths: (0..<brushControl.segmentCount).map {
-                brushControl.image(forSegment: $0)?.size.width ?? 0
-            },
-            brushHeights: (0..<brushControl.segmentCount).map {
-                brushControl.image(forSegment: $0)?.size.height ?? 0
-            },
+            brushWidths: brushButtons.map { $0.image?.size.width ?? 0 },
+            brushHeights: brushButtons.map { $0.image?.size.height ?? 0 },
             gridHeights: gridControl.itemArray.compactMap {
                 $0.image?.size.height
             },
-            brushControlHeight: brushControl.bounds.height,
+            brushControlHeight: brushStack.bounds.height,
             swatchDiameter: swatches.first?.bounds.height ?? 0,
             sliderControlSize: widthSlider.controlSize.rawValue,
             sliderCellType: widthSlider.cell.map {
@@ -4127,19 +4210,44 @@ private final class FloatingAnnotationToolbar:
         width: Double
     ) {
         (
-            selectedSegment: brushControl.selectedSegment,
-            toolTips: (0..<brushControl.segmentCount).map {
-                brushControl.toolTip(forSegment: $0)
-            },
+            selectedSegment: brushButtons.firstIndex(where: {
+                $0.state == .on
+            }) ?? -1,
+            toolTips: brushButtons.map(\.toolTip),
             closeToolTip: closeButton.toolTip,
             minimumWidth: widthSlider.minValue,
             width: widthSlider.doubleValue
         )
     }
 
+    var drawingToolAppearanceForTesting: (
+        hasSegmentDividers: Bool,
+        itemWidths: [CGFloat],
+        itemGaps: [CGFloat],
+        selectedFillCount: Int
+    ) {
+        layoutSubtreeIfNeeded()
+        let content = brushActionHover.subviews.first
+        let items = (content as? NSStackView)?.arrangedSubviews ?? []
+        let frames = items.map { convert($0.bounds, from: $0) }
+        return (
+            hasSegmentDividers: content is NSSegmentedControl,
+            itemWidths: frames.map(\.width),
+            itemGaps: zip(frames, frames.dropFirst()).map {
+                $1.minX - $0.maxX
+            },
+            selectedFillCount: items.filter {
+                ($0 as? NSButton)?.layer?.backgroundColor
+                    .flatMap(NSColor.init(cgColor:))?.alphaComponent ?? 0 > 0.1
+            }.count
+        )
+    }
+
     func selectDrawingToolForTesting(at index: Int) {
-        brushControl.selectedSegment = index
-        changeBrush()
+        guard brushButtons.indices.contains(index) else {
+            return
+        }
+        brushButtons[index].performClick(nil)
     }
 
     func setStrokeWidthForTesting(_ width: Double) {
@@ -4153,8 +4261,12 @@ private final class FloatingAnnotationToolbar:
         slider: Bool
     ) {
         (
-            brush: brushControl.selectedSegmentBezelColor?
-                .isEqual(NSColor.controlAccentColor) == true,
+            brush: brushButtons.contains {
+                $0.state == .on
+                    && $0.contentTintColor?.isEqual(
+                        NSColor.controlAccentColor
+                    ) == true
+            },
             grid: gridControl.contentTintColor?
                 .isEqual(NSColor.controlAccentColor) == true,
             slider: widthSlider.trackFillColor?
@@ -4218,8 +4330,10 @@ private final class FloatingAnnotationToolbar:
     var backgroundControlLayoutForTesting: (
         backgroundIndex: Int?,
         gridIndex: Int?,
+        separatorIndex: Int?,
         colorsIndex: Int?,
-        backgroundHidden: Bool
+        backgroundHidden: Bool,
+        separatorHidden: Bool
     ) {
         let views = leftStack.arrangedSubviews
         return (
@@ -4229,10 +4343,14 @@ private final class FloatingAnnotationToolbar:
             gridIndex: views.firstIndex {
                 $0 === gridStack
             },
+            separatorIndex: views.firstIndex {
+                $0 === backgroundSeparator
+            },
             colorsIndex: views.firstIndex {
                 $0 === swatchStack
             },
-            backgroundHidden: backgroundColorWell.isHidden
+            backgroundHidden: backgroundColorWell.isHidden,
+            separatorHidden: backgroundSeparator.isHidden
         )
     }
 
@@ -4406,6 +4524,7 @@ private final class FloatingAnnotationToolbar:
 
     func showBackgroundControlForTesting() {
         backgroundColorWell.isHidden = false
+        backgroundSeparator.isHidden = false
         backgroundColorWell.color = .white
     }
 
@@ -4478,8 +4597,8 @@ private final class FloatingAnnotationToolbar:
         onToolChange?(toolState)
     }
 
-    @objc private func changeBrush() {
-        switch brushControl.indexOfSelectedItem {
+    @objc private func changeBrush(_ sender: NSButton) {
+        switch sender.tag {
         case 0:
             toolState.canvasTool = .select
         case 2:
@@ -4676,17 +4795,29 @@ private final class FloatingAnnotationToolbar:
         for swatch in swatches {
             swatch.isSelected = swatch.traceColor == toolState.color
         }
+        let selectedIndex: Int
         switch temporaryCanvasTool ?? toolState.canvasTool {
         case .select:
-            brushControl.selectedSegment = 0
+            selectedIndex = 0
         case .pen:
-            brushControl.selectedSegment = 1
+            selectedIndex = 1
         case .highlighter:
-            brushControl.selectedSegment = 2
+            selectedIndex = 2
         case .rectangle:
-            brushControl.selectedSegment = 3
+            selectedIndex = 3
         case .text:
-            brushControl.selectedSegment = 4
+            selectedIndex = 4
+        }
+        for (index, button) in brushButtons.enumerated() {
+            let selected = index == selectedIndex
+            button.state = selected ? .on : .off
+            button.contentTintColor = selected
+                ? .controlAccentColor
+                : NSColor.white.withAlphaComponent(0.78)
+            button.layer?.backgroundColor = selected
+                ? NSColor.controlAccentColor
+                    .withAlphaComponent(0.22).cgColor
+                : NSColor.clear.cgColor
         }
         if let index = gridControl.itemArray.firstIndex(where: {
             ($0.representedObject as? String)
@@ -4760,6 +4891,37 @@ private final class FloatingAnnotationToolbar:
         ) ?? baseImage
         image.isTemplate = true
         return image
+    }
+
+    private func configureSeparator(_ separator: NSBox) {
+        separator.boxType = .separator
+        separator.heightAnchor.constraint(equalToConstant: 21).isActive = true
+        separator.widthAnchor.constraint(equalToConstant: 1).isActive = true
+    }
+
+    private func configureSeparatorSpacing(
+        around separators: [NSBox],
+        in stack: NSStackView
+    ) {
+        let views = stack.arrangedSubviews
+        for separator in separators {
+            guard let index = views.firstIndex(where: {
+                $0 === separator
+            }),
+                  index > views.startIndex
+            else {
+                continue
+            }
+            let previous = views[views.index(before: index)]
+            stack.setCustomSpacing(
+                Self.separatorSpacing,
+                after: previous
+            )
+            stack.setCustomSpacing(
+                Self.separatorSpacing,
+                after: separator
+            )
+        }
     }
 }
 
