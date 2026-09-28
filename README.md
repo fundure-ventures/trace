@@ -79,7 +79,8 @@ Use **Text** (`T`) and click the canvas to add a text box, or double-click an
 empty area with **Select** (`V`). Pen strokes span **1-12 pt**, while
 Highlighter spans **16-124 pt**.
 With Text selected, the slider controls **12-124 pt** font size instead of
-stroke width. All three use whole-point values and remember their own size
+stroke width. Rectangle outlines use the Pen's **1-12 pt** width. All three
+size settings use whole-point values and remember their own value
 across tool switches and app restarts.
 
 ## More detail

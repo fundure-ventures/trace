@@ -116,6 +116,7 @@ enum ProductTldrawProbe {
             try TraceRetainedInkProbe.runDrawingToolChecks(document: document)
             try await verifyTextEditing(surface, document: document)
             try await verifyIndependentStrokeWidths(surface)
+            try await verifyRectangleWidths(surface)
             try await verifySelectionCopy(surface)
             try await verifyCapturedScreenshotOpacity(surface, document: document)
             return
@@ -2324,6 +2325,76 @@ enum ProductTldrawProbe {
                 && (value?["textSize"] as? NSNumber)?.intValue == 57
         }
         try await verifyDrawnWidth(surface, width: 124, y: 0.85)
+    }
+
+    @MainActor
+    private static func verifyRectangleWidths(
+        _ surface: TldrawProductCanvasView
+    ) async throws {
+        guard let initial = await surface.stateForTesting(),
+              let originalCount =
+                  (initial["rectangleCount"] as? NSNumber)?.intValue
+        else {
+            throw probeError("Could not read rectangle count before drawing")
+        }
+        var state = TraceToolState()
+        for (index, width) in [1.0, 12.0].enumerated() {
+            state.canvasTool = .pen
+            state.brush = .pen
+            state.width = width
+            surface.setToolState(state)
+            try await waitUntil("Pen before \(width) pt Rectangle") {
+                let value = await surface.stateForTesting()
+                return value?["productTool"] as? String == "pen"
+                    && (value?["width"] as? NSNumber)?.doubleValue == width
+            }
+            if index == 0 {
+                state.canvasTool = .rectangle
+                surface.setToolState(state)
+            } else {
+                guard await surface.keyboardEventForTesting(
+                    type: "keydown", key: "r", code: "KeyR"
+                ) != nil else {
+                    throw probeError("Rectangle shortcut did not activate")
+                }
+            }
+            try await waitUntil("Rectangle using \(width) pt Pen width") {
+                let value = await surface.stateForTesting()
+                return value?["productTool"] as? String == "rectangle"
+                    && (value?["width"] as? NSNumber)?.doubleValue == width
+            }
+            let y = index == 0 ? 0.15 : 0.55
+            for (phase, x) in [("began", 0.55), ("moved", 0.7), ("ended", 0.7)] {
+                guard await surface.emitPointerForTesting(phase: phase, x: x, y: y)
+                else {
+                    throw probeError("Could not create a \(width) pt rectangle")
+                }
+            }
+            try await waitUntil("rendered \(width) pt rectangle") {
+                guard let value = await surface.stateForTesting(),
+                      (value["rectangleCount"] as? NSNumber)?.intValue
+                          == originalCount + index + 1,
+                      let metrics = (value["rectangleMetrics"] as? [[String: Any]])?.last,
+                      let strokeWidth =
+                          (metrics["strokeWidth"] as? NSNumber)?.doubleValue,
+                      let perimeter =
+                          (metrics["perimeter"] as? NSNumber)?.doubleValue,
+                      let timedPathLength =
+                          (metrics["timedPathLength"] as? NSNumber)?.doubleValue
+                else {
+                    return false
+                }
+                return abs(strokeWidth - width) < 0.001
+                    && abs(timedPathLength - perimeter) < 0.001
+            }
+            state.canvasTool = .pen
+            surface.setToolState(state)
+            try await waitUntil("Pen after Rectangle") {
+                let value = await surface.stateForTesting()
+                return value?["productTool"] as? String == "pen"
+                    && (value?["width"] as? NSNumber)?.doubleValue == width
+            }
+        }
     }
 
     @MainActor

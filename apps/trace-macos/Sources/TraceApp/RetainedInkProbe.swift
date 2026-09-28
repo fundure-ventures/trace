@@ -1378,6 +1378,9 @@ enum TraceRetainedInkProbe {
         }
         board.selectDrawingToolForPreview(at: 3)
         guard selectedToolState?.canvasTool == .rectangle,
+              selectedToolState?.penWidth == 1,
+              board.drawingToolPresentationForPreview.minimumWidth == 1,
+              board.drawingToolPresentationForPreview.maximumWidth == 12,
               board.drawingToolPresentationForPreview.selectedSegment == 3,
               board.drawingToolAppearanceForPreview.selectedCount == 1
         else {

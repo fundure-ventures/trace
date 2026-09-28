@@ -176,7 +176,8 @@ Highlighter (16-124 pt), and Text (12-124 pt) sizing. Text uses the same slider
 for font size with its own persisted setting. It verifies independent tool
 sizes across toolbar and keyboard switches, rendered strokes and text,
 and app-model recreation, plus opaque screenshot capture after using
-Highlighter.
+Highlighter. Rectangle outlines use Pen's width and preserve their geometry
+at both ends of its 1-12 pt range.
 The same probe checks the toolbar's group divider gaps and the Text symbol's
 size, plus the native separated drawing-tool segments and their selection.
 It also checks native Copy routing for selected text, a text caret, and objects

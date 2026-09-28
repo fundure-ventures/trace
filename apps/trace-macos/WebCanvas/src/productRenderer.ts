@@ -208,6 +208,11 @@ export interface TraceProductRendererBridge {
     renderedBackgroundColor: string
     productTool: ProductCanvasTool
     rectangleCount: number
+    rectangleMetrics: Array<{
+      strokeWidth: number
+      perimeter: number
+      timedPathLength: number | null
+    }>
     zoom: number
     viewportWidth: number
     viewportHeight: number
@@ -838,6 +843,22 @@ export function installTraceProductRenderer(editor: Editor): () => void {
               ? currentTool.textSize / FONT_SIZES[shape.props.size]
               : shape.props.scale,
           },
+        }
+      }
+      if (
+        shape.type === 'geo'
+        && shape.props.geo === 'rectangle'
+        && editor.isIn('geo.pointing')
+      ) {
+        const tool = temporaryDrawActive ? temporaryDrawTool() : currentTool
+        if (tool.tool === 'rectangle') {
+          return {
+            ...shape,
+            props: {
+              ...shape.props,
+              scale: tool.penWidth / STROKE_SIZES[shape.props.size],
+            },
+          }
         }
       }
       if (shape.type !== 'draw') return shape
@@ -1544,6 +1565,16 @@ export function installTraceProductRenderer(editor: Editor): () => void {
               shape.type === 'geo'
               && shape.props.geo === 'rectangle',
           ).length,
+        rectangleMetrics: sortedShapes
+          .filter((shape): shape is TLGeoShape =>
+            shape.type === 'geo' && shape.props.geo === 'rectangle',
+          )
+          .map((shape) => ({
+            strokeWidth: STROKE_SIZES[shape.props.size] * shape.props.scale,
+            perimeter: 2 * (shape.props.w + shape.props.h + shape.props.growY),
+            timedPathLength:
+              timedShapes.find((timed) => timed.id === shape.id)?.pathLength ?? null,
+          })),
         zoom: editor.getZoomLevel(),
         viewportWidth: viewportScreenBounds.width,
         viewportHeight: viewportScreenBounds.height,
@@ -1986,9 +2017,8 @@ function userTimedShapeGeometry(
 ): UserTimedShapeGeometry | null {
   const transform = editor.getShapePageTransform(shape)
   if (shape.type === 'geo') {
-    const scale = positive(shape.props.scale, 1)
-    const width = positive(shape.props.w, 1) * scale
-    const height = positive(shape.props.h, 1) * scale
+    const width = positive(shape.props.w, 1)
+    const height = positive(shape.props.h + shape.props.growY, 1)
     const start = transform.applyToPoint({
       x: 0,
       y: height / 2,
