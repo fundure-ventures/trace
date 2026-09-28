@@ -830,7 +830,10 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         copyIndex: Int?,
         actionSeparatorIndex: Int?,
         closeIndex: Int?,
-        separatorNeighborGaps: [CGFloat]
+        separatorNeighborGaps: [CGFloat],
+        swatchNeighborGaps: [CGFloat],
+        brushSegmentWidths: [CGFloat],
+        brushToStrokeGap: CGFloat
     ) {
         annotationToolbar.toolbarGroupLayoutForTesting
     }
@@ -3334,7 +3337,7 @@ private final class FloatingAnnotationToolbar:
             swatchStack.addArrangedSubview(swatch)
         }
         swatchStack.orientation = .horizontal
-        swatchStack.spacing = 5
+        swatchStack.spacing = 8
 
         brushControl.segmentStyle = .rounded
         brushControl.controlSize = .small
@@ -3368,7 +3371,7 @@ private final class FloatingAnnotationToolbar:
                 ),
                 forSegment: index
             )
-            brushControl.setWidth(28, forSegment: index)
+            brushControl.setWidth(34, forSegment: index)
             brushControl.setToolTip(tool.3, forSegment: index)
         }
         brushControl.setAccessibilityLabel("Drawing tool")
@@ -3690,6 +3693,7 @@ private final class FloatingAnnotationToolbar:
             ],
             in: leftStack
         )
+        leftStack.setCustomSpacing(12, after: brushActionHover)
         configureSeparatorSpacing(
             around: [
                 recordingSeparator,
@@ -3926,7 +3930,10 @@ private final class FloatingAnnotationToolbar:
         copyIndex: Int?,
         actionSeparatorIndex: Int?,
         closeIndex: Int?,
-        separatorNeighborGaps: [CGFloat]
+        separatorNeighborGaps: [CGFloat],
+        swatchNeighborGaps: [CGFloat],
+        brushSegmentWidths: [CGFloat],
+        brushToStrokeGap: CGFloat
     ) {
         layoutSubtreeIfNeeded()
         let left = leftStack.arrangedSubviews
@@ -3993,7 +4000,20 @@ private final class FloatingAnnotationToolbar:
                 + separatorNeighborGaps(
                     around: [voiceSeparator],
                     in: toolbarStack
-                )
+                ),
+            swatchNeighborGaps: zip(
+                swatchStack.arrangedSubviews,
+                swatchStack.arrangedSubviews.dropFirst()
+            ).map { previous, next in
+                let previousFrame = convert(previous.bounds, from: previous)
+                let nextFrame = convert(next.bounds, from: next)
+                return nextFrame.minX - previousFrame.maxX
+            },
+            brushSegmentWidths: (0..<brushControl.segmentCount).map {
+                brushControl.width(forSegment: $0)
+            },
+            brushToStrokeGap: convert(widthSlider.bounds, from: widthSlider).minX
+                - convert(brushActionHover.bounds, from: brushActionHover).maxX
         )
     }
 

@@ -1261,7 +1261,8 @@ enum TraceRetainedInkProbe {
     ) throws {
         let tools = board.drawingToolPresentationForPreview
         let icons = board.toolbarIconMetricsForPreview
-        let separatorGaps = board.toolbarGroupLayoutForPreview.separatorNeighborGaps
+        let layout = board.toolbarGroupLayoutForPreview
+        let separatorGaps = layout.separatorNeighborGaps
         let sizing = board.toolbarSizingForPreview
         guard tools.selectedSegment == 1,
               tools.toolTips == [
@@ -1280,6 +1281,15 @@ enum TraceRetainedInkProbe {
               separatorGaps.allSatisfy({
                   (13.5...14.5).contains($0)
               }),
+              layout.swatchNeighborGaps.count == 3,
+              layout.swatchNeighborGaps.allSatisfy({
+                  (7.5...8.5).contains($0)
+              }),
+              layout.brushSegmentWidths.count == 5,
+              layout.brushSegmentWidths.allSatisfy({
+                  (33.5...34.5).contains($0)
+              }),
+              (11.5...12.5).contains(layout.brushToStrokeGap),
               (32...34).contains(sizing.active.gridToColorsGap),
               abs(
                   sizing.active.toolbarWidth - sizing.inactive.toolbarWidth
@@ -1289,7 +1299,9 @@ enum TraceRetainedInkProbe {
                 "Drawing tools need balanced icon sizes and separator gaps "
                     + "text=\(icons.brushWidths.last ?? 0)x"
                     + "\(icons.brushHeights.last ?? 0) "
-                    + "gaps=\(separatorGaps) sizing=\(sizing)"
+                    + "gaps=\(separatorGaps) swatches=\(layout.swatchNeighborGaps) "
+                    + "segments=\(layout.brushSegmentWidths) "
+                    + "stroke=\(layout.brushToStrokeGap) sizing=\(sizing)"
             )
         }
         var selectedToolState: TraceToolState?
