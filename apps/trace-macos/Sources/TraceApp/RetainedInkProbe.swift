@@ -1281,16 +1281,12 @@ enum TraceRetainedInkProbe {
               separatorGaps.allSatisfy({
                   (13.5...14.5).contains($0)
               }),
-              !appearance.hasSegmentDividers,
-              appearance.itemWidths.count == 5,
-              appearance.itemWidths.allSatisfy({
-                  (29.5...30.5).contains($0)
+              appearance.usesSeparatedStyle,
+              appearance.segmentWidths.count == 5,
+              appearance.segmentWidths.allSatisfy({
+                  (27.5...28.5).contains($0)
               }),
-              appearance.itemGaps.count == 4,
-              appearance.itemGaps.allSatisfy({
-                  (3.5...4.5).contains($0)
-              }),
-              appearance.selectedFillCount == 1,
+              appearance.selectedCount == 1,
               board.controlAccentPresentationForPreview.brush,
               (32...34).contains(sizing.active.gridToColorsGap),
               abs(
@@ -1298,10 +1294,10 @@ enum TraceRetainedInkProbe {
               ) < 0.5
         else {
             throw probeError(
-                "Drawing tools need spaced, divider-free buttons "
+                "Drawing tools need native separated segments "
                     + "text=\(icons.brushWidths.last ?? 0)x"
                     + "\(icons.brushHeights.last ?? 0) "
-                    + "separators=\(separatorGaps) buttons=\(appearance) "
+                    + "separators=\(separatorGaps) segments=\(appearance) "
                     + "sizing=\(sizing)"
             )
         }
@@ -1326,41 +1322,41 @@ enum TraceRetainedInkProbe {
         guard selectedToolState?.canvasTool.rawValue == "text",
               selectedToolState?.brush == .pen,
               board.drawingToolPresentationForPreview.selectedSegment == 4,
-              board.drawingToolAppearanceForPreview.selectedFillCount == 1
+              board.drawingToolAppearanceForPreview.selectedCount == 1
         else {
             throw probeError("Text toolbar action did not select opaque text")
         }
         board.setTemporaryDrawingToolForPreview(.highlighter)
         guard board.drawingToolPresentationForPreview.selectedSegment == 2,
-              board.drawingToolAppearanceForPreview.selectedFillCount == 1
+              board.drawingToolAppearanceForPreview.selectedCount == 1
         else {
-            throw probeError("Temporary Highlighter did not update the selected button")
+            throw probeError("Temporary Highlighter did not update the selected segment")
         }
         board.setTemporaryDrawingToolForPreview(nil)
         guard board.drawingToolPresentationForPreview.selectedSegment == 4,
-              board.drawingToolAppearanceForPreview.selectedFillCount == 1
+              board.drawingToolAppearanceForPreview.selectedCount == 1
         else {
             throw probeError("Releasing the temporary tool did not restore Text")
         }
         board.selectDrawingToolForPreview(at: 4)
         guard board.drawingToolPresentationForPreview.selectedSegment == 4,
-              board.drawingToolAppearanceForPreview.selectedFillCount == 1
+              board.drawingToolAppearanceForPreview.selectedCount == 1
         else {
-            throw probeError("Clicking the selected Text button deselected every tool")
+            throw probeError("Clicking the selected Text segment deselected every tool")
         }
         board.selectDrawingToolForPreview(at: 0)
         guard selectedToolState?.canvasTool == .select,
               board.drawingToolPresentationForPreview.selectedSegment == 0,
-              board.drawingToolAppearanceForPreview.selectedFillCount == 1
+              board.drawingToolAppearanceForPreview.selectedCount == 1
         else {
-            throw probeError("Select button lost its tool selection")
+            throw probeError("Select segment lost its tool selection")
         }
         board.selectDrawingToolForPreview(at: 3)
         guard selectedToolState?.canvasTool == .rectangle,
               board.drawingToolPresentationForPreview.selectedSegment == 3,
-              board.drawingToolAppearanceForPreview.selectedFillCount == 1
+              board.drawingToolAppearanceForPreview.selectedCount == 1
         else {
-            throw probeError("Rectangle button lost its tool selection")
+            throw probeError("Rectangle segment lost its tool selection")
         }
         board.selectDrawingToolForPreview(at: 1)
         board.setStrokeWidthForPreview(1)

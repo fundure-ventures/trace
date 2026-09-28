@@ -927,10 +927,9 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     }
 
     var drawingToolAppearanceForPreview: (
-        hasSegmentDividers: Bool,
-        itemWidths: [CGFloat],
-        itemGaps: [CGFloat],
-        selectedFillCount: Int
+        usesSeparatedStyle: Bool,
+        segmentWidths: [CGFloat],
+        selectedCount: Int
     ) {
         annotationToolbar.drawingToolAppearanceForTesting
     }
@@ -3263,8 +3262,12 @@ private final class FloatingAnnotationToolbar:
     var onBackgroundColorChange: ((TraceRGBAColor) -> Void)?
     var onPreferredSizeChange: (() -> Void)?
 
-    private let brushStack = NSStackView()
-    private var brushButtons: [NSButton] = []
+    private let brushControl = NSSegmentedControl(
+        labels: ["", "", "", "", ""],
+        trackingMode: .selectOne,
+        target: nil,
+        action: nil
+    )
     private let brushActionHover = ToolbarActionHoverView()
     private let gridControl = NSPopUpButton(
         frame: .zero,
@@ -3341,9 +3344,11 @@ private final class FloatingAnnotationToolbar:
         swatchStack.orientation = .horizontal
         swatchStack.spacing = 5
 
-        brushStack.orientation = .horizontal
-        brushStack.alignment = .centerY
-        brushStack.spacing = 4
+        brushControl.segmentStyle = .separated
+        brushControl.controlSize = .small
+        brushControl.selectedSegmentBezelColor = .controlAccentColor
+        brushControl.target = self
+        brushControl.action = #selector(changeBrush)
         let drawingTools = [
             (
                 "cursorarrow",
@@ -3362,36 +3367,22 @@ private final class FloatingAnnotationToolbar:
             ("textformat", "character", "Text", "Text (T)"),
         ]
         for (index, tool) in drawingTools.enumerated() {
-            let button = NSButton()
-            button.title = ""
-            button.isBordered = false
-            button.setButtonType(.toggle)
-            button.imagePosition = .imageOnly
-            button.image = symbolImage(
-                named: tool.0,
-                fallback: tool.1,
-                description: tool.2,
-                pointSize: index == 4 ? 20 : Self.drawingToolSymbolPointSize
+            brushControl.setImage(
+                symbolImage(
+                    named: tool.0,
+                    fallback: tool.1,
+                    description: tool.2,
+                    pointSize: index == 4 ? 20 : Self.drawingToolSymbolPointSize
+                ),
+                forSegment: index
             )
-            button.wantsLayer = true
-            button.layer?.cornerRadius = 6
-            button.layer?.cornerCurve = .continuous
-            button.target = self
-            button.action = #selector(changeBrush(_:))
-            button.tag = index
-            button.toolTip = tool.3
-            button.setAccessibilityLabel(tool.2)
-            button.setAccessibilityRole(.radioButton)
-            button.widthAnchor.constraint(equalToConstant: 30).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 24).isActive = true
-            brushButtons.append(button)
-            brushStack.addArrangedSubview(button)
+            brushControl.setWidth(28, forSegment: index)
+            brushControl.setToolTip(tool.3, forSegment: index)
         }
-        brushStack.setAccessibilityLabel("Drawing tool")
-        brushStack.setAccessibilityRole(.radioGroup)
+        brushControl.setAccessibilityLabel("Drawing tool")
         brushActionHover.setContent(
-            brushStack,
-            controls: brushButtons
+            brushControl,
+            controls: [brushControl]
         )
 
         gridControl.controlSize = .small
@@ -4184,12 +4175,16 @@ private final class FloatingAnnotationToolbar:
             voiceHeight: voiceToggleButton.image?.size.height ?? 0,
             copyHeight: copyButton.image?.size.height ?? 0,
             closeHeight: closeButton.image?.size.height ?? 0,
-            brushWidths: brushButtons.map { $0.image?.size.width ?? 0 },
-            brushHeights: brushButtons.map { $0.image?.size.height ?? 0 },
+            brushWidths: (0..<brushControl.segmentCount).map {
+                brushControl.image(forSegment: $0)?.size.width ?? 0
+            },
+            brushHeights: (0..<brushControl.segmentCount).map {
+                brushControl.image(forSegment: $0)?.size.height ?? 0
+            },
             gridHeights: gridControl.itemArray.compactMap {
                 $0.image?.size.height
             },
-            brushControlHeight: brushStack.bounds.height,
+            brushControlHeight: brushControl.bounds.height,
             swatchDiameter: swatches.first?.bounds.height ?? 0,
             sliderControlSize: widthSlider.controlSize.rawValue,
             sliderCellType: widthSlider.cell.map {
@@ -4210,10 +4205,10 @@ private final class FloatingAnnotationToolbar:
         width: Double
     ) {
         (
-            selectedSegment: brushButtons.firstIndex(where: {
-                $0.state == .on
-            }) ?? -1,
-            toolTips: brushButtons.map(\.toolTip),
+            selectedSegment: brushControl.selectedSegment,
+            toolTips: (0..<brushControl.segmentCount).map {
+                brushControl.toolTip(forSegment: $0)
+            },
             closeToolTip: closeButton.toolTip,
             minimumWidth: widthSlider.minValue,
             width: widthSlider.doubleValue
@@ -4221,33 +4216,24 @@ private final class FloatingAnnotationToolbar:
     }
 
     var drawingToolAppearanceForTesting: (
-        hasSegmentDividers: Bool,
-        itemWidths: [CGFloat],
-        itemGaps: [CGFloat],
-        selectedFillCount: Int
+        usesSeparatedStyle: Bool,
+        segmentWidths: [CGFloat],
+        selectedCount: Int
     ) {
-        layoutSubtreeIfNeeded()
-        let content = brushActionHover.subviews.first
-        let items = (content as? NSStackView)?.arrangedSubviews ?? []
-        let frames = items.map { convert($0.bounds, from: $0) }
         return (
-            hasSegmentDividers: content is NSSegmentedControl,
-            itemWidths: frames.map(\.width),
-            itemGaps: zip(frames, frames.dropFirst()).map {
-                $1.minX - $0.maxX
+            usesSeparatedStyle: brushControl.segmentStyle == .separated,
+            segmentWidths: (0..<brushControl.segmentCount).map {
+                brushControl.width(forSegment: $0)
             },
-            selectedFillCount: items.filter {
-                ($0 as? NSButton)?.layer?.backgroundColor
-                    .flatMap(NSColor.init(cgColor:))?.alphaComponent ?? 0 > 0.1
+            selectedCount: (0..<brushControl.segmentCount).filter {
+                brushControl.isSelected(forSegment: $0)
             }.count
         )
     }
 
     func selectDrawingToolForTesting(at index: Int) {
-        guard brushButtons.indices.contains(index) else {
-            return
-        }
-        brushButtons[index].performClick(nil)
+        brushControl.selectedSegment = index
+        changeBrush()
     }
 
     func setStrokeWidthForTesting(_ width: Double) {
@@ -4261,12 +4247,8 @@ private final class FloatingAnnotationToolbar:
         slider: Bool
     ) {
         (
-            brush: brushButtons.contains {
-                $0.state == .on
-                    && $0.contentTintColor?.isEqual(
-                        NSColor.controlAccentColor
-                    ) == true
-            },
+            brush: brushControl.selectedSegmentBezelColor?
+                .isEqual(NSColor.controlAccentColor) == true,
             grid: gridControl.contentTintColor?
                 .isEqual(NSColor.controlAccentColor) == true,
             slider: widthSlider.trackFillColor?
@@ -4597,8 +4579,8 @@ private final class FloatingAnnotationToolbar:
         onToolChange?(toolState)
     }
 
-    @objc private func changeBrush(_ sender: NSButton) {
-        switch sender.tag {
+    @objc private func changeBrush() {
+        switch brushControl.indexOfSelectedItem {
         case 0:
             toolState.canvasTool = .select
         case 2:
@@ -4795,29 +4777,17 @@ private final class FloatingAnnotationToolbar:
         for swatch in swatches {
             swatch.isSelected = swatch.traceColor == toolState.color
         }
-        let selectedIndex: Int
         switch temporaryCanvasTool ?? toolState.canvasTool {
         case .select:
-            selectedIndex = 0
+            brushControl.selectedSegment = 0
         case .pen:
-            selectedIndex = 1
+            brushControl.selectedSegment = 1
         case .highlighter:
-            selectedIndex = 2
+            brushControl.selectedSegment = 2
         case .rectangle:
-            selectedIndex = 3
+            brushControl.selectedSegment = 3
         case .text:
-            selectedIndex = 4
-        }
-        for (index, button) in brushButtons.enumerated() {
-            let selected = index == selectedIndex
-            button.state = selected ? .on : .off
-            button.contentTintColor = selected
-                ? .controlAccentColor
-                : NSColor.white.withAlphaComponent(0.78)
-            button.layer?.backgroundColor = selected
-                ? NSColor.controlAccentColor
-                    .withAlphaComponent(0.22).cgColor
-                : NSColor.clear.cgColor
+            brushControl.selectedSegment = 4
         }
         if let index = gridControl.itemArray.firstIndex(where: {
             ($0.representedObject as? String)
