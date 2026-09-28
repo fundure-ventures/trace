@@ -887,6 +887,7 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         voiceHeight: CGFloat,
         copyHeight: CGFloat,
         closeHeight: CGFloat,
+        brushWidths: [CGFloat],
         brushHeights: [CGFloat],
         gridHeights: [CGFloat],
         brushControlHeight: CGFloat,
@@ -3235,7 +3236,7 @@ private final class FloatingAnnotationToolbar:
 {
     private static let preferredHeight: CGFloat = 48
     private static let horizontalPadding: CGFloat = 12
-    private static let separatorSpacing: CGFloat = 12
+    private static let separatorSpacing: CGFloat = 16
     private static let gridAccessoryGap: CGFloat = 6
     private static let gridAccessoryWidth: CGFloat = 32
     private static let gridSelectorWidth: CGFloat = 42
@@ -3363,7 +3364,7 @@ private final class FloatingAnnotationToolbar:
                     named: tool.0,
                     fallback: tool.1,
                     description: tool.2,
-                    pointSize: index == 4 ? 22 : Self.drawingToolSymbolPointSize
+                    pointSize: index == 4 ? 20 : Self.drawingToolSymbolPointSize
                 ),
                 forSegment: index
             )
@@ -4151,6 +4152,7 @@ private final class FloatingAnnotationToolbar:
         voiceHeight: CGFloat,
         copyHeight: CGFloat,
         closeHeight: CGFloat,
+        brushWidths: [CGFloat],
         brushHeights: [CGFloat],
         gridHeights: [CGFloat],
         brushControlHeight: CGFloat,
@@ -4165,6 +4167,9 @@ private final class FloatingAnnotationToolbar:
             voiceHeight: voiceToggleButton.image?.size.height ?? 0,
             copyHeight: copyButton.image?.size.height ?? 0,
             closeHeight: closeButton.image?.size.height ?? 0,
+            brushWidths: (0..<brushControl.segmentCount).map {
+                brushControl.image(forSegment: $0)?.size.width ?? 0
+            },
             brushHeights: (0..<brushControl.segmentCount).map {
                 brushControl.image(forSegment: $0)?.size.height ?? 0
             },

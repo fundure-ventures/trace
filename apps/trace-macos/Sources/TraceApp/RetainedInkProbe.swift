@@ -1260,6 +1260,9 @@ enum TraceRetainedInkProbe {
         _ board: TraceBoardWindowController
     ) throws {
         let tools = board.drawingToolPresentationForPreview
+        let icons = board.toolbarIconMetricsForPreview
+        let separatorGaps = board.toolbarGroupLayoutForPreview.separatorNeighborGaps
+        let sizing = board.toolbarSizingForPreview
         guard tools.selectedSegment == 1,
               tools.toolTips == [
                   "Select (V or hold ⌘)",
@@ -1269,12 +1272,25 @@ enum TraceRetainedInkProbe {
                   "Text (T)",
               ],
               tools.closeToolTip == "Close trace (⌘W)",
-              board.toolbarIconMetricsForPreview.brushHeights.count == 5,
-              (19...22).contains(
-                  board.toolbarIconMetricsForPreview.brushHeights[4]
-              )
+              icons.brushHeights.count == 5,
+              icons.brushWidths.count == 5,
+              (17...19).contains(icons.brushHeights[4]),
+              icons.brushWidths[4] <= 28,
+              separatorGaps.count == 10,
+              separatorGaps.allSatisfy({
+                  (13.5...14.5).contains($0)
+              }),
+              (32...34).contains(sizing.active.gridToColorsGap),
+              abs(
+                  sizing.active.toolbarWidth - sizing.inactive.toolbarWidth
+              ) < 0.5
         else {
-            throw probeError("Drawing tools do not expose their icons and shortcuts")
+            throw probeError(
+                "Drawing tools need balanced icon sizes and separator gaps "
+                    + "text=\(icons.brushWidths.last ?? 0)x"
+                    + "\(icons.brushHeights.last ?? 0) "
+                    + "gaps=\(separatorGaps) sizing=\(sizing)"
+            )
         }
         var selectedToolState: TraceToolState?
         board.onToolChange = { selectedToolState = $0 }
@@ -1345,7 +1361,7 @@ enum TraceRetainedInkProbe {
               layout.separatorNeighborGaps.count == 10,
               (
                   layout.separatorNeighborGaps.allSatisfy {
-                      (9.5...10.5).contains($0)
+                      (13.5...14.5).contains($0)
                   }
               )
         else {
@@ -1364,7 +1380,7 @@ enum TraceRetainedInkProbe {
               icons.closeHeight >= 15,
               icons.swatchDiameter == 20,
               icons.brushControlHeight >= icons.swatchDiameter,
-              icons.brushHeights.allSatisfy({
+              icons.brushHeights.dropLast().allSatisfy({
                   $0 >= icons.swatchDiameter * 0.95
                     && $0 <= icons.swatchDiameter * 1.10
               }),
@@ -1504,8 +1520,8 @@ enum TraceRetainedInkProbe {
                       (6...10).contains($0)
                   } == true
               ),
-              sizing.active.gridToColorsGap >= 24,
-              sizing.active.gridToColorsGap <= 26,
+              sizing.active.gridToColorsGap >= 32,
+              sizing.active.gridToColorsGap <= 34,
               abs(
                   sizing.active.gridToColorsGap
                     - sizing.inactive.gridToColorsGap
