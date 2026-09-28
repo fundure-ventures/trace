@@ -717,10 +717,8 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     var backgroundControlLayoutForPreview: (
         backgroundIndex: Int?,
         gridIndex: Int?,
-        separatorIndex: Int?,
         colorsIndex: Int?,
-        backgroundHidden: Bool,
-        separatorHidden: Bool
+        backgroundHidden: Bool
     ) {
         annotationToolbar.backgroundControlLayoutForTesting
     }
@@ -820,20 +818,16 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     var toolbarGroupLayoutForPreview: (
         contentCenterOffset: CGFloat,
         gridAccessoryGap: CGFloat,
-        gridDividerVisible: Bool,
-        toolSeparatorIndex: Int?,
         brushIndex: Int?,
         strokeIndex: Int?,
-        voiceSeparatorIndex: Int?,
         voiceIndex: Int?,
-        recordingSeparatorIndex: Int?,
         copyIndex: Int?,
-        actionSeparatorIndex: Int?,
         closeIndex: Int?,
-        separatorNeighborGaps: [CGFloat],
         swatchNeighborGaps: [CGFloat],
         brushSegmentWidths: [CGFloat],
-        brushToStrokeGap: CGFloat
+        brushToStrokeGap: CGFloat,
+        dividerCount: Int,
+        groupGaps: [CGFloat]
     ) {
         annotationToolbar.toolbarGroupLayoutForTesting
     }
@@ -3239,7 +3233,7 @@ private final class FloatingAnnotationToolbar:
 {
     private static let preferredHeight: CGFloat = 48
     private static let horizontalPadding: CGFloat = 12
-    private static let separatorSpacing: CGFloat = 16
+    private static let groupSpacing: CGFloat = 24
     private static let gridAccessoryGap: CGFloat = 6
     private static let gridAccessoryWidth: CGFloat = 32
     private static let gridSelectorWidth: CGFloat = 42
@@ -3283,11 +3277,6 @@ private final class FloatingAnnotationToolbar:
     )
     private let widthLabel = NSTextField(labelWithString: "5.2")
     private let backgroundColorWell = PageBackgroundColorWell()
-    private let backgroundSeparator = NSBox()
-    private let toolSeparator = NSBox()
-    private let voiceSeparator = NSBox()
-    private let recordingSeparator = NSBox()
-    private let actionSeparator = NSBox()
     private let swatchStack = NSStackView()
     private let leftStack = NSStackView()
     private let gridStack = NSStackView()
@@ -3517,16 +3506,6 @@ private final class FloatingAnnotationToolbar:
             .isActive = true
         backgroundColorWell.setAccessibilityLabel("Page background color")
         backgroundColorWell.toolTip = "Page background color"
-        for separator in [
-            backgroundSeparator,
-            toolSeparator,
-            voiceSeparator,
-            recordingSeparator,
-            actionSeparator,
-        ] {
-            configureSeparator(separator)
-        }
-
         voiceWaveform.translatesAutoresizingMaskIntoConstraints = false
         voiceWaveform.widthAnchor.constraint(equalToConstant: 42).isActive =
             true
@@ -3656,9 +3635,7 @@ private final class FloatingAnnotationToolbar:
 
         let rightControls: [NSView] = [
             voiceGroup,
-            recordingSeparator,
             copyActionHover,
-            actionSeparator,
             closeActionHover,
         ]
         gridStack.addArrangedSubview(gridControl)
@@ -3666,9 +3643,7 @@ private final class FloatingAnnotationToolbar:
         let leftControls: [NSView] = [
             backgroundColorWell,
             gridStack,
-            backgroundSeparator,
             swatchStack,
-            toolSeparator,
             brushActionHover,
             widthSlider,
             widthLabel,
@@ -3686,32 +3661,18 @@ private final class FloatingAnnotationToolbar:
             stack.spacing = 8
         }
         gridStack.spacing = Self.gridAccessoryGap
-        configureSeparatorSpacing(
-            around: [
-                backgroundSeparator,
-                toolSeparator,
-            ],
-            in: leftStack
-        )
+        leftStack.setCustomSpacing(Self.groupSpacing, after: gridStack)
+        leftStack.setCustomSpacing(Self.groupSpacing, after: swatchStack)
         leftStack.setCustomSpacing(12, after: brushActionHover)
-        configureSeparatorSpacing(
-            around: [
-                recordingSeparator,
-                actionSeparator,
-            ],
-            in: rightStack
-        )
+        rightStack.setCustomSpacing(Self.groupSpacing, after: voiceGroup)
+        rightStack.setCustomSpacing(Self.groupSpacing, after: copyActionHover)
         toolbarStack.translatesAutoresizingMaskIntoConstraints = false
         toolbarStack.orientation = .horizontal
         toolbarStack.alignment = .centerY
         toolbarStack.spacing = 8
         toolbarStack.addArrangedSubview(leftStack)
-        toolbarStack.addArrangedSubview(voiceSeparator)
         toolbarStack.addArrangedSubview(rightStack)
-        configureSeparatorSpacing(
-            around: [voiceSeparator],
-            in: toolbarStack
-        )
+        toolbarStack.setCustomSpacing(Self.groupSpacing, after: leftStack)
         addSubview(toolbarStack)
 
         NSLayoutConstraint.activate([
@@ -3920,25 +3881,20 @@ private final class FloatingAnnotationToolbar:
     var toolbarGroupLayoutForTesting: (
         contentCenterOffset: CGFloat,
         gridAccessoryGap: CGFloat,
-        gridDividerVisible: Bool,
-        toolSeparatorIndex: Int?,
         brushIndex: Int?,
         strokeIndex: Int?,
-        voiceSeparatorIndex: Int?,
         voiceIndex: Int?,
-        recordingSeparatorIndex: Int?,
         copyIndex: Int?,
-        actionSeparatorIndex: Int?,
         closeIndex: Int?,
-        separatorNeighborGaps: [CGFloat],
         swatchNeighborGaps: [CGFloat],
         brushSegmentWidths: [CGFloat],
-        brushToStrokeGap: CGFloat
+        brushToStrokeGap: CGFloat,
+        dividerCount: Int,
+        groupGaps: [CGFloat]
     ) {
         layoutSubtreeIfNeeded()
         let left = leftStack.arrangedSubviews
         let right = rightStack.arrangedSubviews
-        let toolbar = toolbarStack.arrangedSubviews
         let gridControlFrame = convert(
             gridControl.bounds,
             from: gridControl
@@ -3947,60 +3903,33 @@ private final class FloatingAnnotationToolbar:
             gridSpacingGroup.bounds,
             from: gridSpacingGroup
         )
+        let neighboringGroups: [(NSView, NSView)] = [
+            (gridStack, swatchStack),
+            (swatchStack, brushActionHover),
+            (leftStack, rightStack),
+            (voiceGroup, copyActionHover),
+            (copyActionHover, closeActionHover),
+        ]
         return (
             contentCenterOffset:
                 abs(toolbarStack.frame.midX - bounds.midX),
             gridAccessoryGap:
                 gridAccessoryFrame.minX - gridControlFrame.maxX,
-            gridDividerVisible:
-                backgroundSeparator.superview != nil
-                    && !backgroundSeparator.isHidden,
-            toolSeparatorIndex: left.firstIndex {
-                $0 === toolSeparator
-            },
             brushIndex: left.firstIndex {
                 $0 === brushActionHover
             },
             strokeIndex: left.firstIndex {
                 $0 === widthSlider
             },
-            voiceSeparatorIndex: toolbar.firstIndex {
-                $0 === voiceSeparator
-            },
             voiceIndex: right.firstIndex {
                 $0 === voiceGroup
-            },
-            recordingSeparatorIndex: right.firstIndex {
-                $0 === recordingSeparator
             },
             copyIndex: right.firstIndex {
                 $0 === copyActionHover
             },
-            actionSeparatorIndex: right.firstIndex {
-                $0 === actionSeparator
-            },
             closeIndex: right.firstIndex {
                 $0 === closeActionHover
             },
-            separatorNeighborGaps:
-                separatorNeighborGaps(
-                    around: [
-                        backgroundSeparator,
-                        toolSeparator,
-                    ],
-                    in: leftStack
-                )
-                + separatorNeighborGaps(
-                    around: [
-                        recordingSeparator,
-                        actionSeparator,
-                    ],
-                    in: rightStack
-                )
-                + separatorNeighborGaps(
-                    around: [voiceSeparator],
-                    in: toolbarStack
-                ),
             swatchNeighborGaps: zip(
                 swatchStack.arrangedSubviews,
                 swatchStack.arrangedSubviews.dropFirst()
@@ -4013,34 +3942,15 @@ private final class FloatingAnnotationToolbar:
                 brushControl.width(forSegment: $0)
             },
             brushToStrokeGap: convert(widthSlider.bounds, from: widthSlider).minX
-                - convert(brushActionHover.bounds, from: brushActionHover).maxX
-        )
-    }
-
-    private func separatorNeighborGaps(
-        around separators: [NSBox],
-        in stack: NSStackView
-    ) -> [CGFloat] {
-        let views = stack.arrangedSubviews
-        return separators.flatMap { separator -> [CGFloat] in
-            guard let index = views.firstIndex(where: {
-                $0 === separator
-            }),
-                  index > views.startIndex,
-                  index < views.index(before: views.endIndex)
-            else {
-                return []
+                - convert(brushActionHover.bounds, from: brushActionHover).maxX,
+            dividerCount: [leftStack, rightStack, toolbarStack]
+                .flatMap(\.arrangedSubviews)
+                .filter { $0 is NSBox }.count,
+            groupGaps: neighboringGroups.map { previous, next in
+                convert(next.bounds, from: next).minX
+                    - convert(previous.bounds, from: previous).maxX
             }
-            let previous = views[views.index(before: index)]
-            let next = views[views.index(after: index)]
-            let previousFrame = convert(previous.bounds, from: previous)
-            let separatorFrame = convert(separator.bounds, from: separator)
-            let nextFrame = convert(next.bounds, from: next)
-            return [
-                separatorFrame.minX - previousFrame.maxX,
-                nextFrame.minX - separatorFrame.maxX,
-            ]
-        }
+        )
     }
 
     var toolbarSizingForTesting: (
@@ -4308,10 +4218,8 @@ private final class FloatingAnnotationToolbar:
     var backgroundControlLayoutForTesting: (
         backgroundIndex: Int?,
         gridIndex: Int?,
-        separatorIndex: Int?,
         colorsIndex: Int?,
-        backgroundHidden: Bool,
-        separatorHidden: Bool
+        backgroundHidden: Bool
     ) {
         let views = leftStack.arrangedSubviews
         return (
@@ -4321,14 +4229,10 @@ private final class FloatingAnnotationToolbar:
             gridIndex: views.firstIndex {
                 $0 === gridStack
             },
-            separatorIndex: views.firstIndex {
-                $0 === backgroundSeparator
-            },
             colorsIndex: views.firstIndex {
                 $0 === swatchStack
             },
-            backgroundHidden: backgroundColorWell.isHidden,
-            separatorHidden: backgroundSeparator.isHidden
+            backgroundHidden: backgroundColorWell.isHidden
         )
     }
 
@@ -4502,7 +4406,6 @@ private final class FloatingAnnotationToolbar:
 
     func showBackgroundControlForTesting() {
         backgroundColorWell.isHidden = false
-        backgroundSeparator.isHidden = false
         backgroundColorWell.color = .white
     }
 
@@ -4857,37 +4760,6 @@ private final class FloatingAnnotationToolbar:
         ) ?? baseImage
         image.isTemplate = true
         return image
-    }
-
-    private func configureSeparator(_ separator: NSBox) {
-        separator.boxType = .separator
-        separator.heightAnchor.constraint(equalToConstant: 21).isActive = true
-        separator.widthAnchor.constraint(equalToConstant: 1).isActive = true
-    }
-
-    private func configureSeparatorSpacing(
-        around separators: [NSBox],
-        in stack: NSStackView
-    ) {
-        let views = stack.arrangedSubviews
-        for separator in separators {
-            guard let index = views.firstIndex(where: {
-                $0 === separator
-            }),
-                  index > views.startIndex
-            else {
-                continue
-            }
-            let previous = views[views.index(before: index)]
-            stack.setCustomSpacing(
-                Self.separatorSpacing,
-                after: previous
-            )
-            stack.setCustomSpacing(
-                Self.separatorSpacing,
-                after: separator
-            )
-        }
     }
 }
 

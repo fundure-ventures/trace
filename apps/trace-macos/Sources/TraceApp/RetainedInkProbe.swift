@@ -23,6 +23,7 @@ enum TraceRetainedInkProbe {
             board.hideBoard()
         }
         board.prepareDocumentForPreview(document, toolState: TraceToolState())
+        try verifyBackgroundControlLayout(board, visible: true)
         try verifyDrawingToolControls(board)
     }
 
@@ -1235,10 +1236,8 @@ enum TraceRetainedInkProbe {
         let swatch = board.backgroundSwatchPresentationForPreview
         guard layout.backgroundIndex == 0,
               layout.gridIndex == 1,
-              layout.separatorIndex == 2,
-              layout.colorsIndex == 3,
-              layout.backgroundHidden == !visible,
-              !layout.separatorHidden
+              layout.colorsIndex == 2,
+              layout.backgroundHidden == !visible
         else {
             throw probeError(
                 "background control is not the leading toolbar group"
@@ -1262,7 +1261,6 @@ enum TraceRetainedInkProbe {
         let tools = board.drawingToolPresentationForPreview
         let icons = board.toolbarIconMetricsForPreview
         let layout = board.toolbarGroupLayoutForPreview
-        let separatorGaps = layout.separatorNeighborGaps
         let sizing = board.toolbarSizingForPreview
         guard tools.selectedSegment == 1,
               tools.toolTips == [
@@ -1277,9 +1275,10 @@ enum TraceRetainedInkProbe {
               icons.brushWidths.count == 5,
               (17...19).contains(icons.brushHeights[4]),
               icons.brushWidths[4] <= 28,
-              separatorGaps.count == 10,
-              separatorGaps.allSatisfy({
-                  (13.5...14.5).contains($0)
+              layout.dividerCount == 0,
+              layout.groupGaps.count == 5,
+              layout.groupGaps.allSatisfy({
+                  (23.5...24.5).contains($0)
               }),
               layout.swatchNeighborGaps.count == 3,
               layout.swatchNeighborGaps.allSatisfy({
@@ -1290,16 +1289,17 @@ enum TraceRetainedInkProbe {
                   (33.5...34.5).contains($0)
               }),
               (11.5...12.5).contains(layout.brushToStrokeGap),
-              (32...34).contains(sizing.active.gridToColorsGap),
+              (23...25).contains(sizing.active.gridToColorsGap),
               abs(
                   sizing.active.toolbarWidth - sizing.inactive.toolbarWidth
               ) < 0.5
         else {
             throw probeError(
-                "Drawing tools need balanced icon sizes and separator gaps "
+                "Drawing tools need divider-free group spacing "
                     + "text=\(icons.brushWidths.last ?? 0)x"
                     + "\(icons.brushHeights.last ?? 0) "
-                    + "gaps=\(separatorGaps) swatches=\(layout.swatchNeighborGaps) "
+                    + "dividers=\(layout.dividerCount) groups=\(layout.groupGaps) "
+                    + "swatches=\(layout.swatchNeighborGaps) "
                     + "segments=\(layout.brushSegmentWidths) "
                     + "stroke=\(layout.brushToStrokeGap) sizing=\(sizing)"
             )
@@ -1360,29 +1360,22 @@ enum TraceRetainedInkProbe {
         let gridSelector = board.gridSelectorPresentationForPreview
         guard layout.contentCenterOffset < 0.5,
               layout.gridAccessoryGap >= 5,
-              layout.gridDividerVisible,
-              layout.toolSeparatorIndex == 4,
-              layout.brushIndex == 5,
-              layout.strokeIndex == 6,
-              layout.voiceSeparatorIndex == 1,
+              layout.dividerCount == 0,
+              layout.brushIndex == 3,
+              layout.strokeIndex == 4,
               layout.voiceIndex == 0,
-              layout.recordingSeparatorIndex == 1,
-              layout.copyIndex == 2,
-              layout.actionSeparatorIndex == 3,
-              layout.closeIndex == 4,
-              layout.separatorNeighborGaps.count == 10,
-              (
-                  layout.separatorNeighborGaps.allSatisfy {
-                      (13.5...14.5).contains($0)
-                  }
-              )
+              layout.copyIndex == 1,
+              layout.closeIndex == 2,
+              layout.groupGaps.count == 5,
+              layout.groupGaps.allSatisfy({
+                  (23.5...24.5).contains($0)
+              })
         else {
             throw probeError(
                 "toolbar groups are not packed in the requested order "
                     + "center=\(layout.contentCenterOffset) "
-                    + "voice-divider=\(String(describing: layout.voiceSeparatorIndex)) "
-                    + "grid-divider=\(layout.gridDividerVisible) "
-                    + "separator-gaps=\(layout.separatorNeighborGaps)"
+                    + "dividers=\(layout.dividerCount) "
+                    + "group-gaps=\(layout.groupGaps)"
             )
         }
         guard icons.brushHeights.count == 5,
@@ -1532,8 +1525,8 @@ enum TraceRetainedInkProbe {
                       (6...10).contains($0)
                   } == true
               ),
-              sizing.active.gridToColorsGap >= 32,
-              sizing.active.gridToColorsGap <= 34,
+              sizing.active.gridToColorsGap >= 23,
+              sizing.active.gridToColorsGap <= 25,
               abs(
                   sizing.active.gridToColorsGap
                     - sizing.inactive.gridToColorsGap

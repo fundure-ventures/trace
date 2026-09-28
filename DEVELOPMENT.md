@@ -175,8 +175,8 @@ color changes, snapshot persistence, and the Pen/Highlighter minimum widths.
 It verifies independent Drawing and Highlighter widths across toolbar and
 keyboard switches, rendered strokes, and app-model recreation, plus opaque
 screenshot capture after using Highlighter.
-The same probe checks divider gaps, spacing between toolbar items, and the
-Text symbol's size.
+The same probe checks divider-free group spacing, spacing between toolbar
+items, and the Text symbol's size.
 It also checks native Copy routing for selected text, a text caret, and objects
 selected before holding Command, without writing to the system clipboard.
 
