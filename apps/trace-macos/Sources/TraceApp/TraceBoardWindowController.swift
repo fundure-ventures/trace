@@ -921,7 +921,10 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         toolTips: [String?],
         closeToolTip: String?,
         minimumWidth: Double,
-        width: Double
+        maximumWidth: Double,
+        width: Double,
+        valueLabel: String,
+        sliderLabel: String?
     ) {
         annotationToolbar.drawingToolPresentationForTesting
     }
@@ -940,6 +943,10 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
 
     func setStrokeWidthForPreview(_ width: Double) {
         annotationToolbar.setStrokeWidthForTesting(width)
+    }
+
+    func pressToolSizeArrowForPreview(_ keyCode: UInt16) -> Bool {
+        annotationToolbar.pressToolSizeArrowForTesting(keyCode)
     }
 
     var controlAccentPresentationForPreview: (
@@ -3238,6 +3245,28 @@ private final class ToolbarActionHoverView: NSView {
 #endif
 }
 
+private final class WholePointSlider: NSSlider {
+    override func keyDown(with event: NSEvent) {
+        let step: Double
+        switch event.keyCode {
+        // macOS left/down and right/up arrow keys.
+        case 123, 125:
+            step = -1
+        case 124, 126:
+            step = 1
+        default:
+            super.keyDown(with: event)
+            return
+        }
+        let next = min(maxValue, max(minValue, doubleValue + step))
+        guard next != doubleValue else {
+            return
+        }
+        doubleValue = next
+        sendAction(action, to: target)
+    }
+}
+
 private final class FloatingAnnotationToolbar:
     DraggableToolbarView,
     NSTextFieldDelegate
@@ -3279,14 +3308,14 @@ private final class FloatingAnnotationToolbar:
         return field
     }()
     private let gridSpacingGroup = NSStackView()
-    private let widthSlider = NSSlider(
+    private let widthSlider = WholePointSlider(
         value: TraceStrokeWidthPolicy.defaultValue,
         minValue: TraceStrokeWidthPolicy.minimum,
         maxValue: TraceStrokeWidthPolicy.maximum,
         target: nil,
         action: nil
     )
-    private let widthLabel = NSTextField(labelWithString: "5.2")
+    private let widthLabel = NSTextField(labelWithString: "5")
     private let backgroundColorWell = PageBackgroundColorWell()
     private let backgroundSeparator = NSBox()
     private let toolSeparator = NSBox()
@@ -4202,7 +4231,10 @@ private final class FloatingAnnotationToolbar:
         toolTips: [String?],
         closeToolTip: String?,
         minimumWidth: Double,
-        width: Double
+        maximumWidth: Double,
+        width: Double,
+        valueLabel: String,
+        sliderLabel: String?
     ) {
         (
             selectedSegment: brushControl.selectedSegment,
@@ -4211,7 +4243,10 @@ private final class FloatingAnnotationToolbar:
             },
             closeToolTip: closeButton.toolTip,
             minimumWidth: widthSlider.minValue,
-            width: widthSlider.doubleValue
+            maximumWidth: widthSlider.maxValue,
+            width: widthSlider.doubleValue,
+            valueLabel: widthLabel.stringValue,
+            sliderLabel: widthSlider.accessibilityLabel()
         )
     }
 
@@ -4239,6 +4274,25 @@ private final class FloatingAnnotationToolbar:
     func setStrokeWidthForTesting(_ width: Double) {
         widthSlider.doubleValue = width
         changeWidth()
+    }
+
+    func pressToolSizeArrowForTesting(_ keyCode: UInt16) -> Bool {
+        guard let event = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: window?.windowNumber ?? 0,
+            context: nil,
+            characters: "",
+            charactersIgnoringModifiers: "",
+            isARepeat: false,
+            keyCode: keyCode
+        ) else {
+            return false
+        }
+        widthSlider.keyDown(with: event)
+        return true
     }
 
     var controlAccentPresentationForTesting: (
@@ -4709,8 +4763,31 @@ private final class FloatingAnnotationToolbar:
     }
 
     @objc private func changeWidth() {
-        toolState.width = widthSlider.doubleValue
-        widthLabel.stringValue = String(format: "%.1f", toolState.width)
+        switch temporaryCanvasTool ?? toolState.canvasTool {
+        case .text:
+            toolState.textSize = TraceTextSizePolicy.clamped(
+                widthSlider.doubleValue
+            )
+            widthSlider.doubleValue = Double(toolState.textSize)
+        case .highlighter:
+            toolState.highlighterWidth = TraceStrokeWidthPolicy.clamped(
+                widthSlider.doubleValue,
+                brush: .highlighter
+            )
+            widthSlider.doubleValue = toolState.highlighterWidth
+        case .select:
+            toolState.width = TraceStrokeWidthPolicy.clamped(
+                widthSlider.doubleValue,
+                brush: toolState.brush
+            )
+            widthSlider.doubleValue = toolState.width
+        case .pen, .rectangle:
+            toolState.penWidth = TraceStrokeWidthPolicy.clamped(
+                widthSlider.doubleValue
+            )
+            widthSlider.doubleValue = toolState.penWidth
+        }
+        widthLabel.stringValue = String(Int(widthSlider.doubleValue))
         onToolChange?(toolState)
     }
 
@@ -4797,13 +4874,39 @@ private final class FloatingAnnotationToolbar:
         }
         gridSpacingField.isHidden = toolState.gridStyle == .none
         gridSpacingField.stringValue = String(toolState.gridSpacingPoints)
-        toolState.width = TraceStrokeWidthPolicy.clamped(
-            toolState.width,
-            brush: toolState.brush
+        toolState.penWidth = TraceStrokeWidthPolicy.clamped(toolState.penWidth)
+        toolState.highlighterWidth = TraceStrokeWidthPolicy.clamped(
+            toolState.highlighterWidth,
+            brush: .highlighter
         )
-        widthSlider.minValue = TraceStrokeWidthPolicy.minimum(for: toolState.brush)
-        widthSlider.doubleValue = toolState.width
-        widthLabel.stringValue = String(format: "%.1f", toolState.width)
+        toolState.textSize = TraceTextSizePolicy.clamped(Double(toolState.textSize))
+        switch temporaryCanvasTool ?? toolState.canvasTool {
+        case .text:
+            widthSlider.minValue = Double(TraceTextSizePolicy.minimum)
+            widthSlider.maxValue = Double(TraceTextSizePolicy.maximum)
+            widthSlider.doubleValue = Double(toolState.textSize)
+            widthSlider.setAccessibilityLabel("Font size")
+            widthSlider.toolTip = "Font size"
+        case .highlighter:
+            widthSlider.minValue = TraceStrokeWidthPolicy.minimum(for: .highlighter)
+            widthSlider.maxValue = TraceStrokeWidthPolicy.maximum(for: .highlighter)
+            widthSlider.doubleValue = toolState.highlighterWidth
+            widthSlider.setAccessibilityLabel("Stroke width")
+            widthSlider.toolTip = "Stroke width"
+        case .select:
+            widthSlider.minValue = TraceStrokeWidthPolicy.minimum(for: toolState.brush)
+            widthSlider.maxValue = TraceStrokeWidthPolicy.maximum(for: toolState.brush)
+            widthSlider.doubleValue = toolState.width
+            widthSlider.setAccessibilityLabel("Stroke width")
+            widthSlider.toolTip = "Stroke width"
+        case .pen, .rectangle:
+            widthSlider.minValue = TraceStrokeWidthPolicy.minimum
+            widthSlider.maxValue = TraceStrokeWidthPolicy.maximum
+            widthSlider.doubleValue = toolState.penWidth
+            widthSlider.setAccessibilityLabel("Stroke width")
+            widthSlider.toolTip = "Stroke width"
+        }
+        widthLabel.stringValue = String(Int(widthSlider.doubleValue))
     }
 
     private func focusGridSpacingField() {

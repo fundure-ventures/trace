@@ -3,6 +3,7 @@ import {
   DefaultColorStyle,
   DefaultFillStyle,
   DefaultSizeStyle,
+  FONT_SIZES,
   STROKE_SIZES,
   type Editor,
   type TLDefaultColorStyle,
@@ -13,10 +14,12 @@ import {
   type TLImageShape,
   type TLShape,
   type TLShapeId,
+  type TLTextShape,
   type TLEventInfo,
   b64Vecs,
   createShapeId,
   getSvgAsImage,
+  renderPlaintextFromRichText,
   Vec,
 } from 'tldraw'
 import {
@@ -72,6 +75,7 @@ export interface ProductTool {
   brush: ProductBrush
   penWidth: number
   highlighterWidth: number
+  textSize: number
   gridStyle: ProductGrid
   gridSpacing: number
 }
@@ -219,9 +223,11 @@ export interface TraceProductRendererBridge {
     toolPath: string
     isEditingText: boolean
     textOpacities: number[]
+    textSizes: number[]
     color: TLDefaultColorStyle
     opacity: number
     width: number
+    textSize: number
     gridStyle: ProductGrid
     gridSpacing: number
     drawWidths: number[]
@@ -301,8 +307,9 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     tool: 'pen',
     color: 'red',
     brush: 'pen',
-    penWidth: 5.25,
-    highlighterWidth: 8,
+    penWidth: 5,
+    highlighterWidth: 16,
+    textSize: 24,
     gridStyle: 'none',
     gridSpacing: 8,
   }
@@ -820,7 +827,18 @@ export function installTraceProductRenderer(editor: Editor): () => void {
         return shape
       }
       if (shape.type === 'text') {
-        return { ...shape, opacity: 1 }
+        const isEmptyText =
+          renderPlaintextFromRichText(editor, shape.props.richText).length === 0
+        return {
+          ...shape,
+          opacity: 1,
+          props: {
+            ...shape.props,
+            scale: isEmptyText
+              ? currentTool.textSize / FONT_SIZES[shape.props.size]
+              : shape.props.scale,
+          },
+        }
       }
       if (shape.type !== 'draw') return shape
       const tool = temporaryDrawActive ? temporaryDrawTool() : currentTool
@@ -1023,6 +1041,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     setTool(tool) {
       const preserveTextEditing =
         tool.tool === currentTool.tool && editor.getEditingShape()?.type === 'text'
+      const textSizeChanged = tool.textSize !== currentTool.textSize
       if (!preserveTextEditing && editor.getEditingShapeId()) {
         editor.complete()
       }
@@ -1032,6 +1051,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
         brush: tool.brush,
         penWidth: clampToolWidth(tool.penWidth, 'pen'),
         highlighterWidth: clampToolWidth(tool.highlighterWidth, 'highlighter'),
+        textSize: clampTextSize(tool.textSize),
         gridStyle: tool.gridStyle,
         gridSpacing: positive(tool.gridSpacing, 8),
       }
@@ -1049,6 +1069,16 @@ export function installTraceProductRenderer(editor: Editor): () => void {
           currentTool,
           !temporarySelectActive && !temporaryDrawActive && !preserveTextEditing,
         )
+        const editingShape = editor.getEditingShape()
+        if (preserveTextEditing && textSizeChanged && editingShape?.type === 'text') {
+          editor.updateShape<TLTextShape>({
+            id: editingShape.id,
+            type: 'text',
+            props: {
+              scale: currentTool.textSize / FONT_SIZES[editingShape.props.size],
+            },
+          })
+        }
       })
       postDocumentChange()
     },
@@ -1536,9 +1566,13 @@ export function installTraceProductRenderer(editor: Editor): () => void {
         textOpacities: sortedShapes
           .filter((shape) => shape.type === 'text')
           .map((shape) => shape.opacity),
+        textSizes: sortedShapes
+          .filter((shape): shape is TLTextShape => shape.type === 'text')
+          .map((shape) => FONT_SIZES[shape.props.size] * shape.props.scale),
         color: currentTool.color,
         opacity: opacityForProductTool(currentTool),
         width: widthForProductTool(currentTool),
+        textSize: currentTool.textSize,
         gridStyle: currentTool.gridStyle,
         gridSpacing: currentTool.gridSpacing,
         drawWidths: drawShapes.map(
@@ -2513,11 +2547,15 @@ function scaleForWidth(width: number): number {
 }
 
 function clampToolWidth(width: number, brush: ProductBrush): number {
-  return clamp(
-    Number.isFinite(width) ? width : 5.25,
-    brush === 'highlighter' ? 8 : 1,
-    12,
-  )
+  return Math.round(clamp(
+    Number.isFinite(width) ? width : 5,
+    brush === 'highlighter' ? 16 : 1,
+    brush === 'highlighter' ? 124 : 12,
+  ))
+}
+
+function clampTextSize(size: number): number {
+  return Math.round(clamp(Number.isFinite(size) ? size : 24, 12, 124))
 }
 
 function isBackgroundShape(id: TLShapeId): boolean {

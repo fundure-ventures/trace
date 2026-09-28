@@ -1342,6 +1342,7 @@ final class TldrawProductCanvasView:
             "brush": brushName(state.brush),
             "penWidth": state.penWidth,
             "highlighterWidth": state.highlighterWidth,
+            "textSize": state.textSize,
             "gridStyle": state.gridStyle.rawValue,
             "gridSpacing": state.gridSpacingPoints,
         ]

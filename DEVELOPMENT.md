@@ -171,10 +171,12 @@ TRACE_PRODUCT_TLDRAW_PROBE=1 ".build/Trace Debug.app/Contents/MacOS/trace"
 For focused text-entry, toolbar, and tool-width checks, use
 `TRACE_PRODUCT_TLDRAW_PROBE=text` with the same debug executable. This checks
 double-click text creation, the Text tool and shortcut, spaces, editing through
-color changes, snapshot persistence, and the Pen/Highlighter minimum widths.
-It verifies independent Drawing and Highlighter widths across toolbar and
-keyboard switches, rendered strokes, and app-model recreation, plus opaque
-screenshot capture after using Highlighter.
+color changes, snapshot persistence, and whole-point Pen (1-12 pt),
+Highlighter (16-124 pt), and Text (12-124 pt) sizing. Text uses the same slider
+for font size with its own persisted setting. It verifies independent tool
+sizes across toolbar and keyboard switches, rendered strokes and text,
+and app-model recreation, plus opaque screenshot capture after using
+Highlighter.
 The same probe checks the toolbar's group divider gaps and the Text symbol's
 size, plus the native separated drawing-tool segments and their selection.
 It also checks native Copy routing for selected text, a text caret, and objects

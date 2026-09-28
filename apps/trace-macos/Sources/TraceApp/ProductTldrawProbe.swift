@@ -196,7 +196,7 @@ enum ProductTldrawProbe {
               ) < 0.001,
               abs(
                   ((state["width"] as? NSNumber)?.doubleValue ?? 0)
-                      - 8
+                      - 16
               ) < 0.001,
               (state["drawWidths"] as? [NSNumber])?.contains(where: {
                   abs($0.doubleValue - 7.5) < 0.001
@@ -2112,19 +2112,22 @@ enum ProductTldrawProbe {
               ),
               shortcut["productTool"] as? String == "highlighter",
               let highlighter = await surface.stateForTesting(),
-              (highlighter["width"] as? NSNumber)?.doubleValue == 8
+              (highlighter["width"] as? NSNumber)?.doubleValue == 16
         else {
-            throw probeError("Highlighter shortcut did not clamp to 8 pt")
+            throw probeError("Highlighter shortcut did not clamp to 16 pt")
         }
-        try await verifyDrawnWidth(surface, width: 8, y: 0.5)
+        try await verifyDrawnWidth(surface, width: 16, y: 0.5)
         guard let textTool = TraceCanvasTool(rawValue: "text") else {
             throw probeError("Text tool is missing from the native bridge")
         }
         state.canvasTool = textTool
         state.brush = .pen
+        state.textSize = 36
         surface.setToolState(state)
         try await waitUntil("native Text tool") {
-            await surface.stateForTesting()?["selectedTool"] as? String == "text"
+            let value = await surface.stateForTesting()
+            return value?["selectedTool"] as? String == "text"
+                && (value?["textSize"] as? NSNumber)?.intValue == 36
         }
         guard await surface.emitPointerForTesting(
                   phase: "began", x: 0.2, y: 0.3
@@ -2141,6 +2144,13 @@ enum ProductTldrawProbe {
         let secondText = "More text with spaces"
         guard try await surface.typeTextForTesting(secondText) == secondText else {
             throw probeError("Text tool did not preserve spaces")
+        }
+        state.textSize = 124
+        surface.setToolState(state)
+        try await waitUntil("live text font size") {
+            let value = await surface.stateForTesting()
+            return value?["isEditingText"] as? Bool == true
+                && (value?["textSizes"] as? [NSNumber])?.map(\.intValue) == [24, 124]
         }
         state.color = .blue
         surface.setToolState(state)
@@ -2177,6 +2187,7 @@ enum ProductTldrawProbe {
         }
         guard let value = await surface.stateForTesting(),
               value["textOpacities"] as? [Double] == [1, 1],
+              (value["textSizes"] as? [NSNumber])?.map(\.intValue) == [24, 124],
               let snapshot = await surface.snapshotForTesting(),
               snapshot.contains(firstText),
               snapshot.contains(secondText + suffix)
@@ -2207,6 +2218,25 @@ enum ProductTldrawProbe {
         else {
             throw probeError("T did not select opaque text")
         }
+        state.canvasTool = .text
+        state.textSize = 12
+        surface.setToolState(state)
+        try await waitUntil("minimum text font size") {
+            (await surface.stateForTesting()?["textSize"] as? NSNumber)?.intValue == 12
+        }
+        guard await surface.emitPointerForTesting(
+                  phase: "began", x: 0.8, y: 0.4
+              ),
+              await surface.emitPointerForTesting(
+                  phase: "ended", x: 0.8, y: 0.4
+              )
+        else {
+            throw probeError("Could not create minimum-size text")
+        }
+        try await waitUntil("minimum-size text shape") {
+            (await surface.stateForTesting()?["textSizes"] as? [NSNumber])?
+                .map(\.intValue) == [24, 124, 12]
+        }
     }
 
     @MainActor
@@ -2215,14 +2245,15 @@ enum ProductTldrawProbe {
         state.width = 2.25
         state.canvasTool = .highlighter
         state.brush = .highlighter
-        state.width = 11
+        state.width = 21
+        state.textSize = 57
         surface.setToolState(state)
         try await waitUntil("native independent widths") {
             let value = await surface.stateForTesting()
             return value?["productTool"] as? String == "highlighter"
-                && (value?["width"] as? NSNumber)?.doubleValue == 11
+                && (value?["width"] as? NSNumber)?.doubleValue == 21
         }
-        for (key, code, width, y) in [("d", "KeyD", 2.25, 0.6), ("h", "KeyH", 11.0, 0.65)] {
+        for (key, code, width, y) in [("d", "KeyD", 2.0, 0.6), ("h", "KeyH", 21.0, 0.65)] {
             guard await surface.keyboardEventForTesting(type: "keydown", key: key, code: code) != nil,
                   let value = await surface.stateForTesting(),
                   (value["width"] as? NSNumber)?.doubleValue == width
@@ -2231,22 +2262,29 @@ enum ProductTldrawProbe {
             }
             try await verifyDrawnWidth(surface, width: width, y: y)
         }
+        guard await surface.keyboardEventForTesting(type: "keydown", key: "t", code: "KeyT") != nil,
+              let textTool = await surface.stateForTesting(),
+              (textTool["textSize"] as? NSNumber)?.intValue == 57,
+              textTool["productTool"] as? String == "text"
+        else {
+            throw probeError("Text shortcut lost its independent font size")
+        }
         state.canvasTool = .pen
         state.brush = .pen
         state.width = 3.5
         surface.setToolState(state)
         try await waitUntil("updated Drawing width") {
-            (await surface.stateForTesting()?["width"] as? NSNumber)?.doubleValue == 3.5
+            (await surface.stateForTesting()?["width"] as? NSNumber)?.doubleValue == 4
         }
         guard await surface.keyboardEventForTesting(type: "keydown", key: "h", code: "KeyH") != nil,
               let value = await surface.stateForTesting(),
-              (value["width"] as? NSNumber)?.doubleValue == 11
+              (value["width"] as? NSNumber)?.doubleValue == 21
         else {
             throw probeError("Updating Drawing changed the remembered Highlighter width")
         }
         for (key, code, brush, width, y) in [
-            ("h", "KeyH", TraceBrushKind.pen, 11.0, 0.72),
-            ("d", "KeyD", TraceBrushKind.highlighter, 3.5, 0.78),
+            ("h", "KeyH", TraceBrushKind.pen, 21.0, 0.72),
+            ("d", "KeyD", TraceBrushKind.highlighter, 4.0, 0.78),
         ] {
             guard await surface.keyboardEventForTesting(
                 type: "keydown", key: key, code: code
@@ -2275,6 +2313,17 @@ enum ProductTldrawProbe {
                 throw probeError("Temporary drawing changed the persistent tool width")
             }
         }
+        state.canvasTool = .highlighter
+        state.brush = .highlighter
+        state.width = 124
+        surface.setToolState(state)
+        try await waitUntil("124 point Highlighter") {
+            let value = await surface.stateForTesting()
+            return (value?["width"] as? NSNumber)?.intValue == 124
+                && value?["productTool"] as? String == "highlighter"
+                && (value?["textSize"] as? NSNumber)?.intValue == 57
+        }
+        try await verifyDrawnWidth(surface, width: 124, y: 0.85)
     }
 
     @MainActor

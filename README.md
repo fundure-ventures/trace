@@ -76,10 +76,11 @@ Finder **Open With** accepts an image batch and places the images together on
 one blank canvas.
 
 Use **Text** (`T`) and click the canvas to add a text box, or double-click an
-empty area with **Select** (`V`). Pen strokes can be as thin as **1 pt**;
-Highlighter starts at **8 pt**. Both tools retain a maximum width of **12 pt**.
-Drawing and Highlighter each remember their own last-used width across tool
-switches and app restarts.
+empty area with **Select** (`V`). Pen strokes span **1-12 pt**, while
+Highlighter spans **16-124 pt**.
+With Text selected, the slider controls **12-124 pt** font size instead of
+stroke width. All three use whole-point values and remember their own size
+across tool switches and app restarts.
 
 ## More detail
 

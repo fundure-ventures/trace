@@ -295,10 +295,14 @@ enum TraceCanvasTool: String, Equatable {
 enum TraceStrokeWidthPolicy {
     static let minimum = 1.0
     static let maximum = 12.0
-    static let defaultValue = 5.25
+    static let defaultValue = 5.0
 
     static func minimum(for brush: TraceBrushKind) -> Double {
-        brush == .highlighter ? 8 : minimum
+        brush == .highlighter ? 16 : minimum
+    }
+
+    static func maximum(for brush: TraceBrushKind) -> Double {
+        brush == .highlighter ? 124 : maximum
     }
 
     static func clamped(
@@ -306,7 +310,19 @@ enum TraceStrokeWidthPolicy {
         brush: TraceBrushKind = .pen
     ) -> Double {
         let finiteWidth = width.isFinite ? width : defaultValue
-        return min(maximum, max(minimum(for: brush), finiteWidth))
+        return min(maximum(for: brush), max(minimum(for: brush), finiteWidth))
+            .rounded()
+    }
+}
+
+enum TraceTextSizePolicy {
+    static let minimum = 12
+    static let maximum = 124
+    static let defaultValue = 24
+
+    static func clamped(_ size: Double) -> Int {
+        let finiteSize = size.isFinite ? size : Double(defaultValue)
+        return Int(min(Double(maximum), max(Double(minimum), finiteSize)).rounded())
     }
 }
 
@@ -316,6 +332,7 @@ struct TraceToolState: Equatable {
     var brush: TraceBrushKind = .pen
     var penWidth: Double = TraceStrokeWidthPolicy.defaultValue
     var highlighterWidth: Double = TraceStrokeWidthPolicy.minimum(for: .highlighter)
+    var textSize: Int = TraceTextSizePolicy.defaultValue
     var gridStyle: TraceGridStyle = .none
     var gridSpacingPoints = TraceGridPolicy.defaultSpacingPoints
 
@@ -325,9 +342,12 @@ struct TraceToolState: Equatable {
         }
         set {
             if brush == .highlighter {
-                highlighterWidth = newValue
+                highlighterWidth = TraceStrokeWidthPolicy.clamped(
+                    newValue,
+                    brush: .highlighter
+                )
             } else {
-                penWidth = newValue
+                penWidth = TraceStrokeWidthPolicy.clamped(newValue)
             }
         }
     }
@@ -551,6 +571,10 @@ final class TraceAppModel {
             (defaults.object(forKey: "TraceHighlighterStrokeWidth") as? NSNumber)?
                 .doubleValue ?? TraceStrokeWidthPolicy.minimum(for: .highlighter),
             brush: .highlighter
+        )
+        toolState.textSize = TraceTextSizePolicy.clamped(
+            (defaults.object(forKey: "TraceTextSize") as? NSNumber)?
+                .doubleValue ?? Double(TraceTextSizePolicy.defaultValue)
         )
         if let rawGridStyle = defaults.string(
             forKey: "TraceGridStyle"
@@ -1318,6 +1342,7 @@ final class TraceAppModel {
             state.highlighterWidth,
             brush: .highlighter
         )
+        state.textSize = TraceTextSizePolicy.clamped(Double(state.textSize))
         state.gridSpacingPoints = TraceGridPolicy.clampedSpacing(
             state.gridSpacingPoints
         )
@@ -1343,6 +1368,9 @@ final class TraceAppModel {
                 state.highlighterWidth,
                 forKey: "TraceHighlighterStrokeWidth"
             )
+        }
+        if state.textSize != previous.textSize {
+            defaults.set(state.textSize, forKey: "TraceTextSize")
         }
         if gridStyleChanged || gridSpacingChanged {
             let defaults = defaults

@@ -1306,25 +1306,49 @@ enum TraceRetainedInkProbe {
         board.selectDrawingToolForPreview(at: 1)
         board.setStrokeWidthForPreview(1)
         guard selectedToolState?.width == 1,
-              board.drawingToolPresentationForPreview.minimumWidth == 1
+              board.drawingToolPresentationForPreview.minimumWidth == 1,
+              board.drawingToolPresentationForPreview.maximumWidth == 12,
+              board.drawingToolPresentationForPreview.valueLabel == "1"
         else {
             throw probeError("Pen toolbar did not allow a 1 pt stroke")
         }
         board.selectDrawingToolForPreview(at: 2)
         guard selectedToolState?.canvasTool == .highlighter,
-              selectedToolState?.width == 8,
-              board.drawingToolPresentationForPreview.minimumWidth == 8,
-              board.drawingToolPresentationForPreview.width == 8
+              selectedToolState?.width == 16,
+              board.drawingToolPresentationForPreview.minimumWidth == 16,
+              board.drawingToolPresentationForPreview.maximumWidth == 124,
+              board.drawingToolPresentationForPreview.width == 16
         else {
-            throw probeError("Highlighter toolbar did not clamp to 8 pt")
+            throw probeError("Highlighter toolbar did not clamp to 16 pt")
         }
         board.selectDrawingToolForPreview(at: 4)
         guard selectedToolState?.canvasTool.rawValue == "text",
               selectedToolState?.brush == .pen,
+              selectedToolState?.textSize == 24,
               board.drawingToolPresentationForPreview.selectedSegment == 4,
+              board.drawingToolPresentationForPreview.minimumWidth == 12,
+              board.drawingToolPresentationForPreview.maximumWidth == 124,
+              board.drawingToolPresentationForPreview.width == 24,
+              board.drawingToolPresentationForPreview.sliderLabel == "Font size",
               board.drawingToolAppearanceForPreview.selectedCount == 1
         else {
             throw probeError("Text toolbar action did not select opaque text")
+        }
+        board.setStrokeWidthForPreview(37.6)
+        guard selectedToolState?.textSize == 38,
+              selectedToolState?.penWidth == 1,
+              selectedToolState?.highlighterWidth == 16,
+              board.drawingToolPresentationForPreview.width == 38,
+              board.drawingToolPresentationForPreview.valueLabel == "38"
+        else {
+            throw probeError("Text slider did not use its own whole-point font size")
+        }
+        guard board.pressToolSizeArrowForPreview(124),
+              selectedToolState?.textSize == 39,
+              board.pressToolSizeArrowForPreview(123),
+              selectedToolState?.textSize == 38
+        else {
+            throw probeError("Text slider arrow keys must step by one point")
         }
         board.setTemporaryDrawingToolForPreview(.highlighter)
         guard board.drawingToolPresentationForPreview.selectedSegment == 2,
@@ -1334,6 +1358,7 @@ enum TraceRetainedInkProbe {
         }
         board.setTemporaryDrawingToolForPreview(nil)
         guard board.drawingToolPresentationForPreview.selectedSegment == 4,
+              board.drawingToolPresentationForPreview.width == 38,
               board.drawingToolAppearanceForPreview.selectedCount == 1
         else {
             throw probeError("Releasing the temporary tool did not restore Text")
@@ -1364,11 +1389,26 @@ enum TraceRetainedInkProbe {
             throw probeError("Switching back to Pen kept the highlighter minimum")
         }
         board.setStrokeWidthForPreview(2.25)
+        guard selectedToolState?.width == 2,
+              board.drawingToolPresentationForPreview.valueLabel == "2"
+        else {
+            throw probeError("Pen slider accepted a fractional point value")
+        }
         board.selectDrawingToolForPreview(at: 2)
-        board.setStrokeWidthForPreview(11)
-        for (index, width) in [(1, 2.25), (2, 11.0), (3, 2.25), (2, 11.0), (4, 2.25)] {
+        board.setStrokeWidthForPreview(21)
+        guard board.pressToolSizeArrowForPreview(124),
+              selectedToolState?.highlighterWidth == 22,
+              board.pressToolSizeArrowForPreview(123),
+              selectedToolState?.highlighterWidth == 21
+        else {
+            throw probeError("Highlighter slider arrow keys must step by one point")
+        }
+        for (index, width) in [(1, 2.0), (2, 21.0), (3, 2.0), (2, 21.0), (4, 38.0)] {
             board.selectDrawingToolForPreview(at: index)
-            guard selectedToolState?.width == width,
+            let displayedSize = index == 4
+                ? Double(selectedToolState?.textSize ?? -1)
+                : selectedToolState?.width ?? -1
+            guard displayedSize == width,
                   board.drawingToolPresentationForPreview.width == width
             else {
                 throw probeError("Toolbar tool \(index) did not restore its own \(width) pt width")
@@ -2979,6 +3019,7 @@ enum TraceRetainedInkProbe {
         }
         defaults.set(24, forKey: "TraceGridSpacingPixels")
         defaults.set(8.75, forKey: "TraceStrokeWidth")
+        defaults.set(61.5, forKey: "TraceTextSize")
         var transportCreated = false
         let previewModel = TraceAppModel(
             drawingStore: TraceDrawingStore(directoryURL: modelDirectory),
@@ -2993,7 +3034,8 @@ enum TraceRetainedInkProbe {
         guard !transportCreated,
               previewModel.toolState.gridSpacingPoints == 24,
               defaults.integer(forKey: "TraceGridSpacingPoints") == 24,
-              abs(previewModel.toolState.width - 8.75) < 0.001
+              previewModel.toolState.width == 9,
+              previewModel.toolState.textSize == 62
         else {
             throw probeError(
                 "tool preferences did not restore without Bluetooth"
@@ -3002,21 +3044,21 @@ enum TraceRetainedInkProbe {
         var firstHighlighter = previewModel.toolState
         firstHighlighter.canvasTool = .highlighter
         firstHighlighter.brush = .highlighter
-        guard firstHighlighter.width == 8 else {
+        guard firstHighlighter.width == 16 else {
             throw probeError("Highlighter inherited the legacy Drawing width")
         }
         var updatedToolState = previewModel.toolState
         updatedToolState.width = 10.25
+        updatedToolState.textSize = 125
         previewModel.updateToolState(updatedToolState)
         RunLoop.current.run(
             until: Date().addingTimeInterval(0.02)
         )
-        guard abs(
-                  defaults.double(forKey: "TraceStrokeWidth") - 10.25
-              ) < 0.001
+        guard defaults.double(forKey: "TraceStrokeWidth") == 10,
+              defaults.integer(forKey: "TraceTextSize") == 124
         else {
             throw probeError(
-                "stroke width did not persist after changing it"
+                "tool sizes did not persist after changing them"
             )
         }
         let reopenedModel = TraceAppModel(
@@ -3030,10 +3072,11 @@ enum TraceRetainedInkProbe {
         defer {
             reopenedModel.stop()
         }
-        guard abs(reopenedModel.toolState.width - 10.25) < 0.001
+        guard reopenedModel.toolState.width == 10,
+              reopenedModel.toolState.textSize == 124
         else {
             throw probeError(
-                "stroke width did not survive model recreation"
+                "tool sizes did not survive model recreation"
             )
         }
         var separateWidths = previewModel.toolState
@@ -3041,10 +3084,11 @@ enum TraceRetainedInkProbe {
         previewModel.updateToolState(separateWidths)
         separateWidths.canvasTool = .highlighter
         separateWidths.brush = .highlighter
-        separateWidths.width = 11
+        separateWidths.width = 21
         previewModel.updateToolState(separateWidths)
-        guard defaults.double(forKey: "TraceStrokeWidth") == 2.25,
-              defaults.double(forKey: "TraceHighlighterStrokeWidth") == 11
+        guard defaults.double(forKey: "TraceStrokeWidth") == 2,
+              defaults.double(forKey: "TraceHighlighterStrokeWidth") == 21,
+              defaults.integer(forKey: "TraceTextSize") == 124
         else {
             throw probeError("Drawing and Highlighter did not persist independently")
         }
@@ -3056,25 +3100,28 @@ enum TraceRetainedInkProbe {
         defer {
             separateWidthsModel.stop()
         }
-        guard separateWidthsModel.toolState.width == 2.25 else {
+        guard separateWidthsModel.toolState.width == 2 else {
             throw probeError("Drawing width was overwritten by Highlighter after restart")
         }
         var restoredHighlighter = separateWidthsModel.toolState
         restoredHighlighter.canvasTool = .highlighter
         restoredHighlighter.brush = .highlighter
         separateWidthsModel.updateToolState(restoredHighlighter)
-        guard separateWidthsModel.toolState.width == 11,
-              separateWidthsModel.toolState.resettingCanvasToPen.width == 2.25
+        guard separateWidthsModel.toolState.width == 21,
+              separateWidthsModel.toolState.resettingCanvasToPen.width == 2,
+              separateWidthsModel.toolState.textSize == 124
         else {
             throw probeError("Separate tool widths did not survive restart and tool reset")
         }
         for (brush, requested, expected) in [
             (TraceBrushKind.pen, 0.0, 1.0),
             (.pen, 1.0, 1.0),
-            (.highlighter, 1.0, 8.0),
-            (.highlighter, 8.0, 8.0),
-            (.highlighter, 20.0, 12.0),
-            (.highlighter, Double.nan, 8.0),
+            (.pen, 1.5, 2.0),
+            (.highlighter, 1.0, 16.0),
+            (.highlighter, 16.0, 16.0),
+            (.highlighter, 20.5, 21.0),
+            (.highlighter, 125.0, 124.0),
+            (.highlighter, Double.nan, 16.0),
             (.pen, 20.0, 12.0),
         ] {
             var state = previewModel.toolState
@@ -3087,6 +3134,13 @@ enum TraceRetainedInkProbe {
                     "\(brush) width \(requested) did not clamp to \(expected)"
                 )
             }
+        }
+        guard TraceTextSizePolicy.clamped(11) == 12,
+              TraceTextSizePolicy.clamped(12.5) == 13,
+              TraceTextSizePolicy.clamped(124.9) == 124,
+              TraceTextSizePolicy.clamped(.nan) == 24
+        else {
+            throw probeError("Text font size must use whole points between 12 and 124")
         }
         guard TracePenPreferences.hoverEnabled(from: defaults) == nil else {
             throw probeError("untouched hover preference was not optional")
