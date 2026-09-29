@@ -6,7 +6,10 @@ import TraceVoice
 
 enum ProductTldrawProbe {
     @MainActor
-    static func run(textToolsOnly: Bool = false) async throws {
+    static func run(
+        textToolsOnly: Bool = false,
+        framingOnly: Bool = false
+    ) async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(
@@ -52,6 +55,13 @@ enum ProductTldrawProbe {
         }
         if let reason = surface.unavailableReason {
             throw probeError("product tldraw unavailable: \(reason)")
+        }
+        if framingOnly {
+            try await verifyOffCenterDocumentFraming(
+                surface,
+                directory: directory
+            )
+            return
         }
 
         let document = TraceDrawingSession(
@@ -2042,6 +2052,97 @@ enum ProductTldrawProbe {
             throw probeError(
                 "tldraw failure did not surface an explicit error"
             )
+        }
+    }
+
+    @MainActor
+    private static func verifyOffCenterDocumentFraming(
+        _ surface: TldrawProductCanvasView,
+        directory: URL
+    ) async throws {
+        let document = TraceDrawingSession(
+            manifest: TraceDrawingManifest(
+                id: UUID(),
+                createdAt: Date(),
+                updatedAt: Date(),
+                sourceApplicationName: "Trace Probe",
+                sourceWindowTitle: "Off-center framing",
+                screenshotFileName: "off-center.png",
+                screenshotPixelWidth: 900,
+                screenshotPixelHeight: 650,
+                sourceWindowBounds: TraceRect(
+                    x: 0,
+                    y: 0,
+                    width: 900,
+                    height: 650
+                ),
+                pageKind: .blank,
+                backgroundColor: TraceRGBAColor(
+                    red: 1,
+                    green: 1,
+                    blue: 1
+                ),
+                viewport: TracePageViewport.full,
+                strokes: []
+            ),
+            screenshot: solidImage(
+                color: .white,
+                size: NSSize(width: 900, height: 650)
+            ),
+            packageURL: directory
+        )
+        surface.setDocument(document, toolState: TraceToolState())
+        try await waitUntil("off-center framing document") {
+            guard let state = await surface.stateForTesting() else {
+                return false
+            }
+            return (state["shapeCount"] as? NSNumber)?.intValue == 0
+                && (state["pageWidth"] as? NSNumber)?.intValue == 900
+                && (state["pageHeight"] as? NSNumber)?.intValue == 650
+        }
+        guard surface.insertImage(
+            solidImage(
+                color: .systemBlue,
+                size: NSSize(width: 240, height: 120)
+            )
+        ) else {
+            throw probeError(
+                "could not insert the off-center framing image"
+            )
+        }
+        try await waitUntil("off-center framing image") {
+            (await surface.stateForTesting()?["userImageCount"]
+                as? NSNumber)?.intValue == 1
+        }
+        guard await surface.setFirstUserImagePositionForTesting(
+                  x: 1_200,
+                  y: 280
+              )
+        else {
+            throw probeError(
+                "could not move the off-center framing image"
+            )
+        }
+        guard let snapshot = await surface.snapshotForTesting() else {
+            throw probeError(
+                "could not save the off-center framing fixture"
+            )
+        }
+        document.tldrawSnapshotJSON = snapshot
+        surface.setDocument(document, toolState: TraceToolState())
+        try await waitUntil("off-center document framing") {
+            guard let state = await surface.stateForTesting(),
+                  let viewportCenterX = (
+                    state["viewportCenterX"] as? NSNumber
+                  )?.doubleValue,
+                  let viewportCenterY = (
+                    state["viewportCenterY"] as? NSNumber
+                  )?.doubleValue
+            else {
+                return false
+            }
+            return abs(viewportCenterX - 1_320) < 0.5
+                && abs(viewportCenterY - 340) < 0.5
         }
     }
 

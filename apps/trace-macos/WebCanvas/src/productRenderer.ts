@@ -1025,8 +1025,9 @@ export function installTraceProductRenderer(editor: Editor): () => void {
           positive(viewportHeight, 1),
         ),
       )
+      const contentBounds = documentContentBounds(editor)
       editor.zoomToBounds(
-        new Box(0, 0, pageWidth, pageHeight),
+        contentBounds ?? new Box(0, 0, pageWidth, pageHeight),
         {
           inset: 0,
           animation: { duration: 0 },
@@ -2645,6 +2646,31 @@ function exportContributorBounds(
     })
   }
   return bounds
+}
+
+function documentContentBounds(editor: Editor): Box | null {
+  const bounds = exportContributorBounds(
+    editor,
+    exportableShapes(editor),
+  )
+  if (bounds.length === 0) return null
+
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  for (const bound of bounds) {
+    minX = Math.min(minX, bound.x)
+    minY = Math.min(minY, bound.y)
+    maxX = Math.max(maxX, bound.x + bound.width)
+    maxY = Math.max(maxY, bound.y + bound.height)
+  }
+  return new Box(
+    minX,
+    minY,
+    positive(maxX - minX, 1),
+    positive(maxY - minY, 1),
+  )
 }
 
 function snapshotJson(editor: Editor): string {

@@ -387,7 +387,7 @@ final class TraceAppDelegate:
     func applicationDidFinishLaunching(_ notification: Notification) {
 #if DEBUG
         let environment = ProcessInfo.processInfo.environment
-        let runsProductProbe = ["1", "text"].contains(
+        let runsProductProbe = ["1", "text", "framing"].contains(
             environment["TRACE_PRODUCT_TLDRAW_PROBE"] ?? ""
         )
         let isUIPreview = environment["TRACE_UI_SNAPSHOT"] != nil
@@ -414,7 +414,9 @@ final class TraceAppDelegate:
                 do {
                     try await ProductTldrawProbe.run(
                         textToolsOnly:
-                            environment["TRACE_PRODUCT_TLDRAW_PROBE"] == "text"
+                            environment["TRACE_PRODUCT_TLDRAW_PROBE"] == "text",
+                        framingOnly:
+                            environment["TRACE_PRODUCT_TLDRAW_PROBE"] == "framing"
                     )
                     print("product tldraw probe passed")
                     NSApp.terminate(nil)
