@@ -1667,3 +1667,4 @@ private final class ProductRendererSchemeHandler:
         }
     }
 }
+

@@ -203,7 +203,7 @@ enum ProductTldrawProbe {
               state["color"] as? String == "green",
               abs(
                   ((state["opacity"] as? NSNumber)?.doubleValue ?? 0)
-                      - 0.5
+                      - 0.6
               ) < 0.001,
               abs(
                   ((state["width"] as? NSNumber)?.doubleValue ?? 0)
@@ -212,11 +212,20 @@ enum ProductTldrawProbe {
               (state["drawWidths"] as? [NSNumber])?.contains(where: {
                   abs($0.doubleValue - 7.5) < 0.001
               }) == true,
-              (state["drawOpacities"] as? [NSNumber])?.contains(where: {
-                  abs($0.doubleValue - 0.5) < 0.001
-              }) == true,
-              (state["drawColors"] as? [String])?.contains("green")
-                  == true,
+              let drawOpacities = state["drawOpacities"] as? [NSNumber],
+              let drawColors = state["drawColors"] as? [String],
+              drawColors.contains("light-green"),
+              zip(drawColors, drawOpacities).allSatisfy({
+                  abs(
+                      $1.doubleValue - ($0 == "light-green" ? 0.6 : 1)
+                  ) < 0.001
+              }),
+              let inkColors = state["inkColors"] as? [String: String],
+              let highlighterColors =
+                state["highlighterColors"] as? [String: String],
+              let derivedGreen = inkColors["green"],
+              derivedGreen != "#099268",
+              highlighterColors["green"] != derivedGreen,
               (state["annotationCount"] as? NSNumber)?.intValue == 0,
               (state["lockedPenCount"] as? NSNumber)?.intValue == 1,
               state["derivedLayersAtBack"] as? Bool == true,
@@ -257,7 +266,7 @@ enum ProductTldrawProbe {
                     == 1
                 && abs(annotationWidth - annotationHeight) < 0.001
                 && annotationWidth <= 26
-                && center["fill"] as? String == "#099268"
+                && center["fill"] as? String == derivedGreen
                 && center["textColor"] as? String == "#ffffff"
                 && center["fontFamily"] as? String
                     == "-apple-system, BlinkMacSystemFont, sans-serif"
@@ -990,6 +999,8 @@ enum ProductTldrawProbe {
             return state["selectedTool"] as? String == "select"
                 && state["productTool"] as? String == "select"
                 && drawCount > drawCountBeforeTemporaryDraw
+                && (state["drawColors"] as? [String])?.last
+                    == "light-green"
                 && temporaryTools.last == "none"
         }
         guard let rectangleKey = await surface.keyboardEventForTesting(
@@ -2510,7 +2521,7 @@ enum ProductTldrawProbe {
         try await waitUntil("Highlighter before screenshot capture") {
             let state = await surface.stateForTesting()
             return state?["productTool"] as? String == "highlighter"
-                && (state?["opacity"] as? NSNumber)?.doubleValue == 0.5
+                && (state?["opacity"] as? NSNumber)?.doubleValue == 0.6
         }
 
         let manifest = TraceDrawingManifest(

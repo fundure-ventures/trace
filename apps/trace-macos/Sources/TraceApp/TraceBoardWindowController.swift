@@ -4865,10 +4865,12 @@ private final class FloatingAnnotationToolbar:
     }
 
     private func syncControls() {
+        let activeTool = temporaryCanvasTool ?? toolState.canvasTool
         for swatch in swatches {
             swatch.isSelected = swatch.traceColor == toolState.color
+            swatch.isDimmed = activeTool == .highlighter
         }
-        switch temporaryCanvasTool ?? toolState.canvasTool {
+        switch activeTool {
         case .select:
             brushControl.selectedSegment = 0
         case .pen:
@@ -6599,6 +6601,12 @@ private final class ColorSwatchButton: NSButton {
         }
     }
 
+    var isDimmed = false {
+        didSet {
+            updateAppearance()
+        }
+    }
+
     init(name: String, color: TraceRGBAColor) {
         traceColor = color
         super.init(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
@@ -6669,7 +6677,8 @@ private final class ColorSwatchButton: NSButton {
 
     private func updateAppearance() {
         let highlighted = isSelected || isHovered
-        layer?.backgroundColor = NSColor(traceColor).cgColor
+        layer?.backgroundColor = NSColor(traceColor)
+            .withAlphaComponent(isDimmed ? 0.6 : 1).cgColor
         layer?.borderWidth = highlighted ? 2.5 : 1
         layer?.borderColor = (
             highlighted

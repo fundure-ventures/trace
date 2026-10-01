@@ -14,10 +14,19 @@ const iconSpriteOutput = fileURLToPath(
   new URL('./dist/icon-sprite.svg', import.meta.url),
 )
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url))
+const browserNodeStubs = fileURLToPath(
+  new URL('./src/browserNodeStubs.ts', import.meta.url),
+)
 
 export default defineConfig({
   base: './',
   envDir: repositoryRoot,
+  resolve: {
+    alias: [
+      { find: /^module$/, replacement: browserNodeStubs },
+      { find: /^fs$/, replacement: browserNodeStubs },
+    ],
+  },
   plugins: [
     react(),
     viteSingleFile(),

@@ -4,6 +4,11 @@ import { type Editor, Tldraw } from 'tldraw'
 import { installTraceProductRenderer } from './productRenderer'
 import { installTraceRenderer, reportTraceError } from './traceRenderer'
 import { TraceAnnotationShapeUtil } from './traceAnnotationShape'
+import {
+  TraceDrawShapeUtil,
+  TraceGeoShapeUtil,
+  TraceTextShapeUtil,
+} from './traceInkShapes'
 
 const importedAssetUrls = getAssetUrlsByImport()
 const assetUrls = {
@@ -15,7 +20,12 @@ const assetUrls = {
     ]),
   ),
 }
-const shapeUtils = [TraceAnnotationShapeUtil]
+const shapeUtils = [
+  TraceAnnotationShapeUtil,
+  TraceDrawShapeUtil,
+  TraceGeoShapeUtil,
+  TraceTextShapeUtil,
+]
 
 // Product rendering is tldraw-only; production license provisioning is external.
 export function App() {
