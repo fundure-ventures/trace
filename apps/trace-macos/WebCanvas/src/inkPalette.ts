@@ -29,6 +29,13 @@ const RELATIVE_CONTRAST = 0.6
 const HIGHLIGHTER_MIX = 0.25
 export const HIGHLIGHTER_OPACITY = 0.6
 const LIGHTNESS_STEP = 0.01
+// Hue offsets from the page that rampa's harmonies produce (analogous,
+// square, triadic, split-complementary, complementary), measured in OKLCH.
+export const HARMONY_OFFSETS = [0, 30, 90, 120, 150, 180, 210, 240, 270, 330] as const
+// Inks only lean toward the nearest harmony so red still reads as red.
+export const MAX_HUE_SHIFT = 8
+// Below this OKLCH chroma the page is effectively grey and has no hue.
+const NEUTRAL_CHROMA = 0.02
 
 export interface InkPalette {
   ink: Record<InkName, string>
@@ -50,8 +57,14 @@ export function deriveInkPalette(background: string | null): InkPalette {
     ink: { ...INK_ANCHORS },
     highlighter: { ...INK_ANCHORS },
   }
+  const pageColor = color(page).oklch
+  const pageHue = pageColor.c < NEUTRAL_CHROMA ? null : pageColor.h
   for (const name of INK_NAMES) {
-    const tinted = color(INK_ANCHORS[name]).mix(page, BACKGROUND_TINT, 'oklab')
+    const blended = color(INK_ANCHORS[name]).mix(page, BACKGROUND_TINT, 'oklab')
+    const tinted =
+      pageHue === null
+        ? blended
+        : blended.set({ hue: harmonizedHue(blended.oklch.h, pageHue) })
     const lightness = tinted.oklch.l
     let ink = tinted.hex
     for (
@@ -91,6 +104,16 @@ function isInkName(name: string): name is InkName {
 export function inkNameForColor(name: TLDefaultColorStyle): TLDefaultColorStyle {
   const ink = INK_NAMES.find((candidate) => HIGHLIGHTER_COLOR_NAMES[candidate] === name)
   return ink ?? name
+}
+
+function harmonizedHue(hue: number, pageHue: number): number {
+  const nearest = HARMONY_OFFSETS.map((offset) => signedHueDelta(hue, pageHue + offset))
+    .reduce((best, delta) => (Math.abs(delta) < Math.abs(best) ? delta : best))
+  return hue + Math.sign(nearest) * Math.min(Math.abs(nearest), MAX_HUE_SHIFT)
+}
+
+function signedHueDelta(from: number, to: number): number {
+  return ((to - from + 540) % 360) - 180
 }
 
 function clamp(lightness: number): number {
