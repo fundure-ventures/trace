@@ -3285,10 +3285,12 @@ private final class FloatingAnnotationToolbar:
         NSColor.systemRed.withAlphaComponent(0.78)
 
     private var toolbarAccentColor: NSColor {
-        let accent = NSColor.controlAccentColor.resolvedColor(
-            with: effectiveAppearance
-        )
-        return accent.usingColorSpace(.deviceRGB) ?? accent
+        var accent = NSColor.controlAccentColor
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            accent = NSColor.controlAccentColor.usingColorSpace(.deviceRGB)
+                ?? .controlAccentColor
+        }
+        return accent
     }
 
     var onToolChange: ((TraceToolState) -> Void)?
