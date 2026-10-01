@@ -24,9 +24,9 @@ const HIGHLIGHTER_COLOR_NAMES: Record<InkName, TLDefaultColorStyle> = {
 const BACKGROUND_TINT = 0.15
 const MIN_CONTRAST = 30
 const RELATIVE_CONTRAST = 0.6
-// A light page tint plus alpha keeps the old 60%-toward-page look on empty
+// A light page tint plus alpha keeps a soft highlighter look on empty
 // page while letting screenshots show through.
-const HIGHLIGHTER_MIX = 0.3
+const HIGHLIGHTER_MIX = 0.25
 export const HIGHLIGHTER_OPACITY = 0.6
 const LIGHTNESS_STEP = 0.01
 

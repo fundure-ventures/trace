@@ -71,8 +71,8 @@ test('highlighter is a lightly tinted ink between the ink and the background', (
     assert.match(palette.highlighter[name], /^#[0-9a-f]{6}$/)
     assert.ok(highlighter > ink && highlighter < page, `${name} ${palette.highlighter[name]}`)
     assert.ok(
-      Math.abs(highlighter - (ink + (page - ink) * 0.3)) < 0.03,
-      `${name} highlighter should sit 30% toward the page`,
+      Math.abs(highlighter - (ink + (page - ink) * 0.25)) < 0.01,
+      `${name} highlighter should sit 25% toward the page`,
     )
   }
 })
