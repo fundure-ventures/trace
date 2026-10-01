@@ -3263,7 +3263,9 @@ private final class ToolbarAccentSegmentedCell: NSSegmentedCell {
         NSColor.controlAccentColor.setFill()
         NSBezierPath(roundedRect: frame, xRadius: 6, yRadius: 6).fill()
         let symbol = image.withSymbolConfiguration(
-            NSImage.SymbolConfiguration(paletteColors: [.white])
+            image.symbolConfiguration.applying(
+                NSImage.SymbolConfiguration(paletteColors: [.white])
+            )
         ) ?? image
         let size = symbol.size
         symbol.draw(in: NSRect(
