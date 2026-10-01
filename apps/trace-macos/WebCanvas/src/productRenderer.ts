@@ -29,6 +29,14 @@ import {
 import { AssetRecordType } from '@tldraw/tlschema'
 import { postToTraceHost, reportTraceError } from './traceRenderer'
 import {
+  colorNameForStroke,
+  deriveInkPalette,
+  highlighterColorName,
+  INK_NAMES,
+  inkNameForColor,
+} from './inkPalette'
+import { applyInkPalette } from './traceInkShapes'
+import {
   TRACE_ANNOTATION_SHAPE_TYPE,
   type TraceAnnotationShape,
 } from './traceAnnotationShape'
@@ -865,10 +873,10 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       const tool = temporaryDrawActive ? temporaryDrawTool() : currentTool
       return {
         ...shape,
-        opacity: opacityForProductTool(tool),
+        opacity: 1,
         props: {
           ...shape.props,
-          color: tool.color,
+          color: colorNameForStroke(tool.color, tool.tool === 'highlighter'),
           size: 'm',
           scale: scaleForWidth(widthForProductTool(tool)),
         },
@@ -1602,7 +1610,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
           .filter((shape): shape is TLTextShape => shape.type === 'text')
           .map((shape) => FONT_SIZES[shape.props.size] * shape.props.scale),
         color: currentTool.color,
-        opacity: opacityForProductTool(currentTool),
+        opacity: editor.getInstanceState().opacityForNextShape,
         width: widthForProductTool(currentTool),
         textSize: currentTool.textSize,
         gridStyle: currentTool.gridStyle,
@@ -1614,6 +1622,18 @@ export function installTraceProductRenderer(editor: Editor): () => void {
         ),
         drawOpacities: drawShapes.map((shape) => shape.opacity),
         drawColors: drawShapes.map((shape) => shape.props.color),
+        inkColors: Object.fromEntries(
+          INK_NAMES.map((name) => [
+            name,
+            DefaultColorThemePalette.lightMode[name].solid,
+          ]),
+        ),
+        highlighterColors: Object.fromEntries(
+          INK_NAMES.map((name) => [
+            name,
+            DefaultColorThemePalette.lightMode[highlighterColorName(name)].solid,
+          ]),
+        ),
         lastExportPlan,
       }
     },
@@ -1833,7 +1853,8 @@ function applyTool(
   tool: ProductTool,
   selectTool = true,
 ): void {
-  editor.setStyleForNextShapes(DefaultColorStyle, tool.color, {
+  const color = colorNameForStroke(tool.color, tool.tool === 'highlighter')
+  editor.setStyleForNextShapes(DefaultColorStyle, color, {
     history: 'ignore',
   })
   editor.setStyleForNextShapes(DefaultFillStyle, 'none', {
@@ -1842,12 +1863,12 @@ function applyTool(
   editor.setStyleForNextShapes(DefaultSizeStyle, 'm', {
     history: 'ignore',
   })
-  editor.setOpacityForNextShapes(opacityForProductTool(tool), {
+  editor.setOpacityForNextShapes(1, {
     history: 'ignore',
   })
-  editor.setStyleForSelectedShapes(DefaultColorStyle, tool.color)
+  editor.setStyleForSelectedShapes(DefaultColorStyle, color)
   editor.setStyleForSelectedShapes(DefaultSizeStyle, 'm')
-  editor.setOpacityForSelectedShapes(opacityForProductTool(tool))
+  editor.setOpacityForSelectedShapes(1)
   const scale = scaleForWidth(widthForProductTool(tool))
   const selectedDrawShapes = editor
     .getSelectedShapes()
@@ -1918,7 +1939,7 @@ function upsertProductStroke(
   const originX = Math.min(...pagePoints.map((point) => point.x))
   const originY = Math.min(...pagePoints.map((point) => point.y))
   const props: TLDrawShape['props'] = {
-    color: stroke.color,
+    color: colorNameForStroke(stroke.color, stroke.brush === 'highlighter'),
     fill: 'none',
     dash: 'draw',
     size: 'm',
@@ -1937,7 +1958,7 @@ function upsertProductStroke(
       type: 'draw',
       x: originX,
       y: originY,
-      opacity: opacityForBrush(stroke.brush),
+      opacity: 1,
       isLocked: locked,
       props,
     })
@@ -1947,7 +1968,7 @@ function upsertProductStroke(
       type: 'draw',
       x: originX,
       y: originY,
-      opacity: opacityForBrush(stroke.brush),
+      opacity: 1,
       isLocked: locked,
       props,
     })
@@ -2033,7 +2054,7 @@ function userTimedShapeGeometry(
       start,
       direction,
       pathLength: 2 * (width + height),
-      color: shape.props.color,
+      color: inkNameForColor(shape.props.color),
     }
   }
 
@@ -2070,7 +2091,7 @@ function userTimedShapeGeometry(
     start,
     direction,
     pathLength,
-    color: shape.props.color,
+    color: inkNameForColor(shape.props.color),
   }
 }
 
@@ -2321,6 +2342,9 @@ function setCanvasBackground(
   } else {
     container.style.removeProperty('--tl-color-background')
   }
+  const palette = deriveInkPalette(color)
+  applyInkPalette(palette)
+  postToTraceHost({ type: 'product-ink-palette', ...palette })
 }
 
 function removeBackground(
@@ -2559,14 +2583,6 @@ function makeSegments(
     type: 'free' as const,
     path: b64Vecs.encodePoints(points),
   }))
-}
-
-function opacityForBrush(brush: ProductBrush): number {
-  return brush === 'highlighter' ? 0.5 : 1
-}
-
-function opacityForProductTool(tool: ProductTool): number {
-  return tool.tool === 'highlighter' ? 0.5 : 1
 }
 
 function widthForProductTool(tool: ProductTool): number {

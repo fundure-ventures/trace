@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@basiclines/rampa-sdk": "6.0.0",
     "@tldraw/assets": "4.5.12",
     "@tldraw/tlschema": "4.5.12",
     "react": "19.2.1",
