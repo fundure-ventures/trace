@@ -3273,7 +3273,7 @@ private final class ToolbarAccentSegmentedCell: NSSegmentedCell {
             y: frame.midY - size.height / 2,
             width: size.width,
             height: size.height
-        ).integral)
+        ))
     }
 }
 
