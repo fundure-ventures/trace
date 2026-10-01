@@ -3249,31 +3249,25 @@ private final class ToolbarActionHoverView: NSView {
 // controls grey regardless of their accent colors, so the cells below paint
 // the accent themselves to look the same in both states.
 private final class ToolbarAccentSegmentedCell: NSSegmentedCell {
+    override func interiorBackgroundStyle(forSegment segment: Int)
+        -> NSView.BackgroundStyle
+    {
+        isSelected(forSegment: segment)
+            ? .emphasized
+            : super.interiorBackgroundStyle(forSegment: segment)
+    }
+
     override func drawSegment(
         _ segment: Int,
         inFrame frame: NSRect,
         with controlView: NSView
     ) {
-        guard isSelected(forSegment: segment),
-              let image = image(forSegment: segment)
-        else {
-            super.drawSegment(segment, inFrame: frame, with: controlView)
-            return
+        if isSelected(forSegment: segment) {
+            NSColor.controlAccentColor.setFill()
+            let pill = frame.insetBy(dx: 1, dy: 1)
+            NSBezierPath(roundedRect: pill, xRadius: 5, yRadius: 5).fill()
         }
-        NSColor.controlAccentColor.setFill()
-        NSBezierPath(roundedRect: frame, xRadius: 6, yRadius: 6).fill()
-        let symbol = image.withSymbolConfiguration(
-            image.symbolConfiguration.applying(
-                NSImage.SymbolConfiguration(paletteColors: [.white])
-            )
-        ) ?? image
-        let size = symbol.size
-        symbol.draw(in: NSRect(
-            x: frame.midX - size.width / 2,
-            y: frame.midY - size.height / 2,
-            width: size.width,
-            height: size.height
-        ))
+        super.drawSegment(segment, inFrame: frame, with: controlView)
     }
 }
 
