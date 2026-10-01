@@ -517,8 +517,8 @@ public enum TraceGridStyle:
     case none
     case dots
     case square
-    case horizontal
-    case vertical
+    case rows
+    case cols
 }
 
 public enum TraceGridControlPolicy {
@@ -529,9 +529,9 @@ public enum TraceGridControlPolicy {
         case 2:
             return .square
         case 3:
-            return .horizontal
+            return .rows
         case 4:
-            return .vertical
+            return .cols
         default:
             return .none
         }
@@ -545,9 +545,9 @@ public enum TraceGridControlPolicy {
             return 1
         case .square:
             return 2
-        case .horizontal:
+        case .rows:
             return 3
-        case .vertical:
+        case .cols:
             return 4
         }
     }

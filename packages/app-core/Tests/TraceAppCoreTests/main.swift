@@ -925,8 +925,8 @@ test("grid control keeps an explicit no-grid segment") {
         .none,
         .dots,
         .square,
-        .horizontal,
-        .vertical,
+        .rows,
+        .cols,
     ]
     try expect(
         styles.enumerated().allSatisfy {

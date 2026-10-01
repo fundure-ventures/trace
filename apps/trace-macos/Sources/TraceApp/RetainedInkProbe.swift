@@ -1518,12 +1518,12 @@ enum TraceRetainedInkProbe {
         board.onToolChange = { state in
             selectedGridStyle = state.gridStyle
         }
-        board.selectGridStyleForPreview(.horizontal)
+        board.selectGridStyleForPreview(.rows)
         let selectedGrid = board.gridSelectorPresentationForPreview
         let selectedGridSizing = board.toolbarSizingForPreview
-        guard selectedGridStyle == .horizontal,
+        guard selectedGridStyle == .rows,
               selectedGrid.selectedTitle == "Rows",
-              selectedGrid.selectedStyle == .horizontal,
+              selectedGrid.selectedStyle == .rows,
               selectedGridSizing.active.spacingVisible
         else {
             throw probeError(
@@ -2069,8 +2069,8 @@ enum TraceRetainedInkProbe {
         for style in [
             TraceGridStyle.dots,
             .square,
-            .horizontal,
-            .vertical,
+            .rows,
+            .cols,
         ] {
             let lightGrid = TraceGridContrastPolicy.gridColor(
                 for: .white,
@@ -2099,8 +2099,8 @@ enum TraceRetainedInkProbe {
         let styles: [TraceGridStyle] = [
             .dots,
             .square,
-            .horizontal,
-            .vertical,
+            .rows,
+            .cols,
         ]
         let iterations = 160
         let finalStyle = styles[(iterations - 1) % styles.count]

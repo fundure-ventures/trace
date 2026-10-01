@@ -58,8 +58,8 @@ export type ProductGrid =
   | 'none'
   | 'dots'
   | 'square'
-  | 'horizontal'
-  | 'vertical'
+  | 'rows'
+  | 'cols'
 
 export interface ProductPoint {
   x: number
