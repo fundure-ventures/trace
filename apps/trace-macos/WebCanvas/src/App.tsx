@@ -7,6 +7,7 @@ import { TraceAnnotationShapeUtil } from './traceAnnotationShape'
 import {
   TraceDrawShapeUtil,
   TraceGeoShapeUtil,
+  TraceShapeWrapper,
   TraceTextShapeUtil,
 } from './traceInkShapes'
 
@@ -20,6 +21,7 @@ const assetUrls = {
     ]),
   ),
 }
+const components = { ShapeWrapper: TraceShapeWrapper }
 const shapeUtils = [
   TraceAnnotationShapeUtil,
   TraceDrawShapeUtil,
@@ -62,6 +64,7 @@ export function App() {
   return (
     <Tldraw
       assetUrls={assetUrls}
+      components={components}
       hideUi={productMode}
       onMount={handleMount}
       shapeUtils={shapeUtils}

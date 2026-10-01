@@ -214,6 +214,10 @@ enum ProductTldrawProbe {
               }) == true,
               (state["drawColors"] as? [String])?.contains("light-green")
                   == true,
+              let drawColors = state["drawColors"] as? [String],
+              state["drawBlendModes"] as? [String] == drawColors.map({
+                  $0 == "light-green" ? "multiply" : "normal"
+              }),
               let inkColors = state["inkColors"] as? [String: String],
               let highlighterColors =
                 state["highlighterColors"] as? [String: String],

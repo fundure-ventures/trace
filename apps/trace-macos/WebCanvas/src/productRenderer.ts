@@ -245,6 +245,7 @@ export interface TraceProductRendererBridge {
     gridSpacing: number
     drawWidths: number[]
     drawOpacities: number[]
+    drawBlendModes: string[]
     drawColors: TLDefaultColorStyle[]
     lastExportPlan: TraceImageExportPlan | null
   }
@@ -1621,6 +1622,12 @@ export function installTraceProductRenderer(editor: Editor): () => void {
               * shape.props.scale,
         ),
         drawOpacities: drawShapes.map((shape) => shape.opacity),
+        drawBlendModes: drawShapes.map((shape) => {
+          const element = editor
+            .getContainer()
+            .querySelector<HTMLElement>(`.tl-shape[data-shape-id="${shape.id}"]`)
+          return element ? getComputedStyle(element).mixBlendMode : 'unmounted'
+        }),
         drawColors: drawShapes.map((shape) => shape.props.color),
         inkColors: Object.fromEntries(
           INK_NAMES.map((name) => [
@@ -2811,7 +2818,11 @@ function addExportBackground(
   background.setAttribute('width', String(bounds.width))
   background.setAttribute('height', String(bounds.height))
   background.setAttribute('fill', color)
-  const firstRenderedChild = Array.from(svg.children)
-    .find((child) => child.localName !== 'defs')
-  svg.insertBefore(background, firstRenderedChild ?? null)
+  // Matches the canvas: highlighter blends reach shapes, not the page.
+  const shapes = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+  shapes.style.isolation = 'isolate'
+  shapes.append(
+    ...Array.from(svg.children).filter((child) => child.localName !== 'defs'),
+  )
+  svg.append(background, shapes)
 }

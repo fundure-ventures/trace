@@ -8,6 +8,7 @@ import {
   INK_ANCHORS,
   INK_NAMES,
   inkNameForColor,
+  isHighlighterColor,
 } from '../src/inkPalette.ts'
 
 const contrast = (foreground: string, background: string) =>
@@ -89,4 +90,21 @@ test('highlighter strokes use dedicated tldraw color names that map back to inks
     assert.equal(colorNameForStroke(name, false), name)
   }
   assert.equal(colorNameForStroke('black', true), 'black')
+})
+
+test('highlighter blends like a marker on light pages and glows on dark pages', () => {
+  for (const background of ['#ffffff', '#fde68a', null]) {
+    assert.equal(deriveInkPalette(background).highlighterBlend, 'multiply', String(background))
+  }
+  for (const background of ['#111111', '#1e3a8a']) {
+    assert.equal(deriveInkPalette(background).highlighterBlend, 'screen', background)
+  }
+})
+
+test('only highlighter color names blend', () => {
+  for (const name of INK_NAMES) {
+    assert.equal(isHighlighterColor(highlighterColorName(name)), true, name)
+    assert.equal(isHighlighterColor(name), false, name)
+  }
+  assert.equal(isHighlighterColor('black'), false)
 })

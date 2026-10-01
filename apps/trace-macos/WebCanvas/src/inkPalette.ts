@@ -27,9 +27,13 @@ const RELATIVE_CONTRAST = 0.6
 const HIGHLIGHTER_MIX = 0.6
 const LIGHTNESS_STEP = 0.01
 
+export type HighlighterBlend = 'multiply' | 'screen'
+
 export interface InkPalette {
   ink: Record<InkName, string>
   highlighter: Record<InkName, string>
+  // Lets content under a highlighter (screenshots, images) show through.
+  highlighterBlend: HighlighterBlend
 }
 
 export function deriveInkPalette(background: string | null): InkPalette {
@@ -46,6 +50,7 @@ export function deriveInkPalette(background: string | null): InkPalette {
   const palette: InkPalette = {
     ink: { ...INK_ANCHORS },
     highlighter: { ...INK_ANCHORS },
+    highlighterBlend: direction < 0 ? 'multiply' : 'screen',
   }
   for (const name of INK_NAMES) {
     const tinted = color(INK_ANCHORS[name]).mix(page, BACKGROUND_TINT, 'oklab')
@@ -79,6 +84,10 @@ export function colorNameForStroke(
 
 function isInkName(name: string): name is InkName {
   return (INK_NAMES as readonly string[]).includes(name)
+}
+
+export function isHighlighterColor(name: TLDefaultColorStyle): boolean {
+  return Object.values(HIGHLIGHTER_COLOR_NAMES).includes(name)
 }
 
 export function inkNameForColor(name: TLDefaultColorStyle): TLDefaultColorStyle {
