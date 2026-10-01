@@ -17,7 +17,6 @@ final class TldrawProductCanvasView:
     var onUserEdit: ((Int) -> Void)?
     var onToolChange: ((TraceCanvasTool) -> Void)?
     var onTemporaryToolChange: ((TraceCanvasTool?) -> Void)?
-    var onInkPaletteChange: ((TraceInkPalette) -> Void)?
     private(set) var unavailableReason: String?
     private(set) var canUndo = false
     private(set) var canRedo = false
@@ -957,10 +956,6 @@ final class TldrawProductCanvasView:
             } else {
                 onTemporaryToolChange?(nil)
             }
-        case "product-ink-palette":
-            if let palette = TraceInkPalette(message: body) {
-                onInkPaletteChange?(palette)
-            }
         case "product-export-resolution":
             guard isCurrentDocumentMessage(body) else {
                 return
@@ -1673,40 +1668,3 @@ private final class ProductRendererSchemeHandler:
     }
 }
 
-/// Drawing colors the web canvas derived from the page background,
-/// keyed by tldraw color name.
-struct TraceInkPalette: Equatable {
-    let ink: [String: NSColor]
-    let highlighter: [String: NSColor]
-
-    init?(message body: [String: Any]) {
-        guard let ink = Self.colors(body["ink"]),
-              let highlighter = Self.colors(body["highlighter"])
-        else {
-            return nil
-        }
-        self.ink = ink
-        self.highlighter = highlighter
-    }
-
-    private static func colors(_ value: Any?) -> [String: NSColor]? {
-        guard let hexes = value as? [String: String] else {
-            return nil
-        }
-        return hexes.compactMapValues(color(hex:))
-    }
-
-    private static func color(hex: String) -> NSColor? {
-        guard hex.hasPrefix("#"), hex.count == 7,
-              let value = UInt32(hex.dropFirst(), radix: 16)
-        else {
-            return nil
-        }
-        return NSColor(
-            srgbRed: CGFloat((value >> 16) & 0xff) / 255,
-            green: CGFloat((value >> 8) & 0xff) / 255,
-            blue: CGFloat(value & 0xff) / 255,
-            alpha: 1
-        )
-    }
-}

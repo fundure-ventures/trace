@@ -85,11 +85,6 @@ export type TraceRendererHostMessage =
     }
   | { type: 'product-edit'; documentId: string; count: number }
   | {
-      type: 'product-ink-palette'
-      ink: Record<string, string>
-      highlighter: Record<string, string>
-    }
-  | {
       type: 'product-tool-change'
       documentId: string
       tool: 'select' | 'pen' | 'highlighter' | 'rectangle' | 'text'

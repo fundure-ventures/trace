@@ -252,10 +252,6 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
             [weak self] tool in
             self?.annotationToolbar.setTemporaryCanvasTool(tool)
         }
-        drawingController.onTldrawInkPaletteChange = {
-            [weak self] palette in
-            self?.annotationToolbar.setInkPalette(palette)
-        }
         drawingController.onTldrawPresentationReady = {
             [weak self] available in
             self?.finishBlankCanvasReveal(
@@ -2441,7 +2437,6 @@ private final class DrawingBoardViewController: NSViewController {
     var onTldrawUserEdit: ((Int) -> Void)?
     var onTldrawToolChange: ((TraceToolState) -> Void)?
     var onTldrawTemporaryToolChange: ((TraceCanvasTool?) -> Void)?
-    var onTldrawInkPaletteChange: ((TraceInkPalette) -> Void)?
     var onTldrawPresentationReady: ((Bool) -> Void)?
     var onCancelCalibration: (() -> Void)?
 
@@ -3073,9 +3068,6 @@ private final class DrawingBoardViewController: NSViewController {
         canvas.onTemporaryToolChange = { [weak self] tool in
             self?.onTldrawTemporaryToolChange?(tool)
         }
-        canvas.onInkPaletteChange = { [weak self] palette in
-            self?.onTldrawInkPaletteChange?(palette)
-        }
         root.addSubview(
             canvas,
             positioned: .below,
@@ -3348,7 +3340,6 @@ private final class FloatingAnnotationToolbar:
     private let closeButton = NSButton()
     private let closeActionHover = ToolbarActionHoverView()
     private var swatches: [ColorSwatchButton] = []
-    private var inkPalette: TraceInkPalette?
     private var toolState = TraceToolState()
     private var temporaryCanvasTool: TraceCanvasTool?
     private var currentVoiceState: TraceVoiceCaptureState?
@@ -3813,11 +3804,6 @@ private final class FloatingAnnotationToolbar:
             return
         }
         temporaryCanvasTool = tool
-        syncControls()
-    }
-
-    func setInkPalette(_ palette: TraceInkPalette) {
-        inkPalette = palette
         syncControls()
     }
 
@@ -4866,12 +4852,9 @@ private final class FloatingAnnotationToolbar:
 
     private func syncControls() {
         let activeTool = temporaryCanvasTool ?? toolState.canvasTool
-        let swatchColors = activeTool == .highlighter
-            ? inkPalette?.highlighter
-            : inkPalette?.ink
         for swatch in swatches {
             swatch.isSelected = swatch.traceColor == toolState.color
-            swatch.displayColor = swatchColors?[swatch.inkName]
+            swatch.isDimmed = activeTool == .highlighter
         }
         switch activeTool {
         case .select:
@@ -6595,7 +6578,6 @@ private final class VoiceWaveformView: NSView {
 
 private final class ColorSwatchButton: NSButton {
     let traceColor: TraceRGBAColor
-    let inkName: String
     private var trackingArea: NSTrackingArea?
     private var isHovered = false
 
@@ -6605,7 +6587,7 @@ private final class ColorSwatchButton: NSButton {
         }
     }
 
-    var displayColor: NSColor? {
+    var isDimmed = false {
         didSet {
             updateAppearance()
         }
@@ -6613,7 +6595,6 @@ private final class ColorSwatchButton: NSButton {
 
     init(name: String, color: TraceRGBAColor) {
         traceColor = color
-        inkName = name.lowercased()
         super.init(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
         title = ""
         isBordered = false
@@ -6682,7 +6663,8 @@ private final class ColorSwatchButton: NSButton {
 
     private func updateAppearance() {
         let highlighted = isSelected || isHovered
-        layer?.backgroundColor = (displayColor ?? NSColor(traceColor)).cgColor
+        layer?.backgroundColor = NSColor(traceColor)
+            .withAlphaComponent(isDimmed ? 0.6 : 1).cgColor
         layer?.borderWidth = highlighted ? 2.5 : 1
         layer?.borderColor = (
             highlighted

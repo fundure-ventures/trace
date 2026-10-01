@@ -2344,9 +2344,7 @@ function setCanvasBackground(
   } else {
     container.style.removeProperty('--tl-color-background')
   }
-  const palette = deriveInkPalette(color)
-  applyInkPalette(palette)
-  postToTraceHost({ type: 'product-ink-palette', ...palette })
+  applyInkPalette(deriveInkPalette(color))
 }
 
 function removeBackground(
