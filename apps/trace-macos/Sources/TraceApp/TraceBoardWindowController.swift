@@ -3284,6 +3284,13 @@ private final class FloatingAnnotationToolbar:
     private static let recordingAccentColor =
         NSColor.systemRed.withAlphaComponent(0.78)
 
+    private var toolbarAccentColor: NSColor {
+        let accent = NSColor.controlAccentColor.resolvedColor(
+            with: effectiveAppearance
+        )
+        return accent.usingColorSpace(.deviceRGB) ?? accent
+    }
+
     var onToolChange: ((TraceToolState) -> Void)?
     var onCopy: ((TraceCopyContent) -> Void)?
     var onClose: (() -> Void)?
@@ -3350,6 +3357,13 @@ private final class FloatingAnnotationToolbar:
     private(set) var voiceStateApplyCountForTesting = 0
 #endif
 
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        brushControl.selectedSegmentBezelColor = toolbarAccentColor
+        gridControl.contentTintColor = toolbarAccentColor
+        widthSlider.trackFillColor = toolbarAccentColor
+    }
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         configureFloatingToolbarAppearance(self)
@@ -3375,7 +3389,7 @@ private final class FloatingAnnotationToolbar:
 
         brushControl.segmentStyle = .separated
         brushControl.controlSize = .small
-        brushControl.selectedSegmentBezelColor = .controlAccentColor
+        brushControl.selectedSegmentBezelColor = toolbarAccentColor
         brushControl.target = self
         brushControl.action = #selector(changeBrush)
         let drawingTools = [
@@ -3417,7 +3431,7 @@ private final class FloatingAnnotationToolbar:
         gridControl.controlSize = .small
         gridControl.bezelStyle = .rounded
         gridControl.imagePosition = .imageOnly
-        gridControl.contentTintColor = .controlAccentColor
+        gridControl.contentTintColor = toolbarAccentColor
         gridControl.target = self
         gridControl.action = #selector(changeGrid)
         gridControl.removeAllItems()
@@ -3522,7 +3536,7 @@ private final class FloatingAnnotationToolbar:
         gridSpacingField.isHidden = true
 
         widthSlider.controlSize = .small
-        widthSlider.trackFillColor = nil
+        widthSlider.trackFillColor = toolbarAccentColor
         widthSlider.target = self
         widthSlider.action = #selector(changeWidth)
         widthSlider.widthAnchor.constraint(equalToConstant: 82)
@@ -4302,11 +4316,11 @@ private final class FloatingAnnotationToolbar:
     ) {
         (
             brush: brushControl.selectedSegmentBezelColor?
-                .isEqual(NSColor.controlAccentColor) == true,
+                .isEqual(toolbarAccentColor) == true,
             grid: gridControl.contentTintColor?
-                .isEqual(NSColor.controlAccentColor) == true,
+                .isEqual(toolbarAccentColor) == true,
             slider: widthSlider.trackFillColor?
-                .isEqual(NSColor.controlAccentColor) == true
+                .isEqual(toolbarAccentColor) == true
         )
     }
 
