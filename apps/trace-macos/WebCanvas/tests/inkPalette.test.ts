@@ -7,8 +7,9 @@ import {
   highlighterColorName,
   INK_ANCHORS,
   INK_NAMES,
+  HIGHLIGHTER_OPACITY,
   inkNameForColor,
-  isHighlighterColor,
+  opacityForStroke,
 } from '../src/inkPalette.ts'
 
 const contrast = (foreground: string, background: string) =>
@@ -60,7 +61,7 @@ for (const [background, direction] of [['#1e3a8a', 1], ['#2f8f4e', 1], ['#fde68a
   })
 }
 
-test('highlighter is an opaque color between the ink and the background', () => {
+test('highlighter is a lightly tinted ink between the ink and the background', () => {
   const background = '#ffffff'
   const palette = deriveInkPalette(background)
   for (const name of INK_NAMES) {
@@ -70,8 +71,8 @@ test('highlighter is an opaque color between the ink and the background', () => 
     assert.match(palette.highlighter[name], /^#[0-9a-f]{6}$/)
     assert.ok(highlighter > ink && highlighter < page, `${name} ${palette.highlighter[name]}`)
     assert.ok(
-      Math.abs(highlighter - (ink + (page - ink) * 0.6)) < 0.03,
-      `${name} highlighter should sit 60% toward the page`,
+      Math.abs(highlighter - (ink + (page - ink) * 0.3)) < 0.03,
+      `${name} highlighter should sit 30% toward the page`,
     )
   }
 })
@@ -92,19 +93,8 @@ test('highlighter strokes use dedicated tldraw color names that map back to inks
   assert.equal(colorNameForStroke('black', true), 'black')
 })
 
-test('highlighter blends like a marker on light pages and glows on dark pages', () => {
-  for (const background of ['#ffffff', '#fde68a', null]) {
-    assert.equal(deriveInkPalette(background).highlighterBlend, 'multiply', String(background))
-  }
-  for (const background of ['#111111', '#1e3a8a']) {
-    assert.equal(deriveInkPalette(background).highlighterBlend, 'screen', background)
-  }
-})
-
-test('only highlighter color names blend', () => {
-  for (const name of INK_NAMES) {
-    assert.equal(isHighlighterColor(highlighterColorName(name)), true, name)
-    assert.equal(isHighlighterColor(name), false, name)
-  }
-  assert.equal(isHighlighterColor('black'), false)
+test('highlighter strokes are partly transparent so content shows through', () => {
+  assert.ok(HIGHLIGHTER_OPACITY > 0.5 && HIGHLIGHTER_OPACITY < 1)
+  assert.equal(opacityForStroke(true), HIGHLIGHTER_OPACITY)
+  assert.equal(opacityForStroke(false), 1)
 })

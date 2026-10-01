@@ -201,7 +201,10 @@ enum ProductTldrawProbe {
                   state["renderedBackgroundColor"] as? String
               )?.contains("255, 255, 255") == true,
               state["color"] as? String == "green",
-              (state["opacity"] as? NSNumber)?.doubleValue == 1,
+              abs(
+                  ((state["opacity"] as? NSNumber)?.doubleValue ?? 0)
+                      - 0.6
+              ) < 0.001,
               abs(
                   ((state["width"] as? NSNumber)?.doubleValue ?? 0)
                       - 16
@@ -209,14 +212,13 @@ enum ProductTldrawProbe {
               (state["drawWidths"] as? [NSNumber])?.contains(where: {
                   abs($0.doubleValue - 7.5) < 0.001
               }) == true,
-              (state["drawOpacities"] as? [NSNumber])?.allSatisfy({
-                  $0.doubleValue == 1
-              }) == true,
-              (state["drawColors"] as? [String])?.contains("light-green")
-                  == true,
+              let drawOpacities = state["drawOpacities"] as? [NSNumber],
               let drawColors = state["drawColors"] as? [String],
-              state["drawBlendModes"] as? [String] == drawColors.map({
-                  $0 == "light-green" ? "multiply" : "normal"
+              drawColors.contains("light-green"),
+              zip(drawColors, drawOpacities).allSatisfy({
+                  abs(
+                      $1.doubleValue - ($0 == "light-green" ? 0.6 : 1)
+                  ) < 0.001
               }),
               let inkColors = state["inkColors"] as? [String: String],
               let highlighterColors =
@@ -2519,6 +2521,7 @@ enum ProductTldrawProbe {
         try await waitUntil("Highlighter before screenshot capture") {
             let state = await surface.stateForTesting()
             return state?["productTool"] as? String == "highlighter"
+                && (state?["opacity"] as? NSNumber)?.doubleValue == 0.6
         }
 
         let manifest = TraceDrawingManifest(

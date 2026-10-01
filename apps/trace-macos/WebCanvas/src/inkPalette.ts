@@ -24,16 +24,15 @@ const HIGHLIGHTER_COLOR_NAMES: Record<InkName, TLDefaultColorStyle> = {
 const BACKGROUND_TINT = 0.15
 const MIN_CONTRAST = 30
 const RELATIVE_CONTRAST = 0.6
-const HIGHLIGHTER_MIX = 0.6
+// A light page tint plus alpha keeps the old 60%-toward-page look on empty
+// page while letting screenshots show through.
+const HIGHLIGHTER_MIX = 0.3
+export const HIGHLIGHTER_OPACITY = 0.6
 const LIGHTNESS_STEP = 0.01
-
-export type HighlighterBlend = 'multiply' | 'screen'
 
 export interface InkPalette {
   ink: Record<InkName, string>
   highlighter: Record<InkName, string>
-  // Lets content under a highlighter (screenshots, images) show through.
-  highlighterBlend: HighlighterBlend
 }
 
 export function deriveInkPalette(background: string | null): InkPalette {
@@ -50,7 +49,6 @@ export function deriveInkPalette(background: string | null): InkPalette {
   const palette: InkPalette = {
     ink: { ...INK_ANCHORS },
     highlighter: { ...INK_ANCHORS },
-    highlighterBlend: direction < 0 ? 'multiply' : 'screen',
   }
   for (const name of INK_NAMES) {
     const tinted = color(INK_ANCHORS[name]).mix(page, BACKGROUND_TINT, 'oklab')
@@ -75,6 +73,10 @@ export function highlighterColorName(ink: InkName): TLDefaultColorStyle {
   return HIGHLIGHTER_COLOR_NAMES[ink]
 }
 
+export function opacityForStroke(isHighlighter: boolean): number {
+  return isHighlighter ? HIGHLIGHTER_OPACITY : 1
+}
+
 export function colorNameForStroke(
   color: TLDefaultColorStyle,
   isHighlighter: boolean,
@@ -84,10 +86,6 @@ export function colorNameForStroke(
 
 function isInkName(name: string): name is InkName {
   return (INK_NAMES as readonly string[]).includes(name)
-}
-
-export function isHighlighterColor(name: TLDefaultColorStyle): boolean {
-  return Object.values(HIGHLIGHTER_COLOR_NAMES).includes(name)
 }
 
 export function inkNameForColor(name: TLDefaultColorStyle): TLDefaultColorStyle {

@@ -34,6 +34,7 @@ import {
   highlighterColorName,
   INK_NAMES,
   inkNameForColor,
+  opacityForStroke,
 } from './inkPalette'
 import { applyInkPalette } from './traceInkShapes'
 import {
@@ -245,7 +246,6 @@ export interface TraceProductRendererBridge {
     gridSpacing: number
     drawWidths: number[]
     drawOpacities: number[]
-    drawBlendModes: string[]
     drawColors: TLDefaultColorStyle[]
     lastExportPlan: TraceImageExportPlan | null
   }
@@ -874,7 +874,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       const tool = temporaryDrawActive ? temporaryDrawTool() : currentTool
       return {
         ...shape,
-        opacity: 1,
+        opacity: opacityForStroke(tool.tool === 'highlighter'),
         props: {
           ...shape.props,
           color: colorNameForStroke(tool.color, tool.tool === 'highlighter'),
@@ -1622,12 +1622,6 @@ export function installTraceProductRenderer(editor: Editor): () => void {
               * shape.props.scale,
         ),
         drawOpacities: drawShapes.map((shape) => shape.opacity),
-        drawBlendModes: drawShapes.map((shape) => {
-          const element = editor
-            .getContainer()
-            .querySelector<HTMLElement>(`.tl-shape[data-shape-id="${shape.id}"]`)
-          return element ? getComputedStyle(element).mixBlendMode : 'unmounted'
-        }),
         drawColors: drawShapes.map((shape) => shape.props.color),
         inkColors: Object.fromEntries(
           INK_NAMES.map((name) => [
@@ -1870,12 +1864,13 @@ function applyTool(
   editor.setStyleForNextShapes(DefaultSizeStyle, 'm', {
     history: 'ignore',
   })
-  editor.setOpacityForNextShapes(1, {
+  const opacity = opacityForStroke(tool.tool === 'highlighter')
+  editor.setOpacityForNextShapes(opacity, {
     history: 'ignore',
   })
   editor.setStyleForSelectedShapes(DefaultColorStyle, color)
   editor.setStyleForSelectedShapes(DefaultSizeStyle, 'm')
-  editor.setOpacityForSelectedShapes(1)
+  editor.setOpacityForSelectedShapes(opacity)
   const scale = scaleForWidth(widthForProductTool(tool))
   const selectedDrawShapes = editor
     .getSelectedShapes()
@@ -1965,7 +1960,7 @@ function upsertProductStroke(
       type: 'draw',
       x: originX,
       y: originY,
-      opacity: 1,
+      opacity: opacityForStroke(stroke.brush === 'highlighter'),
       isLocked: locked,
       props,
     })
@@ -1975,7 +1970,7 @@ function upsertProductStroke(
       type: 'draw',
       x: originX,
       y: originY,
-      opacity: 1,
+      opacity: opacityForStroke(stroke.brush === 'highlighter'),
       isLocked: locked,
       props,
     })
@@ -2818,11 +2813,7 @@ function addExportBackground(
   background.setAttribute('width', String(bounds.width))
   background.setAttribute('height', String(bounds.height))
   background.setAttribute('fill', color)
-  // Matches the canvas: highlighter blends reach shapes, not the page.
-  const shapes = document.createElementNS('http://www.w3.org/2000/svg', 'g')
-  shapes.style.isolation = 'isolate'
-  shapes.append(
-    ...Array.from(svg.children).filter((child) => child.localName !== 'defs'),
-  )
-  svg.append(background, shapes)
+  const firstRenderedChild = Array.from(svg.children)
+    .find((child) => child.localName !== 'defs')
+  svg.insertBefore(background, firstRenderedChild ?? null)
 }
