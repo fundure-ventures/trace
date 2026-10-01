@@ -1533,7 +1533,7 @@ enum TraceRetainedInkProbe {
         try verifyDrawingToolControls(board)
         guard accents.brush,
               accents.grid,
-              !accents.slider
+              accents.slider
         else {
             throw probeError(
                 "toolbar accents did not match production"

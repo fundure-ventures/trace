@@ -3245,7 +3245,61 @@ private final class ToolbarActionHoverView: NSView {
 #endif
 }
 
+// The toolbar panel is rarely the key window, and AppKit draws inactive
+// controls grey regardless of their accent colors, so the cells below paint
+// the accent themselves to look the same in both states.
+private final class ToolbarAccentSegmentedCell: NSSegmentedCell {
+    override func drawSegment(
+        _ segment: Int,
+        inFrame frame: NSRect,
+        with controlView: NSView
+    ) {
+        guard isSelected(forSegment: segment),
+              let image = image(forSegment: segment)
+        else {
+            super.drawSegment(segment, inFrame: frame, with: controlView)
+            return
+        }
+        NSColor.controlAccentColor.setFill()
+        NSBezierPath(roundedRect: frame, xRadius: 6, yRadius: 6).fill()
+        let symbol = image.withSymbolConfiguration(
+            NSImage.SymbolConfiguration(paletteColors: [.white])
+        ) ?? image
+        let size = symbol.size
+        symbol.draw(in: NSRect(
+            x: frame.midX - size.width / 2,
+            y: frame.midY - size.height / 2,
+            width: size.width,
+            height: size.height
+        ).integral)
+    }
+}
+
+private final class ToolbarSegmentedControl: NSSegmentedControl {
+    override class var cellClass: AnyClass? {
+        get { ToolbarAccentSegmentedCell.self }
+        set {}
+    }
+}
+
+private final class ToolbarAccentSliderCell: NSSliderCell {
+    override func drawBar(inside rect: NSRect, flipped: Bool) {
+        super.drawBar(inside: rect, flipped: flipped)
+        var fill = rect
+        fill.size.width = max(0, knobRect(flipped: flipped).midX - rect.minX)
+        NSColor.controlAccentColor.setFill()
+        let radius = rect.height / 2
+        NSBezierPath(roundedRect: fill, xRadius: radius, yRadius: radius)
+            .fill()
+    }
+}
+
 private final class WholePointSlider: NSSlider {
+    override class var cellClass: AnyClass? {
+        get { ToolbarAccentSliderCell.self }
+        set {}
+    }
+
     override func keyDown(with event: NSEvent) {
         let step: Double
         switch event.keyCode {
@@ -3284,15 +3338,6 @@ private final class FloatingAnnotationToolbar:
     private static let recordingAccentColor =
         NSColor.systemRed.withAlphaComponent(0.78)
 
-    private var toolbarAccentColor: NSColor {
-        var accent = NSColor.controlAccentColor
-        effectiveAppearance.performAsCurrentDrawingAppearance {
-            accent = NSColor.controlAccentColor.usingColorSpace(.deviceRGB)
-                ?? .controlAccentColor
-        }
-        return accent
-    }
-
     var onToolChange: ((TraceToolState) -> Void)?
     var onCopy: ((TraceCopyContent) -> Void)?
     var onClose: (() -> Void)?
@@ -3300,7 +3345,7 @@ private final class FloatingAnnotationToolbar:
     var onBackgroundColorChange: ((TraceRGBAColor) -> Void)?
     var onPreferredSizeChange: (() -> Void)?
 
-    private let brushControl = NSSegmentedControl(
+    private let brushControl = ToolbarSegmentedControl(
         labels: ["", "", "", "", ""],
         trackingMode: .selectOne,
         target: nil,
@@ -3359,13 +3404,6 @@ private final class FloatingAnnotationToolbar:
     private(set) var voiceStateApplyCountForTesting = 0
 #endif
 
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        brushControl.selectedSegmentBezelColor = toolbarAccentColor
-        gridControl.contentTintColor = toolbarAccentColor
-        widthSlider.trackFillColor = toolbarAccentColor
-    }
-
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         configureFloatingToolbarAppearance(self)
@@ -3391,7 +3429,7 @@ private final class FloatingAnnotationToolbar:
 
         brushControl.segmentStyle = .separated
         brushControl.controlSize = .small
-        brushControl.selectedSegmentBezelColor = toolbarAccentColor
+        brushControl.selectedSegmentBezelColor = .controlAccentColor
         brushControl.target = self
         brushControl.action = #selector(changeBrush)
         let drawingTools = [
@@ -3433,7 +3471,7 @@ private final class FloatingAnnotationToolbar:
         gridControl.controlSize = .small
         gridControl.bezelStyle = .rounded
         gridControl.imagePosition = .imageOnly
-        gridControl.contentTintColor = toolbarAccentColor
+        gridControl.contentTintColor = .controlAccentColor
         gridControl.target = self
         gridControl.action = #selector(changeGrid)
         gridControl.removeAllItems()
@@ -3538,7 +3576,7 @@ private final class FloatingAnnotationToolbar:
         gridSpacingField.isHidden = true
 
         widthSlider.controlSize = .small
-        widthSlider.trackFillColor = toolbarAccentColor
+        widthSlider.trackFillColor = nil
         widthSlider.target = self
         widthSlider.action = #selector(changeWidth)
         widthSlider.widthAnchor.constraint(equalToConstant: 82)
@@ -4317,12 +4355,10 @@ private final class FloatingAnnotationToolbar:
         slider: Bool
     ) {
         (
-            brush: brushControl.selectedSegmentBezelColor?
-                .isEqual(toolbarAccentColor) == true,
+            brush: brushControl.cell is ToolbarAccentSegmentedCell,
             grid: gridControl.contentTintColor?
-                .isEqual(toolbarAccentColor) == true,
-            slider: widthSlider.trackFillColor?
-                .isEqual(toolbarAccentColor) == true
+                .isEqual(NSColor.controlAccentColor) == true,
+            slider: widthSlider.cell is ToolbarAccentSliderCell
         )
     }
 
