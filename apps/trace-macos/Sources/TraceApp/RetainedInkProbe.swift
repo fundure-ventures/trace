@@ -1504,8 +1504,8 @@ enum TraceRetainedInkProbe {
                   "No grid",
                   "Dots",
                   "Square",
-                  "Horizontal",
-                  "Vertical",
+                  "Rows",
+                  "Cols",
               ],
               gridSelector.menuImageCount == 5
         else {
@@ -1522,7 +1522,7 @@ enum TraceRetainedInkProbe {
         let selectedGrid = board.gridSelectorPresentationForPreview
         let selectedGridSizing = board.toolbarSizingForPreview
         guard selectedGridStyle == .horizontal,
-              selectedGrid.selectedTitle == "Horizontal",
+              selectedGrid.selectedTitle == "Rows",
               selectedGrid.selectedStyle == .horizontal,
               selectedGridSizing.active.spacingVisible
         else {

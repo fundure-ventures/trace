@@ -3495,14 +3495,14 @@ private final class FloatingAnnotationToolbar:
             (.square, "Square", "square.grid.3x3", "square.grid.2x2"),
             (
                 .horizontal,
-                "Horizontal",
-                "rectangle.split.3x1",
+                "Rows",
+                "rectangle.split.1x2",
                 "line.3.horizontal"
             ),
             (
                 .vertical,
-                "Vertical",
-                "rectangle.split.1x2",
+                "Cols",
+                "rectangle.split.3x1",
                 "line.3.horizontal.decrease"
             ),
         ]
