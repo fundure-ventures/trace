@@ -7,8 +7,10 @@ import {
   highlighterColorName,
   INK_ANCHORS,
   INK_NAMES,
+  HARMONY_OFFSETS,
   HIGHLIGHTER_OPACITY,
   inkNameForColor,
+  MAX_HUE_SHIFT,
   opacityForStroke,
 } from '../src/inkPalette.ts'
 
@@ -60,6 +62,40 @@ for (const [background, direction] of [['#1e3a8a', 1], ['#2f8f4e', 1], ['#fde68a
     assert.ok(moved.length > 0, 'expected at least one ink to need a lightness fix')
   })
 }
+
+const signedHueDelta = (from: number, to: number) => ((to - from + 540) % 360) - 180
+
+for (const background of ['#2f8f4e', '#1e3a8a', '#fde68a', '#fbcfe8']) {
+  test(`ink hues lean at most ${MAX_HUE_SHIFT}° toward a harmony of ${background}`, () => {
+    const palette = deriveInkPalette(background)
+    const pageHue = color(background).oklch.h
+    for (const name of INK_NAMES) {
+      const tintedHue = color(INK_ANCHORS[name]).mix(background, 0.15, 'oklab').oklch.h
+      const harmonyDeltas = HARMONY_OFFSETS.map((offset) =>
+        signedHueDelta(tintedHue, pageHue + offset),
+      )
+      const nearest = harmonyDeltas.reduce((best, delta) =>
+        Math.abs(delta) < Math.abs(best) ? delta : best,
+      )
+      const expected = Math.sign(nearest) * Math.min(Math.abs(nearest), MAX_HUE_SHIFT)
+      const actual = signedHueDelta(tintedHue, color(palette.ink[name]).oklch.h)
+      assert.ok(
+        Math.abs(actual - expected) < 1.5,
+        `${name} ${palette.ink[name]} shifted ${actual.toFixed(1)}°, expected ${expected.toFixed(1)}°`,
+      )
+    }
+  })
+}
+
+test('neutral backgrounds have no hue to harmonize with', () => {
+  for (const background of ['#ffffff', '#111111', '#808080']) {
+    const palette = deriveInkPalette(background)
+    for (const name of INK_NAMES) {
+      const tinted = color(INK_ANCHORS[name]).mix(background, 0.15, 'oklab').hex
+      assert.ok(hueDistance(palette.ink[name], tinted) < 1.5, `${name} on ${background}`)
+    }
+  }
+})
 
 test('highlighter is a lightly tinted ink between the ink and the background', () => {
   const background = '#ffffff'

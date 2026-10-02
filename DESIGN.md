@@ -42,7 +42,9 @@ light cluster, or permanent frame chrome.
   macOS appearance.
 - The product board uses the captured screenshot as its entire color field. A
   compact graphite floating toolbar is the only persistent product chrome.
-- Product annotation colors are red, blue, yellow, and green.
+- Product annotation colors are red, blue, yellow, and green, derived from
+  the page background for legibility
+  ([ADR 0008](docs/adr/0008-background-derived-color-theming.md)).
 
 ## Typography
 

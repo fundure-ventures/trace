@@ -13,3 +13,4 @@ current code. Historical exploration and rejected alternatives remain in
 | [0005](0005-native-first-blank-page-loading.md) | Paint blank pages natively until tldraw is ready |
 | [0006](0006-unified-timed-annotations.md) | Unify timed Neo and tldraw annotations |
 | [0007](0007-batched-finder-image-import.md) | Import Finder image batches into one canvas |
+| [0008](0008-background-derived-color-theming.md) | Derive annotation colors from the page background |
