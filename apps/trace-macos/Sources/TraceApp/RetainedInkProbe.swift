@@ -592,11 +592,11 @@ enum TraceRetainedInkProbe {
         let recording = board.voicePresentationForPreview
         guard recording.labelHidden,
               recording.toggleSymbol == "stop.circle.fill",
-              isBrightRed(recording.toggleTint),
+              isVividScarlet(recording.toggleTint),
               isNeutral(recording.waveformColor)
         else {
             throw probeError(
-                "recording voice UI did not use neutral wave and red stop circle"
+                "recording voice UI did not use neutral wave and vivid scarlet stop circle"
             )
         }
         board.resetVoiceStateApplyCountForPreview()
@@ -660,14 +660,14 @@ enum TraceRetainedInkProbe {
             && color.redComponent > color.blueComponent * 1.5
     }
 
-    private static func isBrightRed(_ color: NSColor?) -> Bool {
-        guard isRed(color),
-              let color = color?.usingColorSpace(.deviceRGB)
-        else {
+    private static func isVividScarlet(_ color: NSColor?) -> Bool {
+        guard let color = color?.usingColorSpace(.deviceRGB) else {
             return false
         }
-        return color.greenComponent >= 0.5
-            && color.alphaComponent >= 0.95
+        return abs(color.redComponent - 1) < 0.005
+            && abs(color.greenComponent - 83.0 / 255) < 0.005
+            && abs(color.blueComponent - 71.0 / 255) < 0.005
+            && abs(color.alphaComponent - 1) < 0.005
     }
 
     private static func isNeutral(_ color: NSColor) -> Bool {

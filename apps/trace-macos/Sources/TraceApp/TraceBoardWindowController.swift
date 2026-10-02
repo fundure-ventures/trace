@@ -3283,8 +3283,8 @@ private final class FloatingAnnotationToolbar:
     private static let chevronSymbolPointSize: CGFloat = 9
     private static let recordingAccentColor = NSColor(
         srgbRed: 1,
-        green: 0.55,
-        blue: 0.49,
+        green: 83.0 / 255,
+        blue: 71.0 / 255,
         alpha: 1
     )
 
