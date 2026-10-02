@@ -3245,57 +3245,7 @@ private final class ToolbarActionHoverView: NSView {
 #endif
 }
 
-// The toolbar panel is rarely the key window, and AppKit draws inactive
-// controls grey regardless of their accent colors, so the cells below paint
-// the accent themselves to look the same in both states.
-private final class ToolbarAccentSegmentedCell: NSSegmentedCell {
-    override func interiorBackgroundStyle(forSegment segment: Int)
-        -> NSView.BackgroundStyle
-    {
-        isSelected(forSegment: segment)
-            ? .emphasized
-            : super.interiorBackgroundStyle(forSegment: segment)
-    }
-
-    override func drawSegment(
-        _ segment: Int,
-        inFrame frame: NSRect,
-        with controlView: NSView
-    ) {
-        if isSelected(forSegment: segment) {
-            NSColor.controlAccentColor.setFill()
-            let pill = frame.insetBy(dx: 1, dy: 1)
-            NSBezierPath(roundedRect: pill, xRadius: 5, yRadius: 5).fill()
-        }
-        super.drawSegment(segment, inFrame: frame, with: controlView)
-    }
-}
-
-private final class ToolbarSegmentedControl: NSSegmentedControl {
-    override class var cellClass: AnyClass? {
-        get { ToolbarAccentSegmentedCell.self }
-        set {}
-    }
-}
-
-private final class ToolbarAccentSliderCell: NSSliderCell {
-    override func drawBar(inside rect: NSRect, flipped: Bool) {
-        super.drawBar(inside: rect, flipped: flipped)
-        var fill = rect
-        fill.size.width = max(0, knobRect(flipped: flipped).midX - rect.minX)
-        NSColor.controlAccentColor.setFill()
-        let radius = rect.height / 2
-        NSBezierPath(roundedRect: fill, xRadius: radius, yRadius: radius)
-            .fill()
-    }
-}
-
 private final class WholePointSlider: NSSlider {
-    override class var cellClass: AnyClass? {
-        get { ToolbarAccentSliderCell.self }
-        set {}
-    }
-
     override func keyDown(with event: NSEvent) {
         let step: Double
         switch event.keyCode {
@@ -3341,7 +3291,7 @@ private final class FloatingAnnotationToolbar:
     var onBackgroundColorChange: ((TraceRGBAColor) -> Void)?
     var onPreferredSizeChange: (() -> Void)?
 
-    private let brushControl = ToolbarSegmentedControl(
+    private let brushControl = NSSegmentedControl(
         labels: ["", "", "", "", ""],
         trackingMode: .selectOne,
         target: nil,
@@ -4351,10 +4301,12 @@ private final class FloatingAnnotationToolbar:
         slider: Bool
     ) {
         (
-            brush: brushControl.cell is ToolbarAccentSegmentedCell,
+            brush: brushControl.selectedSegmentBezelColor?
+                .isEqual(NSColor.controlAccentColor) == true,
             grid: gridControl.contentTintColor?
                 .isEqual(NSColor.controlAccentColor) == true,
-            slider: widthSlider.cell is ToolbarAccentSliderCell
+            slider: widthSlider.trackFillColor?
+                .isEqual(NSColor.controlAccentColor) == true
         )
     }
 
