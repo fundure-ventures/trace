@@ -555,6 +555,11 @@ final class TraceAppDelegate:
         }
         projection.start()
 #if DEBUG
+        if SidecarInputProbe.shared.isEnabled {
+            DispatchQueue.main.async { [weak self] in
+                self?.showBoard()
+            }
+        }
         if ProcessInfo.processInfo.environment[
             "TRACE_UI_CALIBRATION"
         ] == "1" {
