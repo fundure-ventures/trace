@@ -3375,8 +3375,8 @@ private final class FloatingAnnotationToolbar:
 
         brushControl.segmentStyle = .separated
         brushControl.controlSize = .small
-        brushControl.selectedSegmentBezelColor =
-            .unemphasizedSelectedContentBackgroundColor
+        // Keep AppKit's active selection as muted as its inactive selection.
+        brushControl.selectedSegmentBezelColor = .clear
         brushControl.target = self
         brushControl.action = #selector(changeBrush)
         let drawingTools = [
@@ -4303,7 +4303,7 @@ private final class FloatingAnnotationToolbar:
     ) {
         (
             brushNeutral: brushControl.selectedSegmentBezelColor?.isEqual(
-                NSColor.unemphasizedSelectedContentBackgroundColor
+                NSColor.clear
             ) == true,
             grid: gridControl.contentTintColor?
                 .isEqual(NSColor.controlAccentColor) == true,
