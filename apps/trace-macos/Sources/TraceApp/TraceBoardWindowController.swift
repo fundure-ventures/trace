@@ -2015,11 +2015,22 @@ private final class TraceBoardWindow: NSWindow {
         if event.type != .tabletProximity {
             fields.append("pressure=\(event.pressure)")
         }
+        if event.type == .tabletProximity {
+            fields.append(
+                "proximity=\(event.isEnteringProximity ? "enter" : "exit")"
+            )
+        }
         if event.type == .tabletPoint
             || event.subtype == .tabletPoint
+            || event.type == .tabletProximity
         {
             let tilt = event.tilt
             fields.append(contentsOf: [
+                "deviceID=\(event.deviceID)",
+                "pointingDeviceID=\(event.pointingDeviceID)",
+                "vendorID=\(event.vendorID)",
+                "tabletID=\(event.tabletID)",
+                "uniqueID=\(event.uniqueID)",
                 "tiltX=\(tilt.x)",
                 "tiltY=\(tilt.y)",
                 "rotation=\(event.rotation)",
