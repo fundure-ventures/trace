@@ -1287,7 +1287,7 @@ enum TraceRetainedInkProbe {
                   (35.5...36.5).contains($0)
               }),
               appearance.selectedCount == 1,
-              board.controlAccentPresentationForPreview.brush,
+              board.controlTintPresentationForPreview.brushNeutral,
               (32...34).contains(sizing.active.gridToColorsGap),
               abs(
                   sizing.active.toolbarWidth - sizing.inactive.toolbarWidth
@@ -1427,7 +1427,7 @@ enum TraceRetainedInkProbe {
         let layout = board.toolbarGroupLayoutForPreview
         board.updateVoiceState(.recording(transcribedChunks: 0))
         let icons = board.toolbarIconMetricsForPreview
-        let accents = board.controlAccentPresentationForPreview
+        let tints = board.controlTintPresentationForPreview
         let spacing = board.gridSpacingPresentationForPreview
         let sizing = board.toolbarSizingForPreview
         let gridSelector = board.gridSelectorPresentationForPreview
@@ -1531,12 +1531,12 @@ enum TraceRetainedInkProbe {
             )
         }
         try verifyDrawingToolControls(board)
-        guard accents.brush,
-              accents.grid,
-              !accents.slider
+        guard tints.brushNeutral,
+              tints.grid,
+              !tints.slider
         else {
             throw probeError(
-                "toolbar accents did not match production"
+                "toolbar tints did not match production"
             )
         }
         guard spacing.unitText == nil,

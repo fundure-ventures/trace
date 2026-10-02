@@ -949,12 +949,12 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         annotationToolbar.pressToolSizeArrowForTesting(keyCode)
     }
 
-    var controlAccentPresentationForPreview: (
-        brush: Bool,
+    var controlTintPresentationForPreview: (
+        brushNeutral: Bool,
         grid: Bool,
         slider: Bool
     ) {
-        annotationToolbar.controlAccentPresentationForTesting
+        annotationToolbar.controlTintPresentationForTesting
     }
 
     var actionHoverPresentationForPreview: (
@@ -3375,7 +3375,8 @@ private final class FloatingAnnotationToolbar:
 
         brushControl.segmentStyle = .separated
         brushControl.controlSize = .small
-        brushControl.selectedSegmentBezelColor = .controlAccentColor
+        brushControl.selectedSegmentBezelColor =
+            .unemphasizedSelectedContentBackgroundColor
         brushControl.target = self
         brushControl.action = #selector(changeBrush)
         let drawingTools = [
@@ -4295,14 +4296,15 @@ private final class FloatingAnnotationToolbar:
         return true
     }
 
-    var controlAccentPresentationForTesting: (
-        brush: Bool,
+    var controlTintPresentationForTesting: (
+        brushNeutral: Bool,
         grid: Bool,
         slider: Bool
     ) {
         (
-            brush: brushControl.selectedSegmentBezelColor?
-                .isEqual(NSColor.controlAccentColor) == true,
+            brushNeutral: brushControl.selectedSegmentBezelColor?.isEqual(
+                NSColor.unemphasizedSelectedContentBackgroundColor
+            ) == true,
             grid: gridControl.contentTintColor?
                 .isEqual(NSColor.controlAccentColor) == true,
             slider: widthSlider.trackFillColor?
