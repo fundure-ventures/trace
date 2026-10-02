@@ -3281,8 +3281,12 @@ private final class FloatingAnnotationToolbar:
     private static let drawingToolSymbolPointSize: CGFloat = 18
     private static let gridSymbolPointSize: CGFloat = 14
     private static let chevronSymbolPointSize: CGFloat = 9
-    private static let recordingAccentColor =
-        NSColor.systemRed.withAlphaComponent(0.78)
+    private static let recordingAccentColor = NSColor(
+        srgbRed: 1,
+        green: 0.55,
+        blue: 0.49,
+        alpha: 1
+    )
 
     var onToolChange: ((TraceToolState) -> Void)?
     var onCopy: ((TraceCopyContent) -> Void)?
