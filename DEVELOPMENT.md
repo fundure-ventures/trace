@@ -135,7 +135,8 @@ a release. Its checked-in definition is
 
 The skill:
 
-1. Collects and validates the app version and build number.
+1. Derives the next patch version and globally higher build number from
+   published GitHub Releases, then validates them.
 2. Drafts release notes for explicit approval.
 3. Builds `.build/Trace.app` from current `main`.
 4. Developer ID-signs, notarizes, staples, and Gatekeeper-verifies it.

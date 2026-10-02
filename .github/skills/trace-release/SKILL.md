@@ -12,19 +12,28 @@ The release is intentionally local and human-gated. Do not use GitHub Actions
 for release signing. Do not create a release from a feature branch, detached
 commit, dirty checkout, or stale `main`.
 
-## Collect the release inputs
+## Derive the release version and build
 
-Obtain:
+Discover the release numbers from GitHub Releases; do not ask the user to
+provide a version or build number.
 
-- `VERSION` in `MAJOR.MINOR.PATCH` form.
-- `BUILD_NUMBER` as a positive integer greater than the previous published
-  build.
+1. List published, non-draft releases, including prereleases. Identify the
+   latest published release by `publishedAt`, and require its tag to match
+   `vMAJOR.MINOR.PATCH`.
+2. Derive `VERSION` by incrementing that release's patch component by one.
+3. Inspect the assets of every published versioned release. Each must have
+   exactly one asset named `Trace-MAJOR.MINOR.PATCH-BUILD_NUMBER.zip` whose
+   version matches its tag. Derive `BUILD_NUMBER` as one greater than the
+   highest build number found across those releases, so it exceeds every
+   previously published build.
+4. If the latest release is not versioned, a versioned release has missing or
+   ambiguous build metadata, or the release list cannot establish these values
+   unambiguously, stop and report the discrepancy. Do not guess or ask the user
+   to supply replacement numbers.
 
 Use the tag `v$VERSION`, title `Trace $VERSION`, and artifact basename
-`Trace-$VERSION-$BUILD_NUMBER`.
-
-Ask one question at a time with `ask_user` when either value is missing. Do not
-infer a production version or build number.
+`Trace-$VERSION-$BUILD_NUMBER`. Report the source release and derived values
+before drafting the release notes.
 
 ## Prove the source is current main
 
