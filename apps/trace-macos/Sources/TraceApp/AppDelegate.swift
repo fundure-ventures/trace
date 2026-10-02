@@ -386,6 +386,7 @@ final class TraceAppDelegate:
 
     func applicationDidFinishLaunching(_ notification: Notification) {
 #if DEBUG
+        SidecarInputProbe.shared.start()
         let environment = ProcessInfo.processInfo.environment
         let runsProductProbe = ["1", "text", "framing"].contains(
             environment["TRACE_PRODUCT_TLDRAW_PROBE"] ?? ""

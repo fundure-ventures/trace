@@ -1001,7 +1001,7 @@ final class TldrawProductCanvasView:
             ].map {
                 "\($0)=\(String(describing: body[$0] ?? "nil"))"
             }.joined(separator: " ")
-            NSLog("Trace Sidecar input probe web: %@", fields)
+            SidecarInputProbe.shared.log("web", fields)
 #endif
         case "product-error", "error":
             let detail = body["message"] as? String

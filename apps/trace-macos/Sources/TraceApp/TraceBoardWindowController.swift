@@ -1989,58 +1989,17 @@ private final class TraceBoardWindow: NSWindow {
 
 #if DEBUG
     private func logSidecarInput(_ event: NSEvent) {
-        let pointerEvents: Set<NSEvent.EventType> = [
-            .leftMouseDown,
-            .leftMouseDragged,
-            .leftMouseUp,
-            .rightMouseDown,
-            .rightMouseDragged,
-            .rightMouseUp,
-            .otherMouseDown,
-            .otherMouseDragged,
-            .otherMouseUp,
-            .mouseMoved,
-            .tabletPoint,
-            .tabletProximity,
+        let ignoredEvents: Set<NSEvent.EventType> = [
+            .keyDown, .keyUp, .flagsChanged, .appKitDefined,
+            .systemDefined, .applicationDefined, .periodic,
+            .cursorUpdate, .mouseEntered, .mouseExited, .scrollWheel,
         ]
-        guard pointerEvents.contains(event.type) else {
+        guard !ignoredEvents.contains(event.type) else {
             return
         }
-        var fields = [
-            "type=\(event.type.rawValue)",
-            "subtype=\(event.subtype.rawValue)",
-            "x=\(event.locationInWindow.x)",
-            "y=\(event.locationInWindow.y)",
-        ]
-        if event.type != .tabletProximity {
-            fields.append("pressure=\(event.pressure)")
-        }
-        if event.type == .tabletProximity {
-            fields.append(
-                "proximity=\(event.isEnteringProximity ? "enter" : "exit")"
-            )
-        }
-        if event.type == .tabletPoint
-            || event.subtype == .tabletPoint
-            || event.type == .tabletProximity
-        {
-            let tilt = event.tilt
-            fields.append(contentsOf: [
-                "deviceID=\(event.deviceID)",
-                "pointingDeviceID=\(event.pointingDeviceID)",
-                "vendorID=\(event.vendorID)",
-                "tabletID=\(event.tabletID)",
-                "uniqueID=\(event.uniqueID)",
-                "tiltX=\(tilt.x)",
-                "tiltY=\(tilt.y)",
-                "rotation=\(event.rotation)",
-                "tangentialPressure=\(event.tangentialPressure)",
-                "pointingDeviceType=\(event.pointingDeviceType.rawValue)",
-            ])
-        }
-        NSLog(
-            "Trace Sidecar input probe AppKit: %@",
-            fields.joined(separator: " ")
+        SidecarInputProbe.shared.log(
+            "window",
+            SidecarInputProbe.describe(event)
         )
     }
 
