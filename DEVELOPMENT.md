@@ -213,6 +213,12 @@ behavior. Device capture errors leave the existing trace intact.
   `/Applications/Xcode.app` when the selected developer tools cannot resolve
   `devicectl`. Simulator entries are excluded.
 - Devices are refreshed every ten seconds and when opening the source menu.
+  Opening the screenshot submenu also warms available iOS connections with a
+  background display-information request, without taking a screenshot.
+  In-flight requests and requests finished in the last ten seconds are skipped.
+  Warm-up failures are logged but never prevent capture, and there is no
+  continuous connection keep-alive. Clicking immediately can still incur
+  connection setup time.
   Tool availability is resolved once per app session; restart Trace after
   installing ADB or Xcode. Neither tool is bundled with Trace.
 - Captures run off the UI thread with timeouts and private temporary files.

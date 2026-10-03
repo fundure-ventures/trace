@@ -3,6 +3,8 @@ import AppKit
 
 @MainActor
 enum TraceDeviceScreenshotProbe {
+    private final class MenuTarget: NSObject, NSMenuDelegate {}
+
     static func run() throws {
         let android = TraceDeviceScreenshotDiscovery.androidDevices("""
         List of devices attached
@@ -41,7 +43,7 @@ enum TraceDeviceScreenshotProbe {
             throw failure("Malformed iOS inventory was silently accepted")
         } catch is DecodingError {}
 
-        let target = NSObject()
+        let target = MenuTarget()
         let parent = NSMenuItem(title: "New Screenshot trace", action: nil, keyEquivalent: "2")
         let desktopAction = NSSelectorFromString("captureDesktop")
         let deviceAction = NSSelectorFromString("captureDevice:")
@@ -50,6 +52,7 @@ enum TraceDeviceScreenshotProbe {
             target: target, desktopAction: desktopAction, deviceAction: deviceAction, capturing: false
         )
         guard let submenu = parent.submenu else { throw failure("Device submenu missing") }
+        try check(submenu.delegate === target, "Screenshot submenu does not notify its owner when opened")
         try check(submenu.items.first?.title == "from GitHub.app", "Desktop source must come first")
         try check(submenu.items.first?.action == desktopAction, "Desktop source lost its action")
         try check(submenu.items[1].isSeparatorItem, "Desktop/device separator missing")
@@ -79,6 +82,19 @@ enum TraceDeviceScreenshotProbe {
         try check(!TraceDeviceScreenshotMenu.insert(hasDocument: false, createDocument: { false }, insertImage: insert), "Failed creation accepted screenshot")
         try check(inserted == 2, "Image inserted after document creation failed")
         try check(!TraceDeviceScreenshotMenu.insert(hasDocument: true, createDocument: create, insertImage: { false }), "Failed insertion reported success")
+
+        var warmup = TraceDeviceWarmupPolicy()
+        try check(!warmup.begin(android[0], now: 100), "Android device was warmed with iOS tools")
+        try check(warmup.begin(ios[0], now: 100), "Available iPhone was not warmed")
+        try check(!warmup.begin(ios[0], now: 101), "Duplicate in-flight warm-up allowed")
+        warmup.finish(ios[0], now: 102)
+        try check(!warmup.begin(ios[0], now: 111), "Recently warmed iPhone was warmed again")
+        try check(warmup.begin(ios[0], now: 112), "Idle iPhone could not warm on another menu opening")
+        warmup.finish(ios[0], now: 113)
+        let blocked = TraceScreenshotDevice(
+            platform: .ios, identifier: "blocked", name: "Blocked", unavailableReason: "Unavailable"
+        )
+        try check(!warmup.begin(blocked, now: 200), "Unavailable iPhone was warmed")
 
         let runner = TraceDeviceCommandRunner()
         let output = try runner.run(executable: URL(fileURLWithPath: "/usr/bin/printf"), arguments: ["PNG-test"])

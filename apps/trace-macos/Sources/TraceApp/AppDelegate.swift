@@ -1582,6 +1582,10 @@ final class TraceAppDelegate:
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        if screenshotMenuItems.contains(where: { $0.submenu === menu }) {
+            deviceScreenshots.warmAvailableIOSDevices()
+            return
+        }
         refreshScreenshotMenus()
         openScreenshotMenus.insert(ObjectIdentifier(menu))
         deviceScreenshots.refresh()

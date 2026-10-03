@@ -125,6 +125,7 @@ enum TraceDeviceScreenshotMenu {
             return
         }
         let menu = NSMenu(title: item.title)
+        menu.delegate = target as? NSMenuDelegate
         let desktop = NSMenuItem(
             title: "from \(applicationName)",
             action: desktopAction,
@@ -158,6 +159,28 @@ enum TraceDeviceScreenshotMenu {
             return false
         }
         return insertImage()
+    }
+}
+
+struct TraceDeviceWarmupPolicy {
+    private var pending = Set<String>()
+    private var finishedAt: [String: TimeInterval] = [:]
+
+    mutating func begin(_ device: TraceScreenshotDevice, now: TimeInterval) -> Bool {
+        guard device.platform == .ios,
+              device.unavailableReason == nil,
+              !pending.contains(device.identifier),
+              finishedAt[device.identifier].map({ now - $0 >= 10 }) ?? true
+        else {
+            return false
+        }
+        pending.insert(device.identifier)
+        return true
+    }
+
+    mutating func finish(_ device: TraceScreenshotDevice, now: TimeInterval) {
+        pending.remove(device.identifier)
+        finishedAt[device.identifier] = now
     }
 }
 
@@ -232,6 +255,8 @@ final class DeviceScreenshotService {
 
     private let discoveryQueue = DispatchQueue(label: "com.traceproject.device-discovery", qos: .utility)
     private let captureQueue = DispatchQueue(label: "com.traceproject.device-capture", qos: .userInitiated)
+    private let warmupQueue = DispatchQueue(label: "com.traceproject.device-warmup", qos: .utility)
+    private var warmupPolicy = TraceDeviceWarmupPolicy()
     private var timer: Timer?
     private var refreshing = false
     private var lastDiscoveryError: String?
@@ -249,6 +274,36 @@ final class DeviceScreenshotService {
     func stop() {
         timer?.invalidate()
         timer = nil
+    }
+
+    func warmAvailableIOSDevices() {
+        guard !isCapturing, let tool = tools?.ios else { return }
+        for device in devices {
+            guard warmupPolicy.begin(
+                device,
+                now: ProcessInfo.processInfo.systemUptime
+            ) else { continue }
+            warmupQueue.async {
+                do {
+                    _ = try TraceDeviceCommandRunner().run(
+                        executable: tool,
+                        arguments: [
+                            "device", "info", "displays", "--device", device.identifier,
+                            "--timeout", "5",
+                        ],
+                        timeout: 6
+                    )
+                } catch {
+                    NSLog("Trace iOS connection warm-up failed: %@", error.localizedDescription)
+                }
+                DispatchQueue.main.async {
+                    self.warmupPolicy.finish(
+                        device,
+                        now: ProcessInfo.processInfo.systemUptime
+                    )
+                }
+            }
+        }
     }
 
     func refresh() {
