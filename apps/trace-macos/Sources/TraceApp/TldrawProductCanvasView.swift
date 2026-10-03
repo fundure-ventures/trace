@@ -61,7 +61,8 @@ final class TldrawProductCanvasView:
     private var pendingTool: [String: Any]?
     private var pendingBackground: String?
     private var pendingStrokeSync: PendingStrokeSync?
-    private var pendingImageBatches: [[[String: Any]]] = []
+    private var pendingImageBatches:
+        [(images: [[String: Any]], atViewportCenter: Bool)] = []
     private var queuedUpdates: [QueuedUpdate] = []
     private var pendingHistoryCommands: [String] = []
     private var evaluationInFlight = false
@@ -745,7 +746,10 @@ final class TldrawProductCanvasView:
     }
 
     @discardableResult
-    func insertImages(_ images: [TraceCanvasImage]) -> Bool {
+    func insertImages(
+        _ images: [TraceCanvasImage],
+        atViewportCenter: Bool = false
+    ) -> Bool {
         guard currentDocumentID != nil,
               !images.isEmpty
         else {
@@ -755,7 +759,7 @@ final class TldrawProductCanvasView:
         guard payloads.count == images.count else {
             return false
         }
-        pendingImageBatches.append(payloads)
+        pendingImageBatches.append((payloads, atViewportCenter))
         scheduleOperation()
         return true
     }
@@ -1139,9 +1143,12 @@ final class TldrawProductCanvasView:
             completesDocument = false
             completesDocumentFrame = false
         } else if !pendingImageBatches.isEmpty {
-            let images = pendingImageBatches.removeFirst()
-            script = "window.traceProductRenderer.insertImages(images)"
-            arguments = ["images": images]
+            let batch = pendingImageBatches.removeFirst()
+            script = "window.traceProductRenderer.insertImages(images, atViewportCenter)"
+            arguments = [
+                "images": batch.images,
+                "atViewportCenter": batch.atViewportCenter,
+            ]
             completesDocument = false
             completesDocumentFrame = false
         } else if !pendingHistoryCommands.isEmpty {
@@ -1667,4 +1674,3 @@ private final class ProductRendererSchemeHandler:
         }
     }
 }
-

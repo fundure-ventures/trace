@@ -41,6 +41,22 @@ enum WindowCaptureError: LocalizedError {
 }
 
 final class WindowCaptureService {
+    var frontmostApplicationName: String? {
+        do {
+            let descriptors = try windowDescriptors(requiresPermission: false)
+            guard let window = WindowSelectionPolicy.frontmost(
+                windowsFrontToBack: descriptors,
+                excludingOwnerPID: ProcessInfo.processInfo.processIdentifier
+            ) else {
+                return nil
+            }
+            return NSRunningApplication(processIdentifier: window.ownerPID)?
+                .bundleURL?.lastPathComponent ?? window.ownerName
+        } catch {
+            return nil
+        }
+    }
+
     var hasPermission: Bool {
         CGPreflightScreenCaptureAccess()
     }
@@ -135,8 +151,10 @@ final class WindowCaptureService {
         return selected
     }
 
-    private func windowDescriptors() throws -> [TraceWindowDescriptor] {
-        guard hasPermission else {
+    private func windowDescriptors(
+        requiresPermission: Bool = true
+    ) throws -> [TraceWindowDescriptor] {
+        guard !requiresPermission || hasPermission else {
             throw WindowCaptureError.permissionRequired
         }
         guard let windowInfo = CGWindowListCopyWindowInfo(

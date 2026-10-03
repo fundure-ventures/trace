@@ -476,8 +476,14 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @discardableResult
-    func insertImages(_ images: [TraceCanvasImage]) -> Bool {
-        guard drawingController.insertImages(images) else {
+    func insertImages(
+        _ images: [TraceCanvasImage],
+        atViewportCenter: Bool = false
+    ) -> Bool {
+        guard drawingController.insertImages(
+            images,
+            atViewportCenter: atViewportCenter
+        ) else {
             return false
         }
         resetToPen()
@@ -2887,14 +2893,20 @@ private final class DrawingBoardViewController: NSViewController {
     }
 
     @discardableResult
-    func insertImages(_ images: [TraceCanvasImage]) -> Bool {
+    func insertImages(
+        _ images: [TraceCanvasImage],
+        atViewportCenter: Bool = false
+    ) -> Bool {
         guard document != nil,
               let tldrawCanvas = ensureTldrawCanvas(),
               tldrawCanvas.unavailableReason == nil
         else {
             return false
         }
-        return tldrawCanvas.insertImages(images)
+        return tldrawCanvas.insertImages(
+            images,
+            atViewportCenter: atViewportCenter
+        )
     }
 
     @discardableResult
