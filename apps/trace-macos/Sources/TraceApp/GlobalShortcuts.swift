@@ -128,6 +128,13 @@ enum TraceGlobalShortcutMenuPresentation {
                     action: action,
                     to: item
                 )
+                for source in item.submenu?.items ?? [] where source.action == item.action {
+                    apply(
+                        snapshot.assignment(for: action),
+                        action: action,
+                        to: source
+                    )
+                }
             }
         }
     }

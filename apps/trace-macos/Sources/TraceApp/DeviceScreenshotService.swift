@@ -132,6 +132,8 @@ enum TraceDeviceScreenshotMenu {
             keyEquivalent: ""
         )
         desktop.target = target
+        desktop.keyEquivalent = item.keyEquivalent
+        desktop.keyEquivalentModifierMask = item.keyEquivalentModifierMask
         menu.addItem(desktop)
         menu.addItem(.separator())
         for device in devices {

@@ -196,6 +196,9 @@ When devices are found, **New Screenshot trace** in the menu bar and File menu
 becomes a source submenu. Its first entry is `from <frontmost app>.app`, followed
 by `from <device name>` entries. Without devices, the original desktop capture
 action and shortcut remain unchanged.
+The desktop source also shows the configured capture shortcut, making its
+target explicit; device sources have no shortcut. Changing the shortcut in
+Setup updates both the parent item and desktop source.
 
 Selecting a device creates a blank trace if none is open, or inserts an editable
 screenshot centered in the current viewport without changing its zoom or

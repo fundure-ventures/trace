@@ -45,6 +45,7 @@ enum TraceDeviceScreenshotProbe {
 
         let target = MenuTarget()
         let parent = NSMenuItem(title: "New Screenshot trace", action: nil, keyEquivalent: "2")
+        parent.keyEquivalentModifierMask = [.command, .shift]
         let desktopAction = NSSelectorFromString("captureDesktop")
         let deviceAction = NSSelectorFromString("captureDevice:")
         TraceDeviceScreenshotMenu.configure(
@@ -55,6 +56,12 @@ enum TraceDeviceScreenshotProbe {
         try check(submenu.delegate === target, "Screenshot submenu does not notify its owner when opened")
         try check(submenu.items.first?.title == "from GitHub.app", "Desktop source must come first")
         try check(submenu.items.first?.action == desktopAction, "Desktop source lost its action")
+        try check(
+            submenu.items.first?.keyEquivalent == "2"
+                && submenu.items.first?.keyEquivalentModifierMask == [.command, .shift],
+            "Desktop source did not show its capture shortcut"
+        )
+        try check(submenu.items[2].keyEquivalent.isEmpty, "Device source claimed the desktop shortcut")
         try check(submenu.items[1].isSeparatorItem, "Desktop/device separator missing")
         try check(submenu.items[2].title == "from Pixel 9", "Device source label incorrect")
         try check(submenu.items[2].representedObject as? TraceScreenshotDevice == android[0], "Device menu lost its capture target")
