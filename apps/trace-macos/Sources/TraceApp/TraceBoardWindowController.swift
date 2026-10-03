@@ -476,8 +476,14 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @discardableResult
-    func insertImages(_ images: [TraceCanvasImage]) -> Bool {
-        guard drawingController.insertImages(images) else {
+    func insertImages(
+        _ images: [TraceCanvasImage],
+        atViewportCenter: Bool = false
+    ) -> Bool {
+        guard drawingController.insertImages(
+            images,
+            atViewportCenter: atViewportCenter
+        ) else {
             return false
         }
         resetToPen()
@@ -949,12 +955,12 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         annotationToolbar.pressToolSizeArrowForTesting(keyCode)
     }
 
-    var controlAccentPresentationForPreview: (
-        brush: Bool,
+    var controlTintPresentationForPreview: (
+        brushNeutral: Bool,
         grid: Bool,
         slider: Bool
     ) {
-        annotationToolbar.controlAccentPresentationForTesting
+        annotationToolbar.controlTintPresentationForTesting
     }
 
     var actionHoverPresentationForPreview: (
@@ -2857,14 +2863,20 @@ private final class DrawingBoardViewController: NSViewController {
     }
 
     @discardableResult
-    func insertImages(_ images: [TraceCanvasImage]) -> Bool {
+    func insertImages(
+        _ images: [TraceCanvasImage],
+        atViewportCenter: Bool = false
+    ) -> Bool {
         guard document != nil,
               let tldrawCanvas = ensureTldrawCanvas(),
               tldrawCanvas.unavailableReason == nil
         else {
             return false
         }
-        return tldrawCanvas.insertImages(images)
+        return tldrawCanvas.insertImages(
+            images,
+            atViewportCenter: atViewportCenter
+        )
     }
 
     @discardableResult
@@ -3251,8 +3263,12 @@ private final class FloatingAnnotationToolbar:
     private static let drawingToolSymbolPointSize: CGFloat = 18
     private static let gridSymbolPointSize: CGFloat = 14
     private static let chevronSymbolPointSize: CGFloat = 9
-    private static let recordingAccentColor =
-        NSColor.systemRed.withAlphaComponent(0.78)
+    private static let recordingAccentColor = NSColor(
+        srgbRed: 1,
+        green: 83.0 / 255,
+        blue: 71.0 / 255,
+        alpha: 1
+    )
 
     var onToolChange: ((TraceToolState) -> Void)?
     var onCopy: ((TraceCopyContent) -> Void)?
@@ -3345,7 +3361,8 @@ private final class FloatingAnnotationToolbar:
 
         brushControl.segmentStyle = .separated
         brushControl.controlSize = .small
-        brushControl.selectedSegmentBezelColor = .controlAccentColor
+        // Keep AppKit's active selection as muted as its inactive selection.
+        brushControl.selectedSegmentBezelColor = .clear
         brushControl.target = self
         brushControl.action = #selector(changeBrush)
         let drawingTools = [
@@ -3408,15 +3425,15 @@ private final class FloatingAnnotationToolbar:
             ),
             (.square, "Square", "square.grid.3x3", "square.grid.2x2"),
             (
-                .horizontal,
-                "Horizontal",
-                "rectangle.split.3x1",
+                .rows,
+                "Rows",
+                "rectangle.split.1x2",
                 "line.3.horizontal"
             ),
             (
-                .vertical,
-                "Vertical",
-                "rectangle.split.1x2",
+                .cols,
+                "Cols",
+                "rectangle.split.3x1",
                 "line.3.horizontal.decrease"
             ),
         ]
@@ -4265,14 +4282,15 @@ private final class FloatingAnnotationToolbar:
         return true
     }
 
-    var controlAccentPresentationForTesting: (
-        brush: Bool,
+    var controlTintPresentationForTesting: (
+        brushNeutral: Bool,
         grid: Bool,
         slider: Bool
     ) {
         (
-            brush: brushControl.selectedSegmentBezelColor?
-                .isEqual(NSColor.controlAccentColor) == true,
+            brushNeutral: brushControl.selectedSegmentBezelColor?.isEqual(
+                NSColor.clear
+            ) == true,
             grid: gridControl.contentTintColor?
                 .isEqual(NSColor.controlAccentColor) == true,
             slider: widthSlider.trackFillColor?

@@ -592,11 +592,11 @@ enum TraceRetainedInkProbe {
         let recording = board.voicePresentationForPreview
         guard recording.labelHidden,
               recording.toggleSymbol == "stop.circle.fill",
-              isSoftRed(recording.toggleTint),
+              isVividScarlet(recording.toggleTint),
               isNeutral(recording.waveformColor)
         else {
             throw probeError(
-                "recording voice UI did not use neutral wave and red stop circle"
+                "recording voice UI did not use neutral wave and vivid scarlet stop circle"
             )
         }
         board.resetVoiceStateApplyCountForPreview()
@@ -660,14 +660,14 @@ enum TraceRetainedInkProbe {
             && color.redComponent > color.blueComponent * 1.5
     }
 
-    private static func isSoftRed(_ color: NSColor?) -> Bool {
-        guard isRed(color),
-              let color = color?.usingColorSpace(.deviceRGB)
-        else {
+    private static func isVividScarlet(_ color: NSColor?) -> Bool {
+        guard let color = color?.usingColorSpace(.deviceRGB) else {
             return false
         }
-        return color.alphaComponent >= 0.65
-            && color.alphaComponent < 0.9
+        return abs(color.redComponent - 1) < 0.005
+            && abs(color.greenComponent - 83.0 / 255) < 0.005
+            && abs(color.blueComponent - 71.0 / 255) < 0.005
+            && abs(color.alphaComponent - 1) < 0.005
     }
 
     private static func isNeutral(_ color: NSColor) -> Bool {
@@ -1287,7 +1287,7 @@ enum TraceRetainedInkProbe {
                   (35.5...36.5).contains($0)
               }),
               appearance.selectedCount == 1,
-              board.controlAccentPresentationForPreview.brush,
+              board.controlTintPresentationForPreview.brushNeutral,
               (32...34).contains(sizing.active.gridToColorsGap),
               abs(
                   sizing.active.toolbarWidth - sizing.inactive.toolbarWidth
@@ -1427,7 +1427,7 @@ enum TraceRetainedInkProbe {
         let layout = board.toolbarGroupLayoutForPreview
         board.updateVoiceState(.recording(transcribedChunks: 0))
         let icons = board.toolbarIconMetricsForPreview
-        let accents = board.controlAccentPresentationForPreview
+        let tints = board.controlTintPresentationForPreview
         let spacing = board.gridSpacingPresentationForPreview
         let sizing = board.toolbarSizingForPreview
         let gridSelector = board.gridSelectorPresentationForPreview
@@ -1504,8 +1504,8 @@ enum TraceRetainedInkProbe {
                   "No grid",
                   "Dots",
                   "Square",
-                  "Horizontal",
-                  "Vertical",
+                  "Rows",
+                  "Cols",
               ],
               gridSelector.menuImageCount == 5
         else {
@@ -1518,12 +1518,12 @@ enum TraceRetainedInkProbe {
         board.onToolChange = { state in
             selectedGridStyle = state.gridStyle
         }
-        board.selectGridStyleForPreview(.horizontal)
+        board.selectGridStyleForPreview(.rows)
         let selectedGrid = board.gridSelectorPresentationForPreview
         let selectedGridSizing = board.toolbarSizingForPreview
-        guard selectedGridStyle == .horizontal,
-              selectedGrid.selectedTitle == "Horizontal",
-              selectedGrid.selectedStyle == .horizontal,
+        guard selectedGridStyle == .rows,
+              selectedGrid.selectedTitle == "Rows",
+              selectedGrid.selectedStyle == .rows,
               selectedGridSizing.active.spacingVisible
         else {
             throw probeError(
@@ -1531,12 +1531,12 @@ enum TraceRetainedInkProbe {
             )
         }
         try verifyDrawingToolControls(board)
-        guard accents.brush,
-              accents.grid,
-              !accents.slider
+        guard tints.brushNeutral,
+              tints.grid,
+              !tints.slider
         else {
             throw probeError(
-                "toolbar accents did not match production"
+                "toolbar tints did not match production"
             )
         }
         guard spacing.unitText == nil,
@@ -2069,8 +2069,8 @@ enum TraceRetainedInkProbe {
         for style in [
             TraceGridStyle.dots,
             .square,
-            .horizontal,
-            .vertical,
+            .rows,
+            .cols,
         ] {
             let lightGrid = TraceGridContrastPolicy.gridColor(
                 for: .white,
@@ -2099,8 +2099,8 @@ enum TraceRetainedInkProbe {
         let styles: [TraceGridStyle] = [
             .dots,
             .square,
-            .horizontal,
-            .vertical,
+            .rows,
+            .cols,
         ]
         let iterations = 160
         let finalStyle = styles[(iterations - 1) % styles.count]

@@ -3,6 +3,19 @@ import Darwin
 
 #if DEBUG
 let environment = ProcessInfo.processInfo.environment
+if environment["TRACE_DEVICE_SCREENSHOT_PROBE"] == "1" {
+    _ = NSApplication.shared
+    do {
+        try MainActor.assumeIsolated {
+            try TraceDeviceScreenshotProbe.run()
+        }
+        print("device screenshot probe passed")
+        exit(0)
+    } catch {
+        fputs("device screenshot probe failed: \(error)\n", stderr)
+        exit(1)
+    }
+}
 if environment["TRACE_HARDWARE_FREE_SETUP_SNAPSHOT"] != nil
     || environment["TRACE_HARDWARE_FREE_CALIBRATION_SNAPSHOT"] != nil
     || environment["TRACE_HARDWARE_FREE_TOOLBAR_SNAPSHOT"] != nil

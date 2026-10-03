@@ -37,6 +37,7 @@ import {
   opacityForStroke,
 } from './inkPalette'
 import { applyInkPalette } from './traceInkShapes'
+import { viewportImagePlacement } from './imagePlacement'
 import {
   TRACE_ANNOTATION_SHAPE_TYPE,
   type TraceAnnotationShape,
@@ -58,8 +59,8 @@ export type ProductGrid =
   | 'none'
   | 'dots'
   | 'square'
-  | 'horizontal'
-  | 'vertical'
+  | 'rows'
+  | 'cols'
 
 export interface ProductPoint {
   x: number
@@ -145,7 +146,7 @@ export interface TraceProductRendererBridge {
   setBackground(color: string): void
   applyAnnotationUpdate(update: ProductAnnotationUpdate): void
   insertImage(image: ProductImage): void
-  insertImages(images: ProductImage[]): void
+  insertImages(images: ProductImage[], atViewportCenter?: boolean): void
   waitForIdle(): Promise<void>
   getSnapshot(): {
     documentId: string
@@ -885,9 +886,12 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     },
   )
 
-  const insertUserImages = (images: ProductImage[]) => {
+  const insertUserImages = (images: ProductImage[], atViewportCenter = false) => {
     if (images.length === 0) return
-    const placements = images.length > 1
+    const viewport = editor.getViewportPageBounds()
+    const placements = atViewportCenter
+      ? images.map(() => viewportImagePlacement(viewport))
+      : images.length > 1
       ? batchImagePlacements(
           images.length,
           pageWidth,
@@ -1167,8 +1171,8 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       insertUserImages([image])
     },
 
-    insertImages(images) {
-      insertUserImages(images)
+    insertImages(images, atViewportCenter = false) {
+      insertUserImages(images, atViewportCenter)
     },
 
     getSnapshotJson() {

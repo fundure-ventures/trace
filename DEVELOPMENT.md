@@ -135,7 +135,8 @@ a release. Its checked-in definition is
 
 The skill:
 
-1. Collects and validates the app version and build number.
+1. Derives the next patch version and globally higher build number from
+   published GitHub Releases, then validates them.
 2. Drafts release notes for explicit approval.
 3. Builds `.build/Trace.app` from current `main`.
 4. Developer ID-signs, notarizes, staples, and Gatekeeper-verifies it.
@@ -188,6 +189,53 @@ It also checks native Copy routing for selected text, a text caret, and objects
 selected before holding Command, without writing to the system clipboard.
 
 ## Diagnostics
+
+### Connected-device screenshots
+
+When devices are found, **New Screenshot trace** in the menu bar and File menu
+becomes a source submenu. Its first entry is `from <frontmost app>.app`, followed
+by `from <device name>` entries. Without devices, the original desktop capture
+action and shortcut remain unchanged.
+The desktop source also shows the configured capture shortcut, making its
+target explicit; device sources have no shortcut. Changing the shortcut in
+Setup updates both the parent item and desktop source.
+
+Selecting a device creates a blank trace if none is open, or inserts an editable
+screenshot centered in the current viewport without changing its zoom or
+replacing the open document. The desktop source retains the existing new-trace
+behavior. Device capture errors leave the existing trace intact.
+
+- Android requires an installed `adb` (SDK Platform Tools), debugging enabled,
+  and authorization on the device. Trace searches PATH, Homebrew, the standard
+  Android SDK location, `ANDROID_HOME`, and `ANDROID_SDK_ROOT`. Unauthorized and
+  offline devices appear disabled with setup hints.
+- Physical iOS devices require a paired, available device and an Xcode version
+  providing `devicectl device capture screenshot` (verified with Xcode 27).
+  Wi-Fi capture works for already-paired devices on the same network; being on
+  the same network alone does not grant access. Trace also checks the standard
+  `/Applications/Xcode.app` when the selected developer tools cannot resolve
+  `devicectl`. Simulator entries are excluded.
+- Devices are refreshed every ten seconds and when opening the source menu.
+  Opening the screenshot submenu also warms available iOS connections with a
+  background display-information request, without taking a screenshot.
+  In-flight requests and requests finished in the last ten seconds are skipped.
+  Warm-up failures are logged but never prevent capture, and there is no
+  continuous connection keep-alive. Clicking immediately can still incur
+  connection setup time.
+  Tool availability is resolved once per app session; restart Trace after
+  installing ADB or Xcode. Neither tool is bundled with Trace.
+- Captures run off the UI thread with timeouts and private temporary files.
+  Android secure windows may produce blank screenshots.
+
+Focused native checks on an already-built debug executable:
+
+```sh
+TRACE_DEVICE_SCREENSHOT_PROBE=1 .build/debug/trace
+```
+
+These cover discovery parsing, source-menu ordering and availability,
+new-document versus current-document routing, command failures, and timeouts.
+Web viewport-placement checks are included in `WebCanvas`'s test suite.
 
 ```sh
 ./tools/neo-diagnostics

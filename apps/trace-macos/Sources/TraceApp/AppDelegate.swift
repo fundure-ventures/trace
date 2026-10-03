@@ -337,7 +337,8 @@ enum TracePasteboardImage {
 final class TraceAppDelegate:
     NSObject,
     NSApplicationDelegate,
-    NSMenuItemValidation
+    NSMenuItemValidation,
+    NSMenuDelegate
 {
     private enum DrawingEditSource {
         case native
@@ -348,6 +349,9 @@ final class TraceAppDelegate:
     private let board = TraceBoardWindowController()
     private let projection = TraceProjectionCoordinator()
     private let globalShortcuts = TraceGlobalShortcutManager()
+    private let deviceScreenshots = DeviceScreenshotService()
+    private var screenshotMenuItems: [NSMenuItem] = []
+    private var openScreenshotMenus = Set<ObjectIdentifier>()
     private var statusItem: NSStatusItem?
     private weak var statusMenu: NSMenu?
     private var statusShortcutMenuItems:
@@ -449,6 +453,13 @@ final class TraceAppDelegate:
         configureBoard()
         configureStatusItem()
         configureMainMenu()
+        deviceScreenshots.onDevicesChange = { [weak self] in
+            guard let self, self.openScreenshotMenus.isEmpty else { return }
+            self.refreshScreenshotMenus()
+        }
+        if !isUIPreview {
+            deviceScreenshots.start()
+        }
         if !isUIPreview {
             do {
                 try updateLaunchInMenuBarAtLogin(
@@ -682,6 +693,7 @@ final class TraceAppDelegate:
             )
         }
         globalShortcuts.stop()
+        deviceScreenshots.stop()
         projection.stop()
         model.stop()
     }
@@ -920,6 +932,7 @@ final class TraceAppDelegate:
         item.button?.image?.isTemplate = true
 
         let menu = NSMenu()
+        menu.delegate = self
 
         let showBoard = NSMenuItem(
             title: TraceAppMenuPresentation.newBlankTrace,
@@ -935,6 +948,7 @@ final class TraceAppDelegate:
             keyEquivalent: ""
         )
         capture.target = self
+        screenshotMenuItems.append(capture)
         menu.addItem(capture)
         statusShortcutMenuItems = [
             .newBlankTrace: [showBoard],
@@ -1226,6 +1240,7 @@ final class TraceAppDelegate:
         let fileItem = NSMenuItem()
         main.addItem(fileItem)
         let fileMenu = NSMenu(title: "File")
+        fileMenu.delegate = self
         let blankItem = NSMenuItem(
             title: TraceAppMenuPresentation.newBlankTrace,
             action: #selector(showBoard),
@@ -1239,6 +1254,7 @@ final class TraceAppDelegate:
             keyEquivalent: ""
         )
         newItem.target = self
+        screenshotMenuItems.append(newItem)
         fileMenu.addItem(newItem)
         fileShortcutMenuItems = [
             .newBlankTrace: [blankItem],
@@ -1583,6 +1599,86 @@ final class TraceAppDelegate:
         }
     }
 
+    func menuWillOpen(_ menu: NSMenu) {
+        if screenshotMenuItems.contains(where: { $0.submenu === menu }) {
+            deviceScreenshots.warmAvailableIOSDevices()
+            return
+        }
+        refreshScreenshotMenus()
+        openScreenshotMenus.insert(ObjectIdentifier(menu))
+        deviceScreenshots.refresh()
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        openScreenshotMenus.remove(ObjectIdentifier(menu))
+    }
+
+    private func refreshScreenshotMenus() {
+        let app = NSWorkspace.shared.frontmostApplication
+        let applicationName = WindowCaptureService().frontmostApplicationName
+            ?? (app?.processIdentifier != ProcessInfo.processInfo.processIdentifier
+                ? app?.bundleURL?.lastPathComponent : nil)
+            ?? "frontmost app"
+        for item in screenshotMenuItems {
+            TraceDeviceScreenshotMenu.configure(
+                item,
+                devices: deviceScreenshots.devices,
+                applicationName: applicationName,
+                target: self,
+                desktopAction: #selector(newCapture),
+                deviceAction: #selector(captureDeviceScreenshot(_:)),
+                capturing: deviceScreenshots.isCapturing
+            )
+        }
+    }
+
+    @objc private func captureDeviceScreenshot(_ sender: NSMenuItem) {
+        guard let device = sender.representedObject as? TraceScreenshotDevice else {
+            NSSound.beep()
+            return
+        }
+        let documentID = model.snapshot.currentDocument?.manifest.id
+        deviceScreenshots.capture(device) { [weak self] result in
+            guard let self else { return }
+            do {
+                let image = try result.get()
+                guard self.model.snapshot.currentDocument?.manifest.id == documentID else {
+                    throw TraceDeviceScreenshotError.failed(
+                        "The open trace changed during capture. Capture again to insert into the current trace."
+                    )
+                }
+                let inserted = TraceDeviceScreenshotMenu.insert(
+                    hasDocument: documentID != nil,
+                    createDocument: {
+                        let screen = NSScreen.main ?? NSScreen.screens.first
+                        return self.model.newBlankPage(
+                            size: self.model.preferredBlankViewportSize,
+                            backingScale: screen?.backingScaleFactor ?? 2,
+                            activatesProjectOutput: false
+                        )
+                    },
+                    insertImage: {
+                        self.board.insertImages(
+                            [TraceCanvasImage(image: image, name: device.menuTitle)],
+                            atViewportCenter: true
+                        )
+                    }
+                )
+                guard inserted else {
+                    throw TraceDeviceScreenshotError.failed("Trace could not insert the device screenshot.")
+                }
+                self.board.setEditorVisible(true)
+            } catch {
+                NSLog("Trace device screenshot failed: %@", error.localizedDescription)
+                let alert = NSAlert()
+                alert.alertStyle = .warning
+                alert.messageText = "Trace could not capture the device"
+                alert.informativeText = error.localizedDescription
+                alert.runModal()
+            }
+        }
+    }
+
     @objc private func toggleCaptureOnCapOff(_ sender: NSMenuItem) {
         model.setCaptureScreenshotOnCapOff(sender.state != .on)
     }
@@ -1829,6 +1925,11 @@ final class TraceAppDelegate:
             NSApp.keyWindow?.firstResponder as? NSTextView
         ).flatMap { $0.isEditable ? $0.undoManager : nil }
         switch menuItem.action {
+        case #selector(captureDeviceScreenshot(_:)):
+            guard let device = menuItem.representedObject as? TraceScreenshotDevice else {
+                return false
+            }
+            return !deviceScreenshots.isCapturing && device.unavailableReason == nil
         case #selector(undoDrawing(_:)):
             return textUndoManager?.canUndo
                 ?? (board.canUndoTldraw || model.snapshot.canUndo)
