@@ -2,6 +2,8 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+DEVELOPER_DIR=$("$ROOT/tools/resolve-xcode-developer-dir")
+export DEVELOPER_DIR
 CONFIGURATION=${TRACE_BUILD_CONFIGURATION:-debug}
 APP="$ROOT/.build/Trace Input Lab.app"
 CONTENTS="$APP/Contents"
@@ -11,6 +13,11 @@ INTERPOLATION_ALGORITHM=${TRACE_INTERPOLATION_ALGORITHM:-circular-arc}
 STROKE_REFINEMENT=${TRACE_STROKE_REFINEMENT:-smooth-path}
 PREDICTION_ALGORITHM=${TRACE_PREDICTION_ALGORITHM:-velocity}
 RENDERER_MODE=${TRACE_RENDERER_MODE:-trace}
+if [[ "${TRACE_SIDECAR_INPUT_PROBE:-0}" == "1"
+    && ( "$CONFIGURATION" != "debug" || -n "${TRACE_REPLAY_LOG:-}" ) ]]; then
+    echo "Sidecar probing requires a debug build without replay." >&2
+    exit 2
+fi
 WEB_ROOT="$ROOT/apps/trace-macos/WebCanvas"
 WEB_RESOURCES="$CONTENTS/Resources/WebCanvas"
 
@@ -111,6 +118,10 @@ ARGS=(
     --prediction-algorithm "$PREDICTION_ALGORITHM"
     --renderer "$RENDERER_MODE"
 )
+
+if [[ "${TRACE_SIDECAR_INPUT_PROBE:-0}" == "1" ]]; then
+    ARGS+=(--sidecar-probe)
+fi
 
 if [[ -n "${TRACE_REPLAY_LOG:-}" ]]; then
     ARGS+=(--replay "$TRACE_REPLAY_LOG")

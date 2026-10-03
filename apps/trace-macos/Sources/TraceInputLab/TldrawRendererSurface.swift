@@ -3,6 +3,9 @@ import NeoInput
 import TraceCalibration
 import TraceGeometry
 import WebKit
+#if DEBUG
+import TraceSidecarProbe
+#endif
 
 final class TldrawRendererSurface:
     NSObject,
@@ -404,6 +407,9 @@ final class TldrawRendererSurface:
     init(resourceDirectory: URL?) {
         self.resourceDirectory = resourceDirectory
         let configuration = WKWebViewConfiguration()
+#if DEBUG
+        SidecarInputProbe.shared.installWebProbe(in: configuration)
+#endif
         configuration.preferences.isElementFullscreenEnabled = false
         let resourceSchemeHandler = TldrawResourceSchemeHandler(
             resourceDirectory: resourceDirectory

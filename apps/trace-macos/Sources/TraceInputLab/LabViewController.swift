@@ -3,6 +3,9 @@ import NeoInput
 import TraceCalibration
 import TraceMetrics
 import TraceStrokeProcessing
+#if DEBUG
+import TraceSidecarProbe
+#endif
 
 /*
  THESIS: A raw pen trace should fill the window; measurement supports it rather
@@ -511,6 +514,9 @@ final class LabViewController: NSViewController {
             return
         }
         model.setRendererMode(mode)
+#if DEBUG
+        SidecarInputProbe.shared.log("renderer", mode.title)
+#endif
     }
 
     @objc private func changeStrategy() {

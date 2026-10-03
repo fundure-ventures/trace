@@ -1,5 +1,8 @@
 import AppKit
 import Darwin
+#if DEBUG
+import TraceSidecarProbe
+#endif
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let configuration: LabConfiguration
@@ -52,14 +55,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 #endif
         do {
-            if configuration.replayURL == nil {
+#if DEBUG
+            let sidecarProbe = SidecarInputProbe.shared
+            try sidecarProbe.start()
+            let usesSidecarProbe = sidecarProbe.isEnabled
+#else
+            let usesSidecarProbe = false
+#endif
+            if configuration.replayURL == nil && !usesSidecarProbe {
                 liveInstanceLock = try LiveInstanceLock()
             }
             let model: LabModel
 #if DEBUG
             if ProcessInfo.processInfo.environment[
                 "TRACE_LAB_NO_HARDWARE"
-            ] == "1" {
+            ] == "1" || usesSidecarProbe {
                 model = try LabModel(
                     configuration: configuration,
                     transport: RendererProbeTransport()
@@ -102,6 +112,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 LabPaperLayout.preferredWindowContentSize
             )
             window.center()
+#if DEBUG
+            if usesSidecarProbe {
+                window.title = "Trace Input Lab - Sidecar Probe"
+                window.acceptsMouseMovedEvents = true
+                sidecarProbe.attachRecognizer(to: window)
+                installSidecarProbeMenu()
+                sidecarProbe.log("renderer", configuration.rendererMode.title)
+            }
+#endif
 
             self.model = model
             self.window = window
@@ -161,6 +180,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
 #if DEBUG
+    private func installSidecarProbeMenu() {
+        let mainMenu = NSApp.mainMenu ?? NSMenu()
+        if NSApp.mainMenu == nil {
+            let appItem = NSMenuItem()
+            let appMenu = NSMenu()
+            appMenu.addItem(withTitle: "Quit Input Lab",
+                action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            appItem.submenu = appMenu
+            mainMenu.addItem(appItem)
+            NSApp.mainMenu = mainMenu
+        }
+        let probeItem = NSMenuItem(title: "Probe", action: nil, keyEquivalent: "")
+        let probeMenu = NSMenu(title: "Probe")
+        for title in [
+            "Baseline mouse", "Pencil hover", "Pencil strokes",
+            "Pencil attached", "Pencil detached", "Finger touch",
+            "Disconnect Sidecar", "Reconnect Sidecar", "Finished",
+        ] {
+            let item = NSMenuItem(title: title,
+                action: #selector(SidecarInputProbe.markStep(_:)), keyEquivalent: "")
+            item.target = SidecarInputProbe.shared
+            probeMenu.addItem(item)
+        }
+        probeItem.submenu = probeMenu
+        mainMenu.addItem(probeItem)
+    }
+
     private func writeSnapshot(
         of window: NSWindow,
         to url: URL

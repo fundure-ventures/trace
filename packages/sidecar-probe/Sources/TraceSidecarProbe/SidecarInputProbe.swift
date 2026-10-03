@@ -1,43 +1,47 @@
 #if DEBUG
 import AppKit
 import CoreGraphics
+import WebKit
 
 /// DEBUG-only diagnostics for Sidecar + Apple Pencil input and display changes.
 /// Enabled with TRACE_SIDECAR_INPUT_PROBE=1; writes to /tmp/trace-sidecar-probe.log.
-final class SidecarInputProbe {
-    static let shared = SidecarInputProbe()
-    static let logPath = "/tmp/trace-sidecar-probe.log"
+public final class SidecarInputProbe: NSObject, WKScriptMessageHandler {
+    public static let shared = SidecarInputProbe()
+    public static let logPath = "/tmp/trace-sidecar-probe.log"
 
-    let isEnabled =
+    public let isEnabled =
         ProcessInfo.processInfo.environment["TRACE_SIDECAR_INPUT_PROBE"] == "1"
+        || CommandLine.arguments.contains("--sidecar-probe")
 
     private var monitors: [Any] = []
     private var observers: [NSObjectProtocol] = []
     private var probedViews = NSHashTable<NSView>.weakObjects()
-    private let fileHandle: FileHandle?
+    private var fileHandle: FileHandle?
     private let timestamp: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss.SSS"
         return formatter
     }()
 
-    private init() {
-        guard isEnabled else {
-            fileHandle = nil
-            return
-        }
-        FileManager.default.createFile(atPath: Self.logPath, contents: nil)
-        fileHandle = FileHandle(forWritingAtPath: Self.logPath)
+    private override init() {
+        fileHandle = nil
+        super.init()
     }
 
-    func log(_ source: String, _ message: String) {
+    public func log(_ source: String, _ message: String) {
         guard isEnabled else { return }
         let line = "\(timestamp.string(from: Date())) [\(source)] \(message)\n"
-        fileHandle?.write(Data(line.utf8))
+        do {
+            try fileHandle?.write(contentsOf: Data(line.utf8))
+        } catch {
+            fputs("Sidecar probe write failed: \(error.localizedDescription)\n", stderr)
+        }
     }
 
-    func start() {
+    public func start() throws {
         guard isEnabled, monitors.isEmpty else { return }
+        try Data().write(to: URL(fileURLWithPath: Self.logPath), options: .atomic)
+        fileHandle = try FileHandle(forWritingTo: URL(fileURLWithPath: Self.logPath))
         log("probe", "started pid=\(ProcessInfo.processInfo.processIdentifier)")
         logScreens(reason: "launch")
 
@@ -58,6 +62,8 @@ final class SidecarInputProbe {
             }
         ) {
             monitors.append(local)
+        } else {
+            log("probe", "local event monitor unavailable")
         }
         if let global = NSEvent.addGlobalMonitorForEvents(
             matching: mask,
@@ -66,6 +72,8 @@ final class SidecarInputProbe {
             }
         ) {
             monitors.append(global)
+        } else {
+            log("probe", "global event monitor unavailable; local probes remain active")
         }
 
         let center = NotificationCenter.default
@@ -101,11 +109,10 @@ final class SidecarInputProbe {
                 self?.attachRecognizer(to: window)
             }
         )
-        CGDisplayRegisterReconfigurationCallback(
+        let registration = CGDisplayRegisterReconfigurationCallback(
             { display, flags, _ in
                 guard !flags.contains(.beginConfigurationFlag) else { return }
-                SidecarInputProbe.shared.log(
-                    "cgdisplay",
+                let detail =
                     "id=\(display) flags=\(flags.rawValue) "
                         + "added=\(flags.contains(.addFlag)) "
                         + "removed=\(flags.contains(.removeFlag)) "
@@ -114,14 +121,19 @@ final class SidecarInputProbe {
                         + "vendor=\(CGDisplayVendorNumber(display)) "
                         + "model=\(CGDisplayModelNumber(display)) "
                         + "serial=\(CGDisplaySerialNumber(display))"
-                )
+                DispatchQueue.main.async {
+                    SidecarInputProbe.shared.log("cgdisplay", detail)
+                }
             },
             nil
         )
+        if registration != .success {
+            log("probe", "CG display callback unavailable: \(registration.rawValue)")
+        }
         NSApp.windows.forEach(attachRecognizer(to:))
     }
 
-    func attachRecognizer(to window: NSWindow) {
+    public func attachRecognizer(to window: NSWindow) {
         guard isEnabled, let view = window.contentView,
             !probedViews.contains(view)
         else { return }
@@ -152,7 +164,7 @@ final class SidecarInputProbe {
         }
     }
 
-    static func describe(_ event: NSEvent) -> String {
+    public static func describe(_ event: NSEvent) -> String {
         var fields = [
             "type=\(event.type.rawValue)",
             "window=\(event.window.map { "\(type(of: $0))" } ?? "nil")",
@@ -196,6 +208,46 @@ final class SidecarInputProbe {
             ])
         }
         return fields.joined(separator: " ")
+    }
+
+    public func installWebProbe(in configuration: WKWebViewConfiguration) {
+        guard isEnabled else { return }
+        configuration.userContentController.add(self, name: "sidecarProbe")
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: """
+            for (const type of [
+              'pointerover', 'pointerenter', 'pointerdown', 'pointermove',
+              'pointerup', 'pointercancel', 'pointerout', 'pointerleave'
+            ]) {
+              window.addEventListener(type, event => {
+                const fields = { eventType: event.type };
+                for (const key of [
+                  'pointerType', 'pointerId', 'isPrimary', 'pressure',
+                  'tangentialPressure', 'tiltX', 'tiltY', 'twist',
+                  'width', 'height', 'buttons', 'clientX', 'clientY'
+                ]) fields[key] = event[key];
+                window.webkit.messageHandlers.sidecarProbe.postMessage(fields);
+              }, { capture: true, passive: true });
+            }
+            window.webkit.messageHandlers.sidecarProbe.postMessage({eventType: 'installed'});
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
+    }
+
+    public func userContentController(
+        _ userContentController: WKUserContentController,
+        didReceive message: WKScriptMessage
+    ) {
+        guard let fields = message.body as? [String: Any] else { return }
+        log("web", fields.keys.sorted().map {
+            "\($0)=\(String(describing: fields[$0]!))"
+        }.joined(separator: " "))
+    }
+
+    @objc public func markStep(_ sender: NSMenuItem) {
+        log("marker", sender.title)
     }
 }
 

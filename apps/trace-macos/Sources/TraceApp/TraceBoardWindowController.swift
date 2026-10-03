@@ -6654,3 +6654,6 @@ extension NSColor {
         )
     }
 }
+#if DEBUG
+import TraceSidecarProbe
+#endif

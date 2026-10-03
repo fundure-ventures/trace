@@ -201,6 +201,40 @@ TRACE_BUILD_ONLY=1 ./tools/neo-diagnostics
 TRACE_BUILD_ONLY=1 ./tools/trace-input-lab
 ```
 
+### Sidecar and Apple Pencil probes
+
+Use the Input Lab rather than the Trace product app:
+
+```sh
+TRACE_SIDECAR_INPUT_PROBE=1 ./tools/trace-input-lab
+```
+
+This DEBUG-only mode opens a visible **Trace Input Lab - Sidecar Probe**
+window, uses the existing no-hardware transport instead of Bluetooth, and
+does not acquire the Neo pen's live-instance lock. The launcher passes
+`--sidecar-probe` explicitly; no global `launchctl` environment is needed.
+It records AppKit events, non-consuming gesture observations, tldraw WebKit
+pointer events, and display/window changes to `/tmp/trace-sidecar-probe.log`.
+The file is replaced on each launch, so save it before another run.
+Global monitoring also records mouse events outside the Lab; close the Lab
+when finished. No keyboard events are recorded.
+
+1. Draw a mouse stroke on the Mac first to establish a working baseline.
+2. Connect Sidecar as an extended display and move the Lab window onto the iPad.
+3. Before each action, select its label from the **Probe** menu. Hover the
+   Pencil, draw light and firm strokes, then attach and detach it three times,
+   waiting five seconds between actions. Try finger touch separately.
+4. Repeat hover and drawing with **Trace**, **PaperKit** (where available),
+   and **tldraw** using the renderer dropdown. Changes are logged automatically.
+5. Move the window back to the Mac. Mark and disconnect Sidecar, then mark
+   and reconnect it. Select **Finished** and close the Lab.
+
+Whether a surface draws is itself a result; the probes do not add input
+support or synthesize Pencil events. A silent attach/detach interval is
+meaningful only after mouse and Pencil strokes have confirmed logging works.
+There is no supported magnetic-attachment API, and this probe does not
+automatically initiate Sidecar or move windows.
+
 ## Project constraints
 
 - Trace is an AppKit `LSUIElement` menu agent; the product canvas is the

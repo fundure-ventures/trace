@@ -1668,3 +1668,6 @@ private final class ProductRendererSchemeHandler:
     }
 }
 
+#if DEBUG
+import TraceSidecarProbe
+#endif

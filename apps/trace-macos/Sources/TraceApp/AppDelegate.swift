@@ -4,6 +4,9 @@ import NeoTransport
 import ServiceManagement
 import TraceAppCore
 import UniformTypeIdentifiers
+#if DEBUG
+import TraceSidecarProbe
+#endif
 
 struct TraceCanvasImage {
     let image: NSImage
@@ -386,7 +389,16 @@ final class TraceAppDelegate:
 
     func applicationDidFinishLaunching(_ notification: Notification) {
 #if DEBUG
-        SidecarInputProbe.shared.start()
+        do {
+            try SidecarInputProbe.shared.start()
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Sidecar probe could not start"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+            NSApp.terminate(nil)
+            return
+        }
         let environment = ProcessInfo.processInfo.environment
         let runsProductProbe = ["1", "text", "framing"].contains(
             environment["TRACE_PRODUCT_TLDRAW_PROBE"] ?? ""

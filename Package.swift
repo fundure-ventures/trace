@@ -50,6 +50,19 @@ let package = Package(
         ),
     ],
     targets: [
+        .testTarget(
+            name: "TraceSidecarProbeTests",
+            dependencies: ["TraceSidecarProbe"],
+            path: "packages/sidecar-probe/Tests/TraceSidecarProbeTests"
+        ),
+        .target(
+            name: "TraceSidecarProbe",
+            path: "packages/sidecar-probe/Sources/TraceSidecarProbe",
+            linkerSettings: [
+                .linkedFramework("AppKit"),
+                .linkedFramework("WebKit"),
+            ]
+        ),
         .target(
             name: "NeoTransport",
             path: "packages/neo-transport/Sources/NeoTransport",
@@ -114,6 +127,7 @@ let package = Package(
         .executableTarget(
             name: "TraceInputLab",
             dependencies: [
+                "TraceSidecarProbe",
                 "NeoTransport",
                 "NeoInput",
                 "TraceCalibration",
@@ -137,6 +151,7 @@ let package = Package(
         .executableTarget(
             name: "TraceApp",
             dependencies: [
+                "TraceSidecarProbe",
                 .product(
                     name: "KeyboardShortcuts",
                     package: "KeyboardShortcuts"
