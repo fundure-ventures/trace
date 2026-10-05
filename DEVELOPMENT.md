@@ -148,6 +148,30 @@ The skill:
 6. Creates `vVERSION` on the exact release commit and uploads only the
    notarized ZIP and SHA-256 file to GitHub Releases.
 
+## Code testing quality
+
+The **Acceptance criteria** in the feature files listed in
+[`FEATURES.md`](FEATURES.md) are the source of truth for test assertions.
+Only assertions that protect those user-observable outcomes are relevant.
+
+- Before writing or changing a test, identify the feature and acceptance
+  criterion it protects. If an important outcome is missing, document it in
+  the feature file first; do not invent requirements inside tests.
+- Assert what the user can do and what happens, not internal calls, state
+  structure, component layout, or current constants unless the criterion
+  explicitly requires that observable result.
+- Use the smallest reliable test or probe that demonstrates the outcome.
+  Unit tests are useful when they protect an acceptance criterion; a unit
+  test of a helper alone does not prove that the feature works end to end.
+- Confirm each new test fails when the behavior it protects is broken, then
+  restore the behavior. A passing test without this check is not evidence
+  that it prevents the regression.
+- Refactoring without changing acceptance criteria should not require
+  rewriting assertions. Rewrite or remove tests that freeze implementation
+  details instead of protecting the documented outcome.
+- Keep tests independent of feature-file wording: link their intent to the
+  criterion, but exercise behavior rather than matching documentation text.
+
 ## Test
 
 ```sh

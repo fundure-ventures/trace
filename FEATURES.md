@@ -76,6 +76,31 @@ Every `memory/features/<feature-name>.md` uses these sections, in order:
 - Update the file and inventory in the same change as the feature. Remove both
   when the feature is removed.
 
+## Before changing behavior
+
+1. Find the affected features in the inventory and read their files.
+2. Treat each **Rule** as a requirement. If the change breaks one, confirm with
+   the user before proceeding and update the rule explicitly.
+3. Find relevant decisions in [ADR.md](ADR.md) and read linked ADRs before
+   changing an implementation they cover.
+
+## After changing behavior
+
+- Update the feature file in the same change: Solution, Touchpoints, Rules,
+  FAQ, and Acceptance criteria must match the shipped behavior.
+- New user-facing feature: add `memory/features/<feature-name>.md` and an
+  inventory row here. Removed feature: delete both.
+- New rule: describe its observable outcome under Acceptance criteria and add
+  an appropriate guard (probe, test, or lint). If a guard is missing, disclose
+  that in the change description, not in the feature's UX contract.
+- New durable implementation decision: follow the template and principles in
+  [ADR.md](ADR.md), add the record in `memory/adr/`, and update its inventory.
+- Keep feature files UX-focused. Commands and engineering practice belong in
+  [DEVELOPMENT.md](DEVELOPMENT.md); visual guidelines belong in [DESIGN.md](DESIGN.md).
+- Keep Acceptance criteria independent of test filenames, symbols, and
+  coverage status. They describe what users should experience, not how the
+  repository currently checks it.
+
 ## Feature template
 
 Copy this structure into `memory/features/<feature-name>.md`, replacing the
@@ -117,7 +142,7 @@ Tests assert **Acceptance criteria**, making the feature Rules observable
 without freezing implementation details. Only assertions protecting those
 outcomes are relevant. When tests need updates without a change to acceptance
 criteria, rewrite them against the documented outcome or remove them. See
-[Code testing quality](AGENTS.md#code-testing-quality) for agent guidance.
+[Code testing quality](DEVELOPMENT.md#code-testing-quality) for engineering guidance.
 
 Acceptance criteria describe expected behavior, not proof that it is currently
 tested. Test implementation belongs in the tests themselves; validation
