@@ -175,7 +175,10 @@ current build's folder.
 
 For a launch-time override, set `TRACE_PERSIST_DEBUG_LOGS=1` to enable verbose
 persistence, or `0` to disable it. It overrides the saved preference at startup;
-the menu can still change it for the running process. For example, launch an
+the menu can still change it for the running process. The Copilot app's
+**Launch Debug** operation enables this flag by default, and `tools/trace`
+explicitly forwards it through Launch Services to the app. Release build/sign
+operations do not enable it. For example, launch an
 already built Debug app from Terminal:
 
 ```sh
