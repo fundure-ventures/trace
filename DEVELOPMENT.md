@@ -1,8 +1,6 @@
 # Development
 
-This file covers development setup, commands, and engineering best practices
-only. User-facing behavior and its rules live in [FEATURES.md](FEATURES.md);
-design guidelines live in [DESIGN.md](DESIGN.md).
+This file covers development setup, commands, and engineering best practices.
 
 ## Prerequisites
 
@@ -21,7 +19,7 @@ required macOS 26.5 SDK is not found automatically.
 The repository produces two application bundles:
 
 | Product | Purpose | Output |
-|---|---|---|
+| --- | --- | --- |
 | Trace Debug | Fast local iteration with a separate bundle identity and ad-hoc signature | built at `.build/Trace Debug.app`, launched from `/Applications/Trace Debug.app` |
 | Trace | Production release build, unsigned until the signing step | `.build/Trace.app` |
 

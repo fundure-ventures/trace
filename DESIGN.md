@@ -27,9 +27,7 @@ components:
 
 # Design System: Trace
 
-This file covers visual and interaction design guidelines and best practices
-only. Feature behavior lives in [FEATURES.md](FEATURES.md); development
-practice lives in [DEVELOPMENT.md](DEVELOPMENT.md).
+This file covers visual and interaction design guidelines and best practices.
 
 ## Overview
 

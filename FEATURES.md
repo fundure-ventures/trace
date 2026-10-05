@@ -1,9 +1,9 @@
 # Features
 
 Trace's user-facing behavior, one file per feature in
-[`memory/features/`](memory/features/). Each file is the source of truth for
-*what* the feature does and *which rules must not regress*. Implementation
-rationale lives in [ADR.md](ADR.md).
+[`memory/features/`](memory/features/).
+Each file is the source of truth for
+*what* the feature does and *which rules must not regress*.
 
 ## Tags
 

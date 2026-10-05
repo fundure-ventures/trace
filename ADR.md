@@ -1,9 +1,10 @@
 # Architecture decision records
 
 This is the inventory and documentation guide for durable implementation
-decisions in [`memory/adr/`](memory/adr/). ADRs explain **why** an implementation
-is shaped the way it is. User-facing behavior and acceptance criteria belong
-in [FEATURES.md](FEATURES.md).
+decisions in [`memory/adr/`](memory/adr/).
+
+ADRs explain **why** an implementation
+is shaped the way it is.
 
 ## Inventory
 
