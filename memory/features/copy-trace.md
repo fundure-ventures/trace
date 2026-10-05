@@ -29,9 +29,13 @@ copies the whole trace; its options menu picks the format.
 - **Why did the board close?** "Close window after copy" is enabled.
 - **How do I get a PDF?** Copy options → Copy as .pdf.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Selection/text/caret routing | `ProductTldrawProbe.swift › verifySelectionCopy` (`TRACE_PRODUCT_TLDRAW_PROBE=framing`) |
-| Composite + clipboard payload | `RetainedInkProbe.swift › verifyComposite` |
-| Export planning | `WebCanvas/tests/exportPlanning.test.ts` |
+## Acceptance criteria
+- With nothing selected, pressing `⌘C` copies the trace in the chosen format
+  and closes the board only when the close-after-copy setting is enabled.
+- With shapes or text selected, `⌘C` copies that selection and leaves the
+  board open. While editing text, even a caret alone keeps it a text-copy action.
+- If the current selection cannot be determined, `⌘C` never unexpectedly
+  copies the whole trace.
+- The toolbar Copy action copies the whole trace regardless of selection.
+- Users can choose image and dictation, image, dictation, or PDF; copied
+  images contain neither grid marks nor selection outlines.

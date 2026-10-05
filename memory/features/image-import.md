@@ -28,9 +28,14 @@ Open images from Finder (**Open With → Trace**), drag them onto a board, or
 - **Paste did nothing?** The clipboard has no image.
 - **Can I undo an import?** Yes, the whole batch in one step.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Open With registration and policy | `RetainedInkProbe.swift › verifyOpenWithRegistration`, `verifyOpenWithImagePolicy` (`TRACE_OPEN_FILE_PROBE=1`) |
-| Paste decoding | `RetainedInkProbe.swift › verifyPasteboardImageDecoding` |
-| Non-overlapping layout | `WebCanvas/tests/imagePlacement.test.ts` |
+## Acceptance criteria
+- Opening several images from Finder creates one blank trace containing
+  the complete batch, selected and arranged without overlap.
+- One Undo removes the entire imported batch; dropping a batch onto a board
+  uses the same arrangement.
+- A Finder batch containing a non-image or unreadable image is rejected
+  rather than partially imported.
+- Users can paste an image from the clipboard; inserted images remain
+  fully opaque even when Highlighter was the previous tool.
+- Opening a single `.traceboard` restores its document instead of treating
+  it as an image.

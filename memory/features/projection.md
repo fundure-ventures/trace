@@ -28,7 +28,13 @@ until a trace is activated, then the trace without the editor).
 - **Mirror vs Project?** Mirror shows the trace whenever one is open; Project waits.
 - **No options in the menu?** Only one display is connected.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Targets, modes, output, wake, fit | `RetainedInkProbe.swift › verifyProjectionPolicy` |
+## Acceptance criteria
+- With an extra display connected, users can choose System, Mirror, or
+  Project for it; the working display is never offered as a target.
+- Selecting Mirror or Project for one display returns all other displays
+  to System mode.
+- Mirror shows an open trace; Project shows black until a trace is activated
+  and then shows the trace without its editor.
+- The trace fits and centers on the output without distortion, with the
+  same behavior over HDMI or AirPlay.
+- The output is kept awake while showing a trace, not while idle.

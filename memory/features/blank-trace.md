@@ -27,9 +27,11 @@ the canvas when ready ([ADR 0005](../adr/0005-native-first-blank-page-loading.md
 - **Why did it open at that size?** It remembers your last blank viewport.
 - **"Canvas unavailable"?** The bundled canvas failed to load; see logs.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Viewport persistence | `RetainedInkProbe.swift › verifyBlankViewportPersistenceAndCalibration` |
-| Presentation defaults | `RetainedInkProbe.swift › verifyDocumentPresentationDefaults` |
-| No silent renderer fallback | `RetainedInkProbe.swift › verifyProductCanvasPolicy` |
+## Acceptance criteria
+- Creating a blank trace shows the remembered background immediately,
+  without flashing a different color while the canvas loads.
+- A new blank trace opens at the last-used blank viewport size.
+- When the canvas becomes ready, it fades in over 280 ms; with Reduce Motion
+  enabled, it appears directly.
+- If the canvas cannot load, users see "Canvas unavailable" rather than a
+  different drawing surface.

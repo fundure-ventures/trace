@@ -29,9 +29,11 @@ Off with Cap, Auto Power Off, Pressure Sensitivity.
 - **Does ordinary paper work?** No, Ncode paper is required.
 - **Why no pen settings?** They appear once the pen connects.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Transport and input protocol | `swift run neo-transport-tests`, `swift run neo-input-tests` |
-| Stroke processing | `swift run trace-stroke-processing-tests` |
-| Menu title | Gap — `TracePenMenuPresentation` has no direct check |
+## Acceptance criteria
+- With a calibrated Neo M1 and compatible Ncode paper, drawing on paper
+  produces live marks on the board.
+- Users can distinguish a disconnected pen, a connecting pen, and a
+  connected pen with its name and battery percentage from the status menu.
+- Reopening a trace preserves pen strokes alongside mouse-drawn content.
+- Without a pen connected, users can still capture, annotate with the
+  mouse or trackpad, dictate, and copy a trace.

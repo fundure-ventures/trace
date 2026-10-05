@@ -28,9 +28,11 @@ the trace and copied alongside the image.
 - **Can I pause?** Yes; Resume continues the same recording.
 - **Where is the transcript?** Copied with the image and saved in the `.traceboard`.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| State coalescing | `RetainedInkProbe.swift › verifyVoiceStateCoalescing` |
-| Persistence | `RetainedInkProbe.swift › verifyVoicePackagePersistence` |
-| Transcription/key handling | `swift run trace-voice-tests` |
+## Acceptance criteria
+- Without a configured key, clicking "Set up Dictation" opens Setup rather
+  than starting a recording.
+- Users can start, pause, and resume a recording, then see it finishing and
+  becoming a transcript, with one clear state shown at a time.
+- Automatic Dictation starts for newly created blank or screenshot traces
+  only when a key and Microphone permission are available.
+- Reopening a saved trace preserves its recorded audio and transcript.

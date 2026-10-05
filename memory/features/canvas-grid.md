@@ -24,9 +24,9 @@ spacing field (↑/↓). The grid adapts black/white to the content beneath
 - **Will the grid show up when I copy?** No.
 - **How do I change spacing quickly?** Focus the spacing field and use ↑/↓.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Interaction and styles | `RetainedInkProbe.swift › verifyGridInteraction` |
-| Spacing baseline | `TRACE_GRID_SPACING_BASELINE_PROBE=1` |
-| Excluded from export | Gap — no automated check |
+## Acceptance criteria
+- Users can choose None, Dots, Square, Rows, or Cols from the toolbar and
+  adjust spacing between 4 and 64 pt, starting at 8 pt.
+- Resizing the window preserves uniform spacing and the subtle 1 pt,
+  20%-opacity grid marks.
+- Copying or exporting a trace never includes the reference grid.

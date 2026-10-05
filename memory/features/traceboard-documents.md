@@ -28,9 +28,12 @@ it in a board fitted to its content.
 - **Finder opens the wrong Trace?** Launch the current build once ([Troubleshooting](../../TROUBLESHOOTING.md)).
 - **Why did reopening zoom out?** It frames all saved shapes.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Open lifecycle | `RetainedInkProbe.swift › verifyOpenFileLifecycle` (`TRACE_OPEN_FILE_PROBE=1`) |
-| Snapshot persistence, folder migration | `RetainedInkProbe.swift › verifyTldrawSnapshotPersistence`, `verifyDrawingFolderMigration` |
-| Reopen framing | `ProductTldrawProbe.swift › verifyOffCenterDocumentFraming` (`TRACE_PRODUCT_TLDRAW_PROBE=framing`) |
+## Acceptance criteria
+- After 0.6 s without edits, a trace autosaves; if saving fails, users are
+  informed rather than led to believe their work is safe.
+- Users can find saved traces through Open traces and reopen a `.traceboard`
+  with its source image, pen strokes, canvas content, and any audio/transcript.
+- Reopening centers and fits all visible saved shapes, including content
+  beyond the original page; an empty trace frames the page instead.
+- Opening a single `.traceboard` restores the document rather than adding
+  it as an imported image.

@@ -34,9 +34,12 @@ the agent running.
 - **Why does the icon change?** It shows that a capture or annotation is active.
 - **Why are some settings missing?** Pen settings appear only while a pen is connected.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Glyph per phase | `RetainedInkProbe.swift › verifyStatusItemPresentation` |
-| Pen sections hidden when disconnected | `RetainedInkProbe.swift › verifyAppSettings` |
-| Agent survives window close | Gap — no automated check |
+## Acceptance criteria
+- Users can reach Trace from the status bar without a Dock icon or a
+  permanent main window.
+- After closing every board and transient window, the status-bar menu
+  remains available to start another trace.
+- The status-bar glyph visibly changes while capturing or annotating and
+  returns to its resting appearance otherwise.
+- Pen-only menu sections appear when a pen connects and disappear when it
+  disconnects.

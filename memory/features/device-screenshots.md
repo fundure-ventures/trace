@@ -32,8 +32,15 @@ becomes a source submenu: `from <frontmost app>.app` first, then
 - **Installed ADB but nothing changed?** Restart Trace; tools resolve once per session.
 - **Blank Android screenshot?** Secure windows block capture.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Parsing, ordering, routing, failures, timeouts | `DeviceScreenshotProbe.swift` (`TRACE_DEVICE_SCREENSHOT_PROBE=1`) |
-| Centered insertion in viewport | `WebCanvas/tests/imagePlacement.test.ts` |
+## Acceptance criteria
+- When devices are available, the screenshot menu lists the desktop source
+  first with its shortcut, followed by device sources without shortcuts.
+- Unauthorized or offline Android devices are disabled with a setup hint;
+  simulators do not appear.
+- Capturing a device with no trace open creates a blank trace; with a trace
+  open, it adds the image at the viewport center without changing zoom or
+  replacing existing content.
+- A failed device capture leaves the open trace intact.
+- Opening the submenu prepares available iOS connections without taking a
+  screenshot; repeated openings within ten seconds do not repeat that work,
+  and no continuous keep-alive runs after it.

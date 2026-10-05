@@ -23,8 +23,10 @@ profile and applied to compatible pages.
 - **Marks are offset.** Recalibrate from Setup.
 - **Do I recalibrate each launch?** No, it is saved.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Mapping math | `swift run trace-calibration-tests`, `swift run trace-geometry-tests` |
-| App integration | `RetainedInkProbe.swift › verifyCompatiblePageCalibrationIntegration` |
+## Acceptance criteria
+- Users can start or repeat guided calibration from Setup and cancel it
+  at any point.
+- After restarting Trace, the same paper profile uses its saved calibration
+  without requiring another corner-tapping session.
+- Drawing on a compatible calibrated page places marks at the corresponding
+  board positions without stretching the page out of proportion.

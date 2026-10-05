@@ -27,8 +27,11 @@ equivalents on the matching File and menu bar items.
 - **Why was my shortcut rejected?** It is already used by the other Trace action.
 - **Do they work while another app is focused?** Yes, they are global.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Duplicate rejection, dispatch, legacy migration | `RetainedInkProbe.swift › verifyGlobalShortcuts` (`TRACE_GLOBAL_SHORTCUTS_PROBE=1`) |
-| Menus mirror shortcuts | `RetainedInkProbe.swift › verifyGlobalShortcutMenuPresentation` |
+## Acceptance criteria
+- Users can invoke New Blank Trace and Capture Frontmost App while another
+  app is focused.
+- Trying to assign the same shortcut to both actions is rejected with an
+  explanation naming the other action.
+- Changing a shortcut immediately updates every menu entry that shows it.
+- Clearing a shortcut leaves the corresponding menu action available;
+  device screenshot sources never acquire a shortcut.

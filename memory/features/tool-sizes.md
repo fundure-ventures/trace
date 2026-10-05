@@ -25,8 +25,12 @@ One toolbar slider adjusts the active tool: Pen 1–12 pt, Highlighter
 - **How do I resize a rectangle outline?** Change the Pen width.
 - **Does text size change existing text?** It applies to the active/edited text.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Independent per-tool sizes, persistence | `ProductTldrawProbe.swift › verifyIndependentStrokeWidths`, `verifyDrawnWidth` |
-| Rectangle uses Pen width | `ProductTldrawProbe.swift › verifyRectangleWidths` |
+## Acceptance criteria
+- Users can choose whole-point Pen widths from 1 to 12 pt, Highlighter
+  widths from 16 to 124 pt, and Text sizes from 12 to 124 pt.
+- Switching tools and restarting Trace preserve each tool's chosen size
+  independently.
+- Selecting Text changes the slider label to "Font size" without changing
+  either stroke-width setting.
+- Rectangle outlines use the Pen width without changing the rectangle's
+  geometry at either end of the width range.

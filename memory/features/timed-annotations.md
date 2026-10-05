@@ -27,8 +27,12 @@ number is inserted into the transcript at the matching spoken words
 - **Can I make markers smaller?** Settings → Dictation → Annotation scale.
 - **Do pen and mouse strokes share numbers?** Yes, one sequence.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Shared clock/sequence and rendering | `RetainedInkProbe.swift › verifyTimedTranscriptAnnotationIntegration`, `verifyTranscriptAnnotationRendering` |
-| Transcript planning | `swift run trace-voice-tests` |
+## Acceptance criteria
+- Marks made with the Neo pen and canvas tools during Dictation share one
+  numbering sequence within the trace.
+- A number beside a mark matches the reference beside its corresponding
+  spoken words in the transcript.
+- Labels added after transcription stay on the page rather than being
+  clipped at its edge.
+- Choosing Small, Medium, or Large annotation scale changes marker size
+  to 75%, 100%, or 150% respectively.

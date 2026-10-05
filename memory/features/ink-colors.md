@@ -25,8 +25,10 @@ they stay legible and in character on any page
 - **Why does red look different on a dark page?** Inks adapt for contrast.
 - **Will my old trace change color?** Only if its page background changes.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Derivation, contrast, hue lean | `WebCanvas/tests/inkPalette.test.ts` |
-| Visible ink layers | `RetainedInkProbe.swift › verifyVisibleInkLayers` |
+## Acceptance criteria
+- Users always see the same recognizable red, blue, yellow, and green
+  toolbar swatches, regardless of page background.
+- Changing the page background adapts drawn ink for legibility while
+  preserving each chosen color's identity.
+- Saving and reopening a trace preserves the chosen ink names and derives
+  their appearance from that document's background.

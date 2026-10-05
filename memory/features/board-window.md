@@ -32,10 +32,14 @@ owns resizing ([ADR 0002](../adr/0002-native-board-window-resizing.md)).
 - **Resizing didn't zoom.** By design; use pinch/`⌘-`/`⌘+`, `⌘0` to reset.
 - **Where are window controls?** Use `⌘W` or the toolbar close button.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Native resize, deferred positioning | `RetainedInkProbe.swift › verifyNativeResizeTracking`, `verifyDeferredResizePositioning` |
-| Toolbar groups/dividers | `RetainedInkProbe.swift › verifyToolbarGroupLayout`; `TRACE_PRODUCT_TLDRAW_PROBE=framing` |
-| Native segmented tools | `TRACE_PRODUCT_TLDRAW_PROBE=framing` |
-| Drag regions | Gap — manual check |
+## Acceptance criteria
+- Users see their content and a floating toolbar above it, without a title
+  bar, traffic lights, or a permanent frame covering the screenshot.
+- Resizing the board changes the visible viewport without resizing marks,
+  changing the page, or changing zoom.
+- Dragging empty toolbar space moves the board; dragging empty canvas space
+  does not move the window.
+- Drawing tools appear as separated native segments, with five outer
+  dividers organizing the toolbar.
+- Selected toolbar controls follow the system accent while active and
+  become grey when the board is inactive.

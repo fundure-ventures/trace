@@ -30,9 +30,12 @@ empty space with Select also creates text. Undo/Redo live in Edit.
 - **Why isn't my rectangle selected after drawing?** Rectangle is sticky for quick repeats.
 - **How do I add text?** `T` then click, or double-click empty space with Select.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Tool controls and shortcuts | `RetainedInkProbe.swift › verifyDrawingToolControls` |
-| Text creation/editing, spaces | `ProductTldrawProbe.swift › verifyTextEditing` (`TRACE_PRODUCT_TLDRAW_PROBE=text`) |
-| Sticky rectangle | Gap — no automated check |
+## Acceptance criteria
+- Users can choose Select, Pen, Highlighter, Rectangle, and Text from the
+  native toolbar or their shortcuts, without a second drawing toolbar.
+- Holding `⌘` temporarily enables Select without losing a previous selection
+  before drawing starts.
+- Drawing one rectangle leaves Rectangle active, ready to draw another.
+- Highlighter marks use the chosen ink at 50% opacity.
+- Users can create text with the Text tool or a Select double-click, type
+  spaces, and change tool settings without interrupting text editing.

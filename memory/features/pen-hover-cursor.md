@@ -23,7 +23,12 @@ pen on the board.
 - **No circle?** Enable Hover Mode and calibrate.
 - **Circle disappears.** It hides after half a second without movement.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Visibility and movement | `RetainedInkProbe.swift › verifyProductHoverPolicy`, `verifyProductHoverOverlay` |
+## Acceptance criteria
+- With Hover Mode enabled, an open trace, and compatible calibrated paper,
+  users see a magnifying circle following the hovering pen.
+- Disabling Hover Mode or using an incompatible page prevents that cursor
+  from appearing.
+- Tiny movements below 1.5 px do not jitter the cursor; half a second
+  without movement hides it.
+- Disconnecting and reconnecting the pen preserves the user's Hover Mode
+  choice.

@@ -34,8 +34,13 @@ The menu bar **Settings** submenu groups behavior by moment:
 - **Can the pen cap start a capture?** Yes: When pen is connected → Capture screenshot.
 - **How do I copy only the transcript?** Copy → Format → Copy dictation.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Persistence, legacy keys, visibility | `RetainedInkProbe.swift › verifyAppSettings` |
-| Pen disconnect plan | `TraceAppModel.swift › TraceAppBehaviorPolicy.penDisconnectPlan` via `verifyAppSettings` |
+## Acceptance criteria
+- Users can reach Settings directly from Trace's status-bar menu.
+- After changing settings and restarting Trace, users find their chosen
+  values unchanged.
+- Copy format choices are available consistently in Settings and the
+  toolbar's copy-options menu.
+- Changing "Close window after copy" immediately updates the Edit menu to
+  describe whether copying will close the trace.
+- With no pen connected, pen-dependent settings are hidden; connecting a pen
+  makes them available.

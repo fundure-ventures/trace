@@ -54,9 +54,11 @@ Every `memory/features/<feature-name>.md` uses these sections, in order:
 5. `## Touchpoints` — features it is reached from or leads to, as links
 6. `## Rules` — UX invariants that must not regress
 7. `## FAQ` — 3–5 common questions
-8. `## Encoded enforcement` — `Rule | Guard` table mapping each rule to the
-   probe, test, or lint that fails when it regresses. Mark unguarded rules
-   `Gap` rather than omitting them.
+8. `## Acceptance criteria` — explanatory, observable scenarios describing
+   what users must be able to do and what must happen. Rules state the
+   invariant; acceptance criteria show how to recognize it in use.
+   Write these independently of the implementation: no test filenames,
+   symbols, commands, coverage claims, or `Gap` bookkeeping.
 
 ## Testing philosophy
 
@@ -65,3 +67,9 @@ guard fails only when a listed rule breaks, and names that rule. Prefer one
 behavioral probe per rule over many assertions on internal values. When a test
 needs frequent updates that do not correspond to a rule change, it is guarding
 the wrong thing: rewrite it against the rule or delete it.
+
+Acceptance criteria describe expected behavior, not proof that it is currently
+tested. Test implementation belongs in the tests themselves; validation
+commands and engineering practice belong in [DEVELOPMENT.md](DEVELOPMENT.md).
+Do not turn an illustrative scenario or proposed behavior into a claim about
+the shipped app without verifying it.

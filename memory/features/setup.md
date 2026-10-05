@@ -31,9 +31,11 @@ opens on first launch (onboarding) and later from the menu bar.
 - **Why does Dictation say setup required?** No OpenRouter key is available.
 - **How do I see onboarding again?** `./tools/trace --clear` (debug product).
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Onboarding presentation and optional flow | `RetainedInkProbe.swift › verifyOnboardingPresentation`, `verifyOptionalSetupFlow` (`TRACE_ONBOARDING_PROBE=1`) |
-| Shortcut rows in Setup | `RetainedInkProbe.swift › verifyGlobalShortcutSetupUI` |
-| Keychain-only storage, env precedence | Gap — manual review |
+## Acceptance criteria
+- Users can reach Setup from the status-bar menu and see statuses and
+  actions for the pen, permissions, Dictation key, and global shortcuts.
+- Users without a pen can complete the setup needed for mouse-driven use.
+- Users can save, replace, or remove their personal OpenRouter key; it is
+  kept only in Keychain, and an externally supplied key takes precedence.
+- The onboarding board cannot be resized.
+- Repeating debug onboarding leaves saved traces intact.

@@ -32,9 +32,13 @@ Monochrome Flash transition from the window's position into a new
 - **Can I disable the animation?** Enable macOS Reduce Motion.
 - **Capture failed?** Check Screen Recording permission in Setup.
 
-## Encoded enforcement
-| Rule | Guard |
-| --- | --- |
-| Single transition, reduced motion | `RetainedInkProbe.swift › verifyCaptureTransitionEffects` |
-| Default capture size | `RetainedInkProbe.swift › verifyAutomaticCaptureDefaultSize` |
-| Opaque screenshot | `ProductTldrawProbe.swift › verifyCapturedScreenshotOpacity` (`TRACE_PRODUCT_TLDRAW_PROBE=text`) |
+## Acceptance criteria
+- Capturing the frontmost app creates a trace of its window at 1:1 point
+  size whenever the display has enough room.
+- Normal capture uses the single Monochrome Flash transition; users are
+  not asked to choose an effect.
+- With Reduce Motion enabled, the board and toolbar appear directly.
+- Capture requires Screen Recording permission, which users can address
+  from Setup.
+- A screenshot remains fully opaque even if Highlighter was used before
+  the capture.
