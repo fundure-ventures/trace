@@ -294,7 +294,6 @@ export function installTraceProductRenderer(editor: Editor): () => void {
   let temporarySelectActive = false
   let temporaryDrawActive = false
   let temporaryDrawSelection: TLShapeId[] = []
-  let pendingTemporarySelectionClear = false
   let commandSelectHeld = false
   let lastDrawingTool: Exclude<ProductCanvasTool, 'select'> = 'pen'
   let activeTimedGesture: {
@@ -511,7 +510,6 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     tool: ProductCanvasTool,
     notifyHost: boolean,
   ) => {
-    pendingTemporarySelectionClear = false
     const brush = tool === 'highlighter'
       ? 'highlighter'
       : tool === 'select'
@@ -943,7 +941,6 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       temporarySelectActive = false
       temporaryDrawActive = false
       temporaryDrawSelection = []
-      pendingTemporarySelectionClear = false
       activeTimedGesture = null
       recentlyCompletedGesture = null
       explicitlyReportedRecordIds.clear()
@@ -1077,7 +1074,6 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     },
 
     setTool(tool) {
-      pendingTemporarySelectionClear = false
       const preserveTextEditing =
         tool.tool === currentTool.tool && editor.getEditingShape()?.type === 'text'
       const textSizeChanged = tool.textSize !== currentTool.textSize
@@ -1298,9 +1294,6 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     },
 
     emitPointerForTesting(phase, x, y) {
-      if (phase === 'began') {
-        prepareTemporarySelectionForDraw(0, container)
-      }
       const viewport = editor.getViewportScreenBounds()
       editor.dispatch({
         type: 'pointer',
@@ -1715,25 +1708,6 @@ export function installTraceProductRenderer(editor: Editor): () => void {
       || target instanceof HTMLInputElement
       || target instanceof HTMLTextAreaElement
   }
-  const prepareTemporarySelectionForDraw = (
-    button: number,
-    target: EventTarget | null,
-  ) => {
-    if (
-      !pendingTemporarySelectionClear
-      || button !== 0
-      || isEditableTarget(target)
-    ) {
-      return
-    }
-    const tool = editor.getCurrentToolId()
-    if (tool !== 'draw' && tool !== 'geo') return
-    pendingTemporarySelectionClear = false
-    runHostMutation(() => editor.selectNone())
-  }
-  const handleCanvasPointerDown = (event: PointerEvent) => {
-    prepareTemporarySelectionForDraw(event.button, event.target)
-  }
   const changeZoom = (delta: number) => {
     const point = editor.getViewportScreenCenter()
     const { x: cx, y: cy, z: currentZoom } = editor.getCamera()
@@ -1800,15 +1774,12 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     }
     if (event.key === 'Meta') {
       commandSelectHeld = true
+      if (editor.getSelectedShapeIds().length > 0) return
       if (
         temporarySelectActive
         && currentTool.tool !== 'select'
       ) {
-        const deferSelectionClear =
-          currentTool.tool !== 'text'
-          && editor.getSelectedShapeIds().length > 0
-        pendingTemporarySelectionClear = deferSelectionClear
-        releaseTemporarySelect(!deferSelectionClear)
+        releaseTemporarySelect(true)
       } else if (currentTool.tool === 'select') {
         activateTemporaryDraw()
       } else {
@@ -1853,7 +1824,6 @@ export function installTraceProductRenderer(editor: Editor): () => void {
   }
   container.addEventListener('dragover', handleDragOver, true)
   container.addEventListener('drop', handleDrop, true)
-  container.addEventListener('pointerdown', handleCanvasPointerDown, true)
   container.addEventListener('pointerup', handlePointerUp)
   container.addEventListener('pointercancel', handlePointerUp)
   window.addEventListener('keydown', handleKeyDown, true)
@@ -1873,7 +1843,6 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     removeBeforeCreate()
     container.removeEventListener('dragover', handleDragOver, true)
     container.removeEventListener('drop', handleDrop, true)
-    container.removeEventListener('pointerdown', handleCanvasPointerDown, true)
     container.removeEventListener('pointerup', handlePointerUp)
     container.removeEventListener('pointercancel', handlePointerUp)
     window.removeEventListener('keydown', handleKeyDown, true)

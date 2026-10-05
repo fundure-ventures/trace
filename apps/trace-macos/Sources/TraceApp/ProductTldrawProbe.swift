@@ -2656,11 +2656,22 @@ enum ProductTldrawProbe {
         }
         let temporarySelectionCopy = try await surface.captureSelectionCopyForTesting()
         guard temporarySelectionCopy["handled"] as? Bool == true,
-              (temporarySelectionCopy["shapeCount"] as? NSNumber)?.intValue == 1
+              (temporarySelectionCopy["shapeCount"] as? NSNumber)?.intValue == 1,
+              let selectionState = await surface.stateForTesting(),
+              selectionState["selectedTool"] as? String == "select",
+              (selectionState["selectedUserImageCount"] as? NSNumber)?.intValue == 1
         else {
             throw probeError(
-                "Command-C cleared a selection before copying: \(temporarySelectionCopy)"
+                "Command-C left selection mode or lost the selection: \(temporarySelectionCopy)"
             )
+        }
+        _ = await surface.keyboardEventForTesting(
+            type: "keyup", key: "Meta", code: "MetaLeft"
+        )
+        guard await surface.keyboardEventForTesting(
+            type: "keydown", key: "d", code: "KeyD"
+        ) != nil else {
+            throw probeError("Could not switch to drawing after copying a selection")
         }
         let beforeTemporaryDraw = await surface.stateForTesting()
         let previousStrokeCount = (
@@ -2670,13 +2681,10 @@ enum ProductTldrawProbe {
             guard await surface.emitPointerForTesting(
                 phase: phase, x: x, y: 0.7
             ) else {
-                throw probeError("Could not draw after copying a temporary selection")
+                throw probeError("Could not draw after switching tools")
             }
         }
-        _ = await surface.keyboardEventForTesting(
-            type: "keyup", key: "Meta", code: "MetaLeft"
-        )
-        try await waitUntil("draw after copying a temporary selection") {
+        try await waitUntil("draw after switching tools") {
             let state = await surface.stateForTesting()
             return (state?["drawWidths"] as? [NSNumber])?.count
                 == previousStrokeCount + 1
@@ -2686,8 +2694,32 @@ enum ProductTldrawProbe {
               (afterTemporaryDraw?["drawWidths"] as? [NSNumber])?.count
                 == previousStrokeCount + 1
         else {
-            throw probeError("Drawing after Copy did not clear the temporary selection")
+            throw probeError("Switching to a drawing tool did not clear selection")
         }
+        guard await surface.keyboardEventForTesting(
+                  type: "keydown", key: "v", code: "KeyV"
+              ) != nil,
+              await surface.selectFirstUserShapeForTesting(),
+              await surface.keyboardEventForTesting(
+                  type: "keydown", key: "Meta", code: "MetaLeft", metaKey: true
+              ) != nil
+        else {
+            throw probeError("Could not test Command with Select active")
+        }
+        let selectToolCopy = try await surface.captureSelectionCopyForTesting()
+        guard selectToolCopy["handled"] as? Bool == true,
+              (selectToolCopy["shapeCount"] as? NSNumber)?.intValue == 1,
+              let selectToolState = await surface.stateForTesting(),
+              selectToolState["selectedTool"] as? String == "select",
+              (selectToolState["selectedUserImageCount"] as? NSNumber)?.intValue == 1
+        else {
+            throw probeError(
+                "Command switched away from the selected shape in Select mode: \(selectToolCopy)"
+            )
+        }
+        _ = await surface.keyboardEventForTesting(
+            type: "keyup", key: "Meta", code: "MetaLeft"
+        )
     }
 
     @MainActor
