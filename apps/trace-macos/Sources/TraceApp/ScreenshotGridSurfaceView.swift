@@ -1,4 +1,5 @@
 import AppKit
+import TraceLogging
 import MetalKit
 import TraceAppCore
 
@@ -448,6 +449,7 @@ private final class ProceduralGridMetalView: MTKView, MTKViewDelegate {
             }
             return true
         } catch {
+            TraceLogger.shared.record(.error, category: .canvas, "Screenshot texture creation failed", error: error)
             screenshotTexture = nil
             return false
         }

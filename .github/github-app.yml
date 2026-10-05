@@ -1,6 +1,6 @@
 scripts:
   - name: Launch Debug
-    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/trace
+    command: cd "$COPILOT_WORKSPACE_PATH" && TRACE_PERSIST_DEBUG_LOGS=1 ./tools/trace
   - name: Build Release
     command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/build-release
   - name: Sign Release
