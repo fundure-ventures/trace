@@ -1,0 +1,32 @@
+# Tool sizes
+
+**Tag:** `#board`
+
+## Problem
+A fine pen line and a broad highlight need very different widths; resetting
+size on every tool switch wastes time.
+
+## Solution
+One toolbar slider adjusts the active tool: Pen 1–12 pt, Highlighter
+16–124 pt, Text font 12–124 pt. Rectangle outlines reuse the Pen width.
+
+## Touchpoints
+- [Board window](board-window.md) toolbar slider
+- Applies to [Drawing tools](drawing-tools.md)
+
+## Rules
+- Whole-point values only.
+- Each tool remembers its own size across switches and app restarts.
+- Text size is independent of stroke widths; slider label switches to "Font size".
+- Rectangle geometry is unchanged at both ends of the Pen range.
+
+## FAQ
+- **Why did my highlighter size not change with the pen?** Sizes are per tool.
+- **How do I resize a rectangle outline?** Change the Pen width.
+- **Does text size change existing text?** It applies to the active/edited text.
+
+## Encoded enforcement
+| Rule | Guard |
+| --- | --- |
+| Independent per-tool sizes, persistence | `ProductTldrawProbe.swift › verifyIndependentStrokeWidths`, `verifyDrawnWidth` |
+| Rectangle uses Pen width | `ProductTldrawProbe.swift › verifyRectangleWidths` |

@@ -1,5 +1,9 @@
 # Development
 
+This file covers development setup, commands, and engineering best practices
+only. User-facing behavior and its rules live in [FEATURES.md](FEATURES.md);
+design guidelines live in [DESIGN.md](DESIGN.md).
+
 ## Prerequisites
 
 - macOS 13+

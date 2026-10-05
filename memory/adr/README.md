@@ -1,8 +1,9 @@
 # Architecture decision records
 
 These ADRs capture durable implementation decisions verified against the
-current code. Historical exploration and rejected alternatives remain in
-[`../poc/`](../poc/README.md).
+current code. User-facing behavior lives in
+[feature memory](../../FEATURES.md); ADRs record *why* the implementation is
+shaped the way it is.
 
 | ADR | Decision |
 | --- | --- |
