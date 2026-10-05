@@ -36,8 +36,26 @@ Trace keeps durable product knowledge in the repository:
   coverage status. They describe what users should experience, not how the
   repository currently checks it.
 
-## Tests
+## Code testing quality
 
-Write tests that guard feature Rules, not implementation details. Do not add
-tests that only restate current values or structure. When a test churns
-without a rule change, fix it to target the rule or remove it.
+The **Acceptance criteria** in the feature files listed in
+[`FEATURES.md`](FEATURES.md) are the source of truth for test assertions.
+Only assertions that protect those user-observable outcomes are relevant.
+
+- Before writing or changing a test, identify the feature and acceptance
+  criterion it protects. If an important outcome is missing, document it in
+  the feature file first; do not invent requirements inside tests.
+- Assert what the user can do and what happens, not internal calls, state
+  structure, component layout, or current constants unless the criterion
+  explicitly requires that observable result.
+- Use the smallest reliable test or probe that demonstrates the outcome.
+  Unit tests are useful when they protect an acceptance criterion; a unit
+  test of a helper alone does not prove that the feature works end to end.
+- Confirm each new test fails when the behavior it protects is broken, then
+  restore the behavior. A passing test without this check is not evidence
+  that it prevents the regression.
+- Refactoring without changing acceptance criteria should not require
+  rewriting assertions. Rewrite or remove tests that freeze implementation
+  details instead of protecting the documented outcome.
+- Keep tests independent of feature-file wording: link their intent to the
+  criterion, but exercise behavior rather than matching documentation text.

@@ -62,11 +62,11 @@ Every `memory/features/<feature-name>.md` uses these sections, in order:
 
 ## Testing philosophy
 
-Tests exist to enforce **Rules**, not to freeze implementation details. A good
-guard fails only when a listed rule breaks, and names that rule. Prefer one
-behavioral probe per rule over many assertions on internal values. When a test
-needs frequent updates that do not correspond to a rule change, it is guarding
-the wrong thing: rewrite it against the rule or delete it.
+Tests assert **Acceptance criteria**, making the feature Rules observable
+without freezing implementation details. Only assertions protecting those
+outcomes are relevant. When tests need updates without a change to acceptance
+criteria, rewrite them against the documented outcome or remove them. See
+[Code testing quality](AGENTS.md#code-testing-quality) for agent guidance.
 
 Acceptance criteria describe expected behavior, not proof that it is currently
 tested. Test implementation belongs in the tests themselves; validation
