@@ -122,6 +122,31 @@ public struct TraceAutosaveGate: Equatable, Sendable {
     }
 }
 
+public struct TraceCLIActionGate: Equatable, Sendable {
+    public private(set) var isBusy = false
+
+    public init() {}
+
+    public mutating func begin() -> Bool {
+        guard !isBusy else { return false }
+        isBusy = true
+        return true
+    }
+
+    public mutating func finish() {
+        isBusy = false
+    }
+}
+
+public enum TraceCLIActionPolicy {
+    public static func isCurrentDocument(
+        expectedID: UUID?,
+        currentID: UUID?
+    ) -> Bool {
+        expectedID == currentID
+    }
+}
+
 public struct TraceDocumentCopyProgress: Equatable, Sendable {
     private var documentID: UUID?
 

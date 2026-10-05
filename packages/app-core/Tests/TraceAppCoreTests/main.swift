@@ -254,6 +254,31 @@ test("presenting a document cancels only the stale copy operation") {
     )
 }
 
+test("CLI mutations report busy and stale document callbacks are rejected") {
+    var gate = TraceCLIActionGate()
+    try expect(gate.begin(), "first CLI mutation did not acquire the action gate")
+    try expect(!gate.begin(), "concurrent CLI mutation was not rejected")
+    gate.finish()
+    try expect(gate.begin(), "CLI action gate remained busy after completion")
+
+    let originalDocument = UUID()
+    let replacementDocument = UUID()
+    try expect(
+        TraceCLIActionPolicy.isCurrentDocument(
+            expectedID: originalDocument,
+            currentID: originalDocument
+        ),
+        "action rejected its original document"
+    )
+    try expect(
+        !TraceCLIActionPolicy.isCurrentDocument(
+            expectedID: originalDocument,
+            currentID: replacementDocument
+        ),
+        "late action was allowed to target a replacement document"
+    )
+}
+
 test("window selection uses the topmost mapped app window") {
     let windows = [
         TraceWindowDescriptor(

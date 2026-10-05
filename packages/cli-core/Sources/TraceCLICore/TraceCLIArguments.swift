@@ -47,14 +47,13 @@ public enum TraceCLIArguments {
     ]
 
     public static func parse(_ arguments: [String]) throws -> TraceCLICommand {
-        var args = arguments
-        var noRecording = false
-        args.removeAll { argument in
-            if argument == "--no-recording" {
-                noRecording = true
-                return true
-            }
-            return false
+        let separator = arguments.firstIndex(of: "--")
+        let optionArguments = separator.map { Array(arguments[..<$0]) } ?? arguments
+        let noRecording = optionArguments.contains("--no-recording")
+        var args = optionArguments.filter { $0 != "--no-recording" }
+        if let separator {
+            args.append("--")
+            args.append(contentsOf: arguments.dropFirst(separator + 1))
         }
         guard let first = args.first else {
             return TraceCLICommand(action: .newTrace, noRecording: noRecording)
@@ -98,7 +97,7 @@ public enum TraceCLIArguments {
             }
             throw TraceCLIParseError.invalidArguments("capture accepts --device NAME or devices")
         }
-        guard !arguments[1].hasPrefix("-") else {
+        guard arguments[1] != "--", !arguments[1].hasPrefix("-") else {
             throw TraceCLIParseError.incompleteOption("--device")
         }
         return TraceCLICommand(action: .captureDevice(arguments[1]), noRecording: noRecording)
@@ -118,7 +117,9 @@ public enum TraceCLIArguments {
             }
             throw TraceCLIParseError.invalidArguments("unexpected argument")
         }
-        guard let format = TraceCLIFormat(rawValue: arguments[1]) else {
+        guard arguments[1] != "--",
+              let format = TraceCLIFormat(rawValue: arguments[1])
+        else {
             throw TraceCLIParseError.invalidFormat(arguments[1])
         }
         return TraceCLICommand(action: action, format: format, noRecording: noRecording)
@@ -129,12 +130,15 @@ public enum TraceCLIArguments {
         noRecording: Bool
     ) throws -> TraceCLICommand {
         let paths: [String]
-        if arguments.first == "--" {
-            paths = Array(arguments.dropFirst())
+        if let separator = arguments.firstIndex(of: "--") {
+            guard separator == 0 else {
+                throw TraceCLIParseError.invalidArguments("unexpected argument before --")
+            }
+            paths = Array(arguments.dropFirst(separator + 1))
         } else {
             paths = arguments
         }
-        guard !paths.isEmpty, !paths.contains(where: { $0.hasPrefix("-") }) else {
+        guard !paths.isEmpty else {
             throw TraceCLIParseError.invalidArguments("expected image or .traceboard file paths")
         }
         let boards = paths.filter {

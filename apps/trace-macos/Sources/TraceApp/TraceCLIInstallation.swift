@@ -87,6 +87,25 @@ enum TraceCLIInstallation {
             guard state(directory: directory, helper: helper) == .notInstalled else {
                 throw CocoaError(.fileWriteUnknown)
             }
+            let destination = linkURL(in: directory)
+            let existingData = Data("leave this executable untouched".utf8)
+            try existingData.write(to: destination)
+            var installRejected = false
+            do {
+                try perform(
+                    install: true,
+                    directory: directory,
+                    helper: helper,
+                    requiresAuthorization: false
+                )
+            } catch {
+                installRejected = true
+            }
+            guard installRejected,
+                  try Data(contentsOf: destination) == existingData
+            else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
         }
     #endif
 
@@ -104,8 +123,14 @@ enum TraceCLIInstallation {
         let destination = linkURL(in: directory)
         let command: String
         if install {
-            command =
-                "mkdir -p \(shellQuote(directory.path)) && ln -sfn \(shellQuote(helper.path)) \(shellQuote(destination.path))"
+            try validateInstallDestination(destination)
+            command = """
+                mkdir -p \(shellQuote(directory.path)) && \
+                if [ -L \(shellQuote(destination.path)) ]; then \
+                rm \(shellQuote(destination.path)); \
+                elif [ -e \(shellQuote(destination.path)) ]; then exit 73; fi && \
+                ln -s \(shellQuote(helper.path)) \(shellQuote(destination.path))
+                """
         } else {
             command = "rm \(shellQuote(destination.path))"
         }
@@ -120,6 +145,19 @@ enum TraceCLIInstallation {
             )
         } else {
             try run(executable: "/bin/sh", arguments: ["-c", command])
+        }
+    }
+
+    private static func validateInstallDestination(_ destination: URL) throws {
+        var metadata = stat()
+        guard lstat(destination.path, &metadata) == 0 else {
+            guard errno == ENOENT else {
+                throw POSIXError(.init(rawValue: errno) ?? .EIO)
+            }
+            return
+        }
+        guard (metadata.st_mode & S_IFMT) == S_IFLNK else {
+            throw CocoaError(.fileWriteFileExists)
         }
     }
 

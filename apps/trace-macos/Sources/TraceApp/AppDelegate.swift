@@ -387,6 +387,7 @@ final class TraceAppDelegate:
     private var liveSessionLock: TracePenSessionLock?
     private var cliServer: TraceCLIServer?
     private let cliWindowCapture = WindowCaptureService()
+    private var cliActionGate = TraceCLIActionGate()
     private let openFileLifecycle = TraceOpenFileLifecycle()
     private var openFileForwardingObserver: NSObjectProtocol?
     private var startupErrorWorkItem: DispatchWorkItem?
@@ -773,7 +774,7 @@ final class TraceAppDelegate:
             }
             let opened = TraceOpenFileCoordinator.handle(
                 request,
-                openDrawing: self.model.openDrawing(from:),
+                openDrawing: { _ = self.model.openDrawing(from: $0) },
                 openImages: { self.openImageSelection($0) }
             )
             completion(opened)
@@ -818,6 +819,28 @@ final class TraceAppDelegate:
         _ request: TraceCLIRequest,
         completion: @escaping (TraceCLIReply) -> Void
     ) {
+        let readOnly = request.action == .devices
+        guard readOnly || cliActionGate.begin() else {
+            completion(TraceCLIReply(ok: false, code: "busy", message: "Trace is busy with another CLI action."))
+            return
+        }
+        var completed = false
+        performCLIRequest(request) { [weak self] reply in
+            DispatchQueue.main.async {
+                guard !completed else { return }
+                completed = true
+                if !readOnly {
+                    self?.cliActionGate.finish()
+                }
+                completion(reply)
+            }
+        }
+    }
+
+    private func performCLIRequest(
+        _ request: TraceCLIRequest,
+        completion: @escaping (TraceCLIReply) -> Void
+    ) {
         guard let action = request.action else {
             completion(
                 TraceCLIReply(ok: false, code: "invalidRequest", message: "Invalid CLI request."))
@@ -840,17 +863,24 @@ final class TraceAppDelegate:
             }
         case .capture:
             if model.snapshot.currentDocument == nil {
-                let started = model.newScreenshotPage(
+                _ = model.newScreenshotPage(
                     noRecording: request.noRecording,
                     excludingOwnerPIDs: Set(request.excludePIDs)
-                )
-                completion(
-                    TraceCLIReply(
-                        ok: started,
-                        code: started ? nil : "actionFailed",
-                        message: started ? nil : "Could not start screenshot capture."
-                    ))
+                ) { result in
+                    switch result {
+                    case .success:
+                        completion(TraceCLIReply(ok: true))
+                    case let .failure(error):
+                        completion(
+                            TraceCLIReply(
+                                ok: false,
+                                code: "actionFailed",
+                                message: error.localizedDescription
+                            ))
+                    }
+                }
             } else {
+                let documentID = model.snapshot.currentDocument?.manifest.id
                 cliWindowCapture.captureFrontmost(
                     excludingOwnerPIDs: Set(request.excludePIDs)
                 ) { [weak self] result in
@@ -860,6 +890,18 @@ final class TraceAppDelegate:
                     }
                     do {
                         let captured = try result.get()
+                        guard TraceCLIActionPolicy.isCurrentDocument(
+                            expectedID: documentID,
+                            currentID: self.model.snapshot.currentDocument?.manifest.id
+                        ) else {
+                            completion(
+                                TraceCLIReply(
+                                    ok: false,
+                                    code: "actionFailed",
+                                    message: "The open trace changed during capture."
+                                ))
+                            return
+                        }
                         let image = NSImage(
                             cgImage: captured.cgImage,
                             size: NSSize(
@@ -868,7 +910,8 @@ final class TraceAppDelegate:
                             )
                         )
                         self.insertCLIImages(
-                            [TraceCanvasImage(image: image, name: captured.descriptor.ownerName)]
+                            [TraceCanvasImage(image: image, name: captured.descriptor.ownerName)],
+                            expectedDocumentID: documentID
                         ) { inserted in
                             if inserted { self.board.setEditorVisible(true) }
                             completion(
@@ -891,62 +934,31 @@ final class TraceAppDelegate:
                 completion(TraceCLIReply(ok: true, devices: self?.cliDevices ?? []))
             }
         case let .captureDevice(name):
-            guard let device = matchDevice(named: name) else {
-                deviceScreenshots.refresh { [weak self] in
+            TraceCLIRefreshPolicy.resolveAfterRefresh(
+                refresh: { [weak self] completion in
+                    guard let self else {
+                        completion()
+                        return
+                    }
+                    self.deviceScreenshots.refresh(completion: completion)
+                },
+                resolve: { [weak self] in self?.matchDevice(named: name) }
+            ) { [weak self] device in
+                guard let self else {
+                    completion(TraceCLIReply(ok: false, code: "unavailable"))
+                    return
+                }
+                guard let device else {
                     completion(
                         TraceCLIReply(
                             ok: false,
                             code: "unknownDevice",
                             message: "Unknown, ambiguous, or unavailable device: \(name)",
-                            devices: self?.cliDevices ?? []
+                            devices: self.cliDevices
                         ))
-                }
-                return
-            }
-            let documentID = model.snapshot.currentDocument?.manifest.id
-            deviceScreenshots.capture(device) { [weak self] result in
-                guard let self else {
-                    completion(TraceCLIReply(ok: false, code: "unavailable"))
                     return
                 }
-                do {
-                    let image = try result.get()
-                    guard self.model.snapshot.currentDocument?.manifest.id == documentID else {
-                        completion(
-                            TraceCLIReply(
-                                ok: false, code: "actionFailed",
-                                message: "The open trace changed during capture."))
-                        return
-                    }
-                    if documentID == nil {
-                        let screen = NSScreen.main ?? NSScreen.screens.first
-                        guard
-                            self.model.newBlankPage(
-                                size: self.model.preferredBlankViewportSize,
-                                backingScale: screen?.backingScaleFactor ?? 2,
-                                activatesProjectOutput: false,
-                                noRecording: request.noRecording
-                            )
-                        else {
-                            completion(TraceCLIReply(ok: false, code: "actionFailed"))
-                            return
-                        }
-                    }
-                    self.insertCLIImages([
-                        TraceCanvasImage(image: image, name: device.menuTitle)
-                    ]) { inserted in
-                        if inserted { self.board.setEditorVisible(true) }
-                        completion(
-                            TraceCLIReply(
-                                ok: inserted,
-                                code: inserted ? nil : "actionFailed"
-                            ))
-                    }
-                } catch {
-                    completion(
-                        TraceCLIReply(
-                            ok: false, code: "actionFailed", message: error.localizedDescription))
-                }
+                self.captureCLIDevice(device, noRecording: request.noRecording, completion: completion)
             }
         case .copy:
             guard model.snapshot.currentDocument != nil else {
@@ -983,8 +995,17 @@ final class TraceAppDelegate:
                 return
             }
             withFlushedTldrawSnapshot { [weak self] in
-                self?.model.openDrawing(from: URL(fileURLWithPath: path))
-                completion(TraceCLIReply(ok: true))
+                guard let self else {
+                    completion(TraceCLIReply(ok: false, code: "unavailable"))
+                    return
+                }
+                let opened = self.model.openDrawing(from: URL(fileURLWithPath: path))
+                completion(
+                    TraceCLIReply(
+                        ok: opened,
+                        code: opened ? nil : "actionFailed",
+                        message: opened ? nil : "Could not open the traceboard."
+                    ))
             }
         case let .openImages(paths):
             guard readableFiles(paths) else {
@@ -1007,7 +1028,8 @@ final class TraceAppDelegate:
                     return
                 }
                 if self.model.snapshot.currentDocument != nil {
-                    self.insertCLIImages(images) { inserted in
+                    let expectedDocumentID = self.model.snapshot.currentDocument?.manifest.id
+                    self.insertCLIImages(images, expectedDocumentID: expectedDocumentID) { inserted in
                         completion(
                             TraceCLIReply(
                                 ok: inserted,
@@ -1029,7 +1051,8 @@ final class TraceAppDelegate:
                     completion(TraceCLIReply(ok: false, code: "actionFailed"))
                     return
                 }
-                self.insertCLIImages(images) { inserted in
+                let expectedDocumentID = self.model.snapshot.currentDocument?.manifest.id
+                self.insertCLIImages(images, expectedDocumentID: expectedDocumentID) { inserted in
                     completion(
                         TraceCLIReply(
                             ok: inserted,
@@ -1050,6 +1073,70 @@ final class TraceAppDelegate:
                 identifier: $0.identifier,
                 unavailableReason: $0.unavailableReason
             )
+        }
+    }
+
+    private func captureCLIDevice(
+        _ device: TraceScreenshotDevice,
+        noRecording: Bool,
+        completion: @escaping (TraceCLIReply) -> Void
+    ) {
+        let initialDocumentID = model.snapshot.currentDocument?.manifest.id
+        deviceScreenshots.capture(device) { [weak self] result in
+            guard let self else {
+                completion(TraceCLIReply(ok: false, code: "unavailable"))
+                return
+            }
+            do {
+                let image = try result.get()
+                guard TraceCLIActionPolicy.isCurrentDocument(
+                    expectedID: initialDocumentID,
+                    currentID: self.model.snapshot.currentDocument?.manifest.id
+                ) else {
+                    completion(
+                        TraceCLIReply(
+                            ok: false,
+                            code: "actionFailed",
+                            message: "The open trace changed during capture."
+                        ))
+                    return
+                }
+                if initialDocumentID == nil {
+                    let screen = NSScreen.main ?? NSScreen.screens.first
+                    guard self.model.newBlankPage(
+                        size: self.model.preferredBlankViewportSize,
+                        backingScale: screen?.backingScaleFactor ?? 2,
+                        activatesProjectOutput: false,
+                        noRecording: noRecording
+                    ) else {
+                        completion(TraceCLIReply(ok: false, code: "actionFailed"))
+                        return
+                    }
+                }
+                let targetDocumentID = self.model.snapshot.currentDocument?.manifest.id
+                guard let targetDocumentID else {
+                    completion(TraceCLIReply(ok: false, code: "actionFailed"))
+                    return
+                }
+                self.insertCLIImages(
+                    [TraceCanvasImage(image: image, name: device.menuTitle)],
+                    expectedDocumentID: targetDocumentID
+                ) { inserted in
+                    if inserted { self.board.setEditorVisible(true) }
+                    completion(
+                        TraceCLIReply(
+                            ok: inserted,
+                            code: inserted ? nil : "actionFailed"
+                        ))
+                }
+            } catch {
+                completion(
+                    TraceCLIReply(
+                        ok: false,
+                        code: "actionFailed",
+                        message: error.localizedDescription
+                    ))
+            }
         }
     }
 
@@ -1083,14 +1170,29 @@ final class TraceAppDelegate:
 
     private func insertCLIImages(
         _ images: [TraceCanvasImage],
+        expectedDocumentID: UUID?,
         attempt: Int = 0,
         completion: @escaping (Bool) -> Void
     ) {
+        guard TraceCLIActionPolicy.isCurrentDocument(
+            expectedID: expectedDocumentID,
+            currentID: model.snapshot.currentDocument?.manifest.id
+        ) else {
+            completion(false)
+            return
+        }
         if board.insertImages(images, atViewportCenter: true) {
+            guard TraceCLIActionPolicy.isCurrentDocument(
+                expectedID: expectedDocumentID,
+                currentID: model.snapshot.currentDocument?.manifest.id
+            ) else {
+                completion(false)
+                return
+            }
             completion(true)
             return
         }
-        guard model.snapshot.currentDocument != nil, attempt < 49 else {
+        guard attempt < 49 else {
             completion(false)
             return
         }
@@ -1101,18 +1203,34 @@ final class TraceAppDelegate:
             }
             self.insertCLIImages(
                 images,
+                expectedDocumentID: expectedDocumentID,
                 attempt: attempt + 1,
                 completion: completion
             )
         }
     }
 
-    private func compositeCLIImage(
+    private func compositeImageForDocument(
+        expectedDocumentID: UUID,
         attempt: Int = 0,
         completion: @escaping (NSImage?) -> Void
     ) {
+        guard TraceCLIActionPolicy.isCurrentDocument(
+            expectedID: expectedDocumentID,
+            currentID: model.snapshot.currentDocument?.manifest.id
+        ) else {
+            completion(nil)
+            return
+        }
         board.compositeImage { [weak self] image in
             guard let self else {
+                completion(nil)
+                return
+            }
+            guard TraceCLIActionPolicy.isCurrentDocument(
+                expectedID: expectedDocumentID,
+                currentID: self.model.snapshot.currentDocument?.manifest.id
+            ) else {
                 completion(nil)
                 return
             }
@@ -1121,7 +1239,8 @@ final class TraceAppDelegate:
                 return
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.compositeCLIImage(
+                self.compositeImageForDocument(
+                    expectedDocumentID: expectedDocumentID,
                     attempt: attempt + 1,
                     completion: completion
                 )
@@ -1138,10 +1257,23 @@ final class TraceAppDelegate:
             completion(TraceCLIReply(ok: false, code: "noDocument", message: "No trace is open."))
             return
         }
+        let expectedDocumentID = document.manifest.id
         let needsTranscript = format != .image
         let finish: (String?) -> Void = { [weak self] transcript in
             guard let self else {
                 completion(TraceCLIReply(ok: false, code: "unavailable"))
+                return
+            }
+            guard TraceCLIActionPolicy.isCurrentDocument(
+                expectedID: expectedDocumentID,
+                currentID: self.model.snapshot.currentDocument?.manifest.id
+            ) else {
+                completion(
+                    TraceCLIReply(
+                        ok: false,
+                        code: "actionFailed",
+                        message: "The open trace changed during export."
+                    ))
                 return
             }
             if format == .dictation {
@@ -1164,7 +1296,7 @@ final class TraceAppDelegate:
                         ]))
                 return
             }
-            self.compositeCLIImage { image in
+            self.compositeImageForDocument(expectedDocumentID: expectedDocumentID) { image in
                 guard let image else {
                     completion(
                         TraceCLIReply(
@@ -2613,7 +2745,7 @@ final class TraceAppDelegate:
         }
         switch content {
         case .all:
-            board.compositeImage { [weak self] image in
+            compositeImageForDocument(expectedDocumentID: documentID) { [weak self] image in
                 guard let self else {
                     return
                 }
@@ -2656,7 +2788,7 @@ final class TraceAppDelegate:
                 completion: completion
             )
         case .image:
-            board.compositeImage { [weak self] image in
+            compositeImageForDocument(expectedDocumentID: documentID) { [weak self] image in
                 guard let self else {
                     return
                 }
@@ -2690,7 +2822,7 @@ final class TraceAppDelegate:
                     .appendingPathExtension("pdf")
                     .lastPathComponent
             } ?? TraceClipboardPayload.defaultDocumentFileName
-            board.compositeImage { [weak self] image in
+            compositeImageForDocument(expectedDocumentID: documentID) { [weak self] image in
                 guard let self else {
                     return
                 }

@@ -28,6 +28,8 @@ becomes a source submenu: `from <frontmost app>.app` first, then
 - `traceapp capture devices` lists connected devices. `traceapp capture
   --device NAME` matches a device by exact name or identifier, then unique
   prefix; unavailable or ambiguous names are rejected with the device list.
+- Each CLI device capture refreshes discovery before matching, so recently
+  connected devices can be selected on their first request.
 
 ## FAQ
 - **My iPhone is missing.** It must be paired and available; same Wi‑Fi alone is not enough.
@@ -44,6 +46,8 @@ becomes a source submenu: `from <frontmost app>.app` first, then
   open, it adds the image at the viewport center without changing zoom or
   replacing existing content.
 - A failed device capture leaves the open trace intact.
+- A device connected since Trace started appears in the next CLI device
+  capture request without requiring an app restart.
 - Opening the submenu prepares available iOS connections without taking a
   screenshot; repeated openings within ten seconds do not repeat that work,
   and no continuous keep-alive runs after it.

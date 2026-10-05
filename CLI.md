@@ -1,8 +1,39 @@
 # `traceapp` command-line guide
 
-Install from Trace → Setup → **Command-line tool**. The Install action adds
-`/usr/local/bin/traceapp` and asks for administrator approval. Alternatively,
-link the helper yourself:
+## How do I install `traceapp`?
+Use Setup → Command-line tool, or link the helper manually. See
+[`traceapp`](#traceapp).
+
+## How do I capture the app I was just using?
+Run `traceapp capture` in a terminal; Trace skips that terminal and inserts
+into an open trace. See [`capture`](#capture).
+
+## How do I capture a connected phone?
+List devices, then capture by name or identifier. See
+[`capture devices`](#capture-devices) and
+[`capture --device NAME`](#capture---device-name).
+
+## How do I add images to an open trace?
+Pass one or more image paths; Trace inserts them into the current board. See
+[`IMAGE...`](#image).
+
+## How do I copy or export a trace?
+Use `copy` for the pasteboard or `export` to write files. See
+[`copy`](#copy) and [`export`](#export).
+
+## How do I choose what to copy or export?
+Pass one of four `--format` values; omitting it uses image plus dictation.
+See [`--format FORMAT`](#--format-format).
+
+## How do I stop Dictation from starting automatically?
+Add `--no-recording` to a new trace, capture, or image import. See
+[`--no-recording`](#--no-recording).
+
+## Install
+
+In Trace, open Setup → Command-line tool and choose **Install**. Trace links
+the bundled helper at `/usr/local/bin/traceapp` and requests administrator
+approval. Alternatively:
 
 ```sh
 mkdir -p ~/.local/bin
@@ -12,59 +43,97 @@ ln -s /Applications/Trace.app/Contents/Helpers/traceapp ~/.local/bin/traceapp
 Make sure `~/.local/bin` is on your `PATH`. Debug builds contain their own
 helper at `Trace Debug.app/Contents/Helpers/traceapp`.
 
-## Commands
+## A–Z command glossary
 
-| Command | Behavior | Example |
+### `--`
+**What it does:** Ends option parsing so later tokens are treated as file paths.
+**Where:** `traceapp -- -capture.png`.
+
+### `--format FORMAT`
+**What it does:** Selects the copy or export format.
+**Where:** `traceapp copy --format FORMAT`; `traceapp export PATH --format FORMAT`.
+**Note:** Accepted values are `image-dictation` (default), `image`, `dictation`,
+and `pdf`. A bare `--format` prints the formats and exits 64.
+
+### `--help`
+**What it does:** Prints command usage and the CLI guide link.
+**Where:** `traceapp --help` or `traceapp COMMAND --help`.
+
+### `--no-recording`
+**What it does:** Suppresses automatic Dictation startup for this request.
+**Where:** `traceapp --no-recording`, `traceapp capture --no-recording`, or
+`traceapp IMAGE... --no-recording`.
+
+### `capture`
+**What it does:** Captures the app in front of the invoking terminal.
+**Where:** `traceapp capture`.
+**Note:** Inserts at the viewport center of an open trace, or creates a
+screenshot trace if none is open. Requires Screen Recording permission.
+
+### `capture --device NAME`
+**What it does:** Captures an attached Android or paired iOS device.
+**Where:** `traceapp capture --device NAME`.
+**Note:** Matches a case-insensitive exact name, identifier, or unique prefix.
+An unknown, ambiguous, unavailable, or missing name prints the device list
+and exits 64.
+
+### `capture devices`
+**What it does:** Lists connected capture devices and availability hints.
+**Where:** `traceapp capture devices`.
+
+### `copy`
+**What it does:** Copies the whole open trace to the pasteboard.
+**Where:** `traceapp copy [--format FORMAT]`.
+**Note:** Follows Trace's Close window after copy setting. An omitted format
+uses `image-dictation`, independent of the Copy format setting.
+
+### `Exit codes`
+**What it does:** Indicates whether the request completed or why it failed.
+**Where:** The process exit status.
+
+| Code | Meaning | Example |
 | --- | --- | --- |
-| `traceapp` | Opens a blank trace. | `traceapp` |
-| `traceapp --no-recording` | Opens a blank trace without starting Dictation. | `traceapp --no-recording` |
-| `traceapp capture` | Captures the app in front of the invoking terminal. Inserts into the open trace, or creates a screenshot trace if none is open. | `traceapp capture` |
-| `traceapp capture devices` | Lists connected capture devices and any availability hints. | `traceapp capture devices` |
-| `traceapp capture --device NAME` | Captures a device by exact name or identifier, or by a unique prefix. | `traceapp capture --device Pixel` |
-| `traceapp IMAGE...` | Inserts images into the open trace, or creates a blank trace if none is open. One `.traceboard` path opens that document instead. | `traceapp ./design.png ./flow.jpg` |
-| `traceapp copy` | Copies the whole trace in the default image-and-dictation format. Follows Trace's Close window after copy setting. | `traceapp copy` |
-| `traceapp copy --format FORMAT` | Copies in the selected format. | `traceapp copy --format image` |
-| `traceapp export PATH [--format FORMAT]` | Writes export file(s) under a directory, or uses a path with an extension as the filename. | `traceapp export ~/Desktop/trace-export --format pdf` |
+| `0` | Completed successfully. | `traceapp capture devices` |
+| `64` | Invalid command, format, or missing option value. | `traceapp copy --format` |
+| `66` | File is missing or unreadable. | `traceapp ./missing.png` |
+| `69` | Trace could not be launched or reached. | `traceapp` when Trace is unavailable |
+| `70` | Trace action failed, or no trace is open for copy/export. | `traceapp copy` with no open trace |
+| `75` | Trace is busy with another CLI action. | A second mutation while a capture is running |
 
-`capture`, `copy`, `export`, and `devices` are reserved subcommands; use
-`--` or a path such as `./capture.png` when a file has a reserved name.
-Images must be image files Trace can read. A mixed image/document batch,
-multiple `.traceboard` files, or an unreadable path is rejected. Use
-`--no-recording` with capture or image imports to suppress Dictation from
-starting for that request.
+### `export`
+**What it does:** Writes an export of the whole open trace without closing it.
+**Where:** `traceapp export PATH [--format FORMAT]`.
+**Note:** A directory path uses the trace name; a path with an extension sets
+the filename. `image` writes PNG, `dictation` TXT, `pdf` PDF, and
+`image-dictation` PNG plus a sibling TXT when a transcript exists.
 
-## Formats
+### `Formats`
+**What it does:** Names the content copied or exported by `--format`.
+**Where:** `--format FORMAT`.
 
-`--format` accepts:
+| Format | Copy result | Export result | Example |
+| --- | --- | --- | --- |
+| `image-dictation` | Image with embedded transcript metadata and transcript text. | PNG and, when a transcript exists, a sibling TXT file. | `traceapp copy --format image-dictation` |
+| `image` | Image only; does not wait for Dictation to finish. | PNG. | `traceapp export out --format image` |
+| `dictation` | Transcript text. | TXT. | `traceapp export out --format dictation` |
+| `pdf` | PDF with the image and transcript. | PDF. | `traceapp export out --format pdf` |
 
-| Format | Copy result | Export result |
-| --- | --- | --- |
-| `image-dictation` | Image with embedded transcript metadata and transcript text. This is the default; it does not use the Copy format setting. | PNG and, when a transcript exists, a sibling TXT file. |
-| `image` | Image only; does not wait for Dictation to finish. | PNG. |
-| `dictation` | Transcript text. | TXT. |
-| `pdf` | PDF document with image and transcript. | PDF. |
+Dictation-containing formats wait for active Dictation to finish. If `--format`
+has no value, `traceapp` prints the available formats and exits 64.
 
-Dictation-containing formats finish an active recording before returning.
-Export does not close the open trace. A directory path uses the trace's name;
-a path ending in an extension supplies the output filename.
+### `IMAGE...`
+**What it does:** Opens one or more images in Trace.
+**Where:** `traceapp IMAGE...` or `traceapp -- IMAGE...`.
+**Note:** Inserts into an open board; otherwise creates a blank trace.
+Use `--` or a path such as `./capture.png` for a file whose name matches a
+reserved command. Mixed image/traceboard arguments and multiple traceboards
+are rejected.
 
-## Options and help
+### `traceapp`
+**What it does:** Opens a blank trace.
+**Where:** `traceapp [--no-recording]`.
+**Note:** `traceapp --help` and `traceapp COMMAND --help` show usage.
 
-- `--no-recording` suppresses Dictation auto-start for a new trace or capture.
-- `--format FORMAT` selects one of the four formats above. If the option has
-  no value, `traceapp` prints the available formats and exits with code 64.
-- `capture --device NAME` selects a connected device. Without a name, the
-  device list is printed and the command exits with code 64.
-- `--` ends option and subcommand parsing for file paths.
-- `traceapp --help` and `traceapp COMMAND --help` print usage.
-
-## Exit codes
-
-| Code | Meaning |
-| --- | --- |
-| `0` | Completed successfully. |
-| `64` | Invalid command or missing option value. |
-| `66` | File is missing or unreadable. |
-| `69` | Trace could not be launched or reached. |
-| `70` | Trace action failed, or no trace is open for copy/export. |
-| `75` | Trace is busy. |
+### `TRACEBOARD`
+**What it does:** Opens one editable `.traceboard` document.
+**Where:** `traceapp PATH.traceboard`.

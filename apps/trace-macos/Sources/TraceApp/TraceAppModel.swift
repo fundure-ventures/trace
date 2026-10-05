@@ -1047,12 +1047,15 @@ final class TraceAppModel {
     @discardableResult
     func newScreenshotPage(
         noRecording: Bool = false,
-        excludingOwnerPIDs: Set<Int32> = []
+        excludingOwnerPIDs: Set<Int32> = [],
+        completion: ((Result<Void, Error>) -> Void)? = nil
     ) -> Bool {
         guard stateMachine.phase != .capturing else {
+            completion?(.failure(cliActionError("A capture is already in progress.")))
             return false
         }
         guard saveCurrentDocumentReportingError() else {
+            completion?(.failure(cliActionError("The open trace could not be saved.")))
             return false
         }
         resetAnnotationState()
@@ -1063,7 +1066,8 @@ final class TraceAppModel {
         onHideBoard?()
         beginManualFrontmostCapture(
             noRecording: noRecording,
-            excludingOwnerPIDs: excludingOwnerPIDs
+            excludingOwnerPIDs: excludingOwnerPIDs,
+            completion: completion
         )
         onStateChange?(snapshot)
         return captureService.hasPermission
@@ -1140,11 +1144,14 @@ final class TraceAppModel {
         persistAppSettings()
     }
 
-    func openDrawing(from url: URL) {
+    @discardableResult
+    func openDrawing(from url: URL) -> Bool {
         TraceLogger.shared.record(.debug, category: .storage, "Opening drawing")
+        var opened = false
         do {
             guard saveCurrentDocumentReportingError() else {
-                return
+                onStateChange?(snapshot)
+                return false
             }
             resetAnnotationState()
             voiceController.cancel()
@@ -1163,11 +1170,13 @@ final class TraceAppModel {
                     capture: nil
                 )
             )
+            opened = true
         } catch {
             TraceLogger.shared.record(.error, category: .storage, "Drawing open failed", error: error)
             lastError = error.localizedDescription
         }
         onStateChange?(snapshot)
+        return opened
     }
 
     func closeBoard() {
@@ -2064,7 +2073,8 @@ final class TraceAppModel {
 
     private func beginManualFrontmostCapture(
         noRecording: Bool = false,
-        excludingOwnerPIDs: Set<Int32> = []
+        excludingOwnerPIDs: Set<Int32> = [],
+        completion: ((Result<Void, Error>) -> Void)? = nil
     ) {
         manualCaptureInFlight = false
         guard captureService.hasPermission
@@ -2073,6 +2083,7 @@ final class TraceAppModel {
             lastError =
                 "Allow Screen Recording before creating a screenshot page."
             onShowOnboarding?()
+            completion?(.failure(cliActionError(lastError ?? "Screen Recording permission is required.")))
             return
         }
         captureInput.startCapture()
@@ -2080,13 +2091,15 @@ final class TraceAppModel {
         stateMachine.receive(.manualCaptureStarted)
         performFrontmostCapture(
             noRecording: noRecording,
-            excludingOwnerPIDs: excludingOwnerPIDs
+            excludingOwnerPIDs: excludingOwnerPIDs,
+            completion: completion
         )
     }
 
     private func performFrontmostCapture(
         noRecording: Bool = false,
-        excludingOwnerPIDs: Set<Int32> = []
+        excludingOwnerPIDs: Set<Int32> = [],
+        completion: ((Result<Void, Error>) -> Void)? = nil
     ) {
         TraceLogger.shared.record(.debug, category: .capture, "Frontmost capture started")
         captureService.captureFrontmost(
@@ -2098,6 +2111,7 @@ final class TraceAppModel {
             guard self.stateMachine.phase == .capturing else {
                 self.captureInput.cancelCapture()
                 self.manualCaptureInFlight = false
+                completion?(.failure(self.cliActionError("The capture was cancelled.")))
                 return
             }
             switch result {
@@ -2138,11 +2152,14 @@ final class TraceAppModel {
                         self.processDrawingInput(event)
                     }
                     TraceLogger.shared.record(.debug, category: .capture, "Frontmost capture completed")
+                    completion?(.success(()))
                 } catch {
                     self.handleCaptureFailure(error)
+                    completion?(.failure(error))
                 }
             case let .failure(error):
                 self.handleCaptureFailure(error)
+                completion?(.failure(error))
             }
             self.onStateChange?(self.snapshot)
         }
@@ -2167,6 +2184,14 @@ final class TraceAppModel {
             (error as? LocalizedError)?.recoverySuggestion,
         ].compactMap { $0 }.joined(separator: " ")
         onShowOnboarding?()
+    }
+
+    private func cliActionError(_ message: String) -> NSError {
+        NSError(
+            domain: "TraceAppModel",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: message]
+        )
     }
 
     private func apply(

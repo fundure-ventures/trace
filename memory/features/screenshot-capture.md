@@ -31,6 +31,8 @@ the screenshot is inserted there instead of replacing it.
 - CLI capture skips the invoking terminal when choosing the frontmost window.
 - CLI capture inserts into an open board at its viewport center and leaves the
   document and zoom intact.
+- A CLI capture returns success only after a screenshot trace or image insert
+  is complete; permission and capture failures return failure.
 
 ## FAQ
 - **Which window is captured?** The frontmost app's window.
@@ -51,3 +53,5 @@ the screenshot is inserted there instead of replacing it.
 - Running `traceapp capture` from a terminal captures the app the user came
   from; if a board is open, its screenshot is inserted without replacing the
   document.
+- A CLI capture does not report success while screen capture is still pending;
+  permission or capture failures are reported as failures.

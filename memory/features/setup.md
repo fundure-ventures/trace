@@ -27,6 +27,8 @@ opens on first launch (onboarding) and later from the menu bar.
 - Onboarding disables board resizing.
 - `./tools/trace --clear` repeats onboarding without deleting saved traces.
 - Command-line installation is optional and never blocks Setup readiness.
+- Installing or reinstalling `traceapp` can replace a symlink, but never
+  overwrites an existing regular file or directory at the install path.
 
 ## FAQ
 - **Do I need a Neo pen?** No; mouse/trackpad tools work without it.
@@ -47,3 +49,5 @@ opens on first launch (onboarding) and later from the menu bar.
 - A missing, current, broken, or conflicting `traceapp` link is explained
   with an appropriate install, uninstall, or reinstall action; CLI setup does
   not prevent other Setup tasks.
+- If another executable already occupies the install path, Install or
+  Reinstall reports the conflict and preserves that file unchanged.

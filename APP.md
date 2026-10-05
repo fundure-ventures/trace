@@ -28,94 +28,94 @@ Open **Setup** from the menu-bar menu. See [Setup](#setup) and
 
 ## Feature glossary
 
-### Menu bar agent
-**What it does:** Keeps Trace available from the menu bar without a Dock icon or app shell.  
-**Where:** macOS menu bar.
-
-### Setup
-**What it does:** Shows optional permissions, pen, Dictation, shortcut, and CLI setup.  
-**Where:** Menu bar → Setup.
-
-### Global shortcuts
-**What it does:** Starts a blank trace or captures the frontmost app from anywhere.  
-**Where:** Setup → Keyboard shortcuts.
-
 ### App settings
-**What it does:** Configures pen, Copy, Dictation, and launch behavior.  
+**What it does:** Configures pen, Copy, Dictation, and launch behavior.
 **Where:** Trace menu bar menu.
-
-### Projection
-**What it does:** Mirrors or projects a trace on an external display.  
-**Where:** Trace menu bar menu.
-
-### Screenshot capture
-**What it does:** Captures a frontmost app window into a trace.  
-**Where:** Menu bar → New Screenshot trace; global shortcut.
 
 ### Blank trace
-**What it does:** Opens an empty page for drawing or collecting images.  
+**What it does:** Opens an empty page for drawing or collecting images.
 **Where:** Menu bar → New Blank trace; global shortcut.
 
-### Device screenshots
-**What it does:** Captures Android or paired iOS device screens directly into Trace.  
-**Where:** Menu bar → New Screenshot trace → device.
-
-### Image import
-**What it does:** Opens, drops, or pastes images onto a canvas.  
-**Where:** Finder → Open With → Trace; board drop; Edit → Paste image.
-
 ### Board window
-**What it does:** Shows the trace canvas and its floating toolbar.  
+**What it does:** Shows the trace canvas and its floating toolbar.
 **Where:** Opens when a trace is created or reopened.
 
-### Drawing tools
-**What it does:** Selects, draws, highlights, creates rectangles, and adds text.  
-**Where:** Floating toolbar; keyboard shortcuts.
-
-### Tool sizes
-**What it does:** Sets independent Pen, Highlighter, and Text sizes.  
-**Where:** Floating toolbar size control.
-
-### Ink colors
-**What it does:** Provides four legible annotation colors.  
-**Where:** Floating toolbar color control.
-
-### Page background
-**What it does:** Changes the page color for blank traces.  
-**Where:** Floating toolbar page controls.
-
 ### Canvas grid
-**What it does:** Adds an adaptive reference grid that is not exported.  
+**What it does:** Adds an adaptive reference grid that is not exported.
 **Where:** Floating toolbar grid control.
 
-### Dictation
-**What it does:** Records narration while annotating.  
-**Where:** Board Dictation control; requires microphone access and an OpenRouter key.
-
-### Timed annotations
-**What it does:** Matches numbered marks to words in the narration.  
-**Where:** Dictation and board annotations.
+### Command-line tool
+**What it does:** Starts captures, imports images, copies traces, and exports files from Terminal.
+**Where:** Setup → Command-line tool; see [CLI guide](CLI.md).
 
 ### Copy trace
-**What it does:** Copies the whole trace image, narration, or PDF.  
+**What it does:** Copies the whole trace image, narration, or PDF.
 **Where:** `⌘C` with nothing selected; toolbar Copy and Copy options.
 
-### Traceboard documents
-**What it does:** Autosaves and reopens editable `.traceboard` packages.  
-**Where:** File → Open traces; `~/Documents/Trace`.
+### Device screenshots
+**What it does:** Captures Android or paired iOS device screens directly into Trace.
+**Where:** Menu bar → New Screenshot trace → device.
+
+### Dictation
+**What it does:** Records narration while annotating.
+**Where:** Board Dictation control; requires microphone access and an OpenRouter key.
+
+### Drawing tools
+**What it does:** Selects, draws, highlights, creates rectangles, and adds text.
+**Where:** Floating toolbar; keyboard shortcuts.
+
+### Global shortcuts
+**What it does:** Starts a blank trace or captures the frontmost app from anywhere.
+**Where:** Setup → Keyboard shortcuts.
+
+### Image import
+**What it does:** Opens, drops, or pastes images onto a canvas.
+**Where:** Finder → Open With → Trace; board drop; Edit → Paste image.
+
+### Ink colors
+**What it does:** Provides four legible annotation colors.
+**Where:** Floating toolbar color control.
+
+### Menu bar agent
+**What it does:** Keeps Trace available from the menu bar without a Dock icon or app shell.
+**Where:** macOS menu bar.
 
 ### Neo pen
-**What it does:** Draws on compatible Ncode paper with a Neo Smartpen.  
+**What it does:** Draws on compatible Ncode paper with a Neo Smartpen.
 **Where:** Bluetooth pen input.
 
+### Page background
+**What it does:** Changes the page color for blank traces.
+**Where:** Floating toolbar page controls.
+
 ### Pen calibration
-**What it does:** Maps the paper's coordinates onto the trace page.  
+**What it does:** Maps the paper's coordinates onto the trace page.
 **Where:** Setup → Pen → Calibration.
 
 ### Pen hover cursor
-**What it does:** Shows where a hovering pen will land.  
+**What it does:** Shows where a hovering pen will land.
 **Where:** On the board while a connected pen hovers.
 
-### Command-line tool
-**What it does:** Starts captures, imports images, copies traces, and exports files from Terminal.  
-**Where:** Setup → Command-line tool; see [CLI guide](CLI.md).
+### Projection
+**What it does:** Mirrors or projects a trace on an external display.
+**Where:** Trace menu bar menu.
+
+### Screenshot capture
+**What it does:** Captures a frontmost app window into a trace.
+**Where:** Menu bar → New Screenshot trace; global shortcut.
+
+### Setup
+**What it does:** Shows optional permissions, pen, Dictation, shortcut, and CLI setup.
+**Where:** Menu bar → Setup.
+
+### Timed annotations
+**What it does:** Matches numbered marks to words in the narration.
+**Where:** Dictation and board annotations.
+
+### Tool sizes
+**What it does:** Sets independent Pen, Highlighter, and Text sizes.
+**Where:** Floating toolbar size control.
+
+### Traceboard documents
+**What it does:** Autosaves and reopens editable `.traceboard` packages.
+**Where:** File → Open traces; `~/Documents/Trace`.

@@ -3,6 +3,8 @@ import Darwin
 import Foundation
 import TraceCLICore
 
+private let cliExchangeTimeout: TimeInterval = 125
+
 private let helpFooter =
     "Docs: https://github.com/fundure-ventures/trace/blob/main/CLI.md"
 private let formats = TraceCLIFormat.allCases.map(\.rawValue)
@@ -22,31 +24,30 @@ private func printFormats() {
 
 private func main() -> Int32 {
     let args = Array(CommandLine.arguments.dropFirst())
-    if args.contains("--help") || args.contains("-h") || args == ["help"] {
+    let optionArgs = Array(args.prefix(while: { $0 != "--" }))
+    if optionArgs.contains("--help") || optionArgs.contains("-h") || optionArgs == ["help"] {
         print(usage)
         print(helpFooter)
         return TraceCLIExitCode.success.rawValue
     }
-    if let index = args.firstIndex(of: "--format"),
-        index + 1 >= args.count || args[index + 1].hasPrefix("-")
-    {
-        printFormats()
-        return TraceCLIExitCode.usage.rawValue
-    }
-    let missingDeviceValue: Bool
-    if let index = args.firstIndex(of: "--device") {
-        missingDeviceValue = index + 1 >= args.count || args[index + 1].hasPrefix("-")
-    } else {
-        missingDeviceValue = false
-    }
-    let parseArgs = missingDeviceValue ? ["capture", "devices"] : args
+    var missingDeviceValue = false
     let command: TraceCLICommand
     do {
-        command = try TraceCLIArguments.parse(parseArgs)
+        command = try TraceCLIArguments.parse(args)
     } catch TraceCLIParseError.incompleteOption(let option) {
-        fputs("\(option) requires a value\n", stderr)
-        if option == "--format" { printFormats() }
-        return TraceCLIExitCode.usage.rawValue
+        if option == "--device" {
+            missingDeviceValue = true
+            do {
+                command = try TraceCLIArguments.parse(["capture", "devices"])
+            } catch {
+                fputs("Could not list capture devices\n", stderr)
+                return TraceCLIExitCode.actionFailed.rawValue
+            }
+        } else {
+            fputs("\(option) requires a value\n", stderr)
+            if option == "--format" { printFormats() }
+            return TraceCLIExitCode.usage.rawValue
+        }
     } catch TraceCLIParseError.invalidFormat(let format) {
         fputs("Unknown format: \(format)\n", stderr)
         printFormats()
@@ -58,7 +59,7 @@ private func main() -> Int32 {
 
     let bundle: URL
     do {
-        bundle = try traceBundle(for: URL(fileURLWithPath: CommandLine.arguments[0]))
+        bundle = try traceBundle(for: currentExecutableURL())
     } catch {
         fputs("traceapp must be run from a Trace.app bundle\n", stderr)
         return TraceCLIExitCode.unavailable.rawValue
@@ -88,10 +89,11 @@ private func main() -> Int32 {
     do {
         let descriptor: Int32
         do {
-            descriptor = try connectWithRetry(to: socketURL, attempts: 1)
+            descriptor = try connect(to: socketURL)
         } catch {
-            try launch(bundle)
-            descriptor = try connectWithRetry(to: socketURL, attempts: 50)
+            let deadline = DispatchTime.now().uptimeNanoseconds + 25_000_000_000
+            try launch(bundle, deadline: deadline)
+            descriptor = try connectWithRetry(to: socketURL, deadline: deadline)
         }
         defer { Darwin.close(descriptor) }
         let response = try exchange(request, over: descriptor)
@@ -154,7 +156,19 @@ private func traceBundle(for executable: URL) throws -> URL {
     throw CocoaError(.fileNoSuchFile)
 }
 
-private func launch(_ bundle: URL) throws {
+private func currentExecutableURL() throws -> URL {
+    var capacity: UInt32 = 0
+    _ = _NSGetExecutablePath(nil, &capacity)
+    guard capacity > 0 else { throw CocoaError(.executableLoad) }
+    var buffer = [CChar](repeating: 0, count: Int(capacity))
+    let result = buffer.withUnsafeMutableBufferPointer {
+        _NSGetExecutablePath($0.baseAddress, &capacity)
+    }
+    guard result == 0 else { throw CocoaError(.executableLoad) }
+    return URL(fileURLWithPath: String(cString: buffer))
+}
+
+private func launch(_ bundle: URL, deadline: UInt64) throws {
     let semaphore = DispatchSemaphore(value: 0)
     var launchError: Error?
     NSWorkspace.shared.openApplication(at: bundle, configuration: NSWorkspace.OpenConfiguration()) {
@@ -162,7 +176,11 @@ private func launch(_ bundle: URL) throws {
         launchError = error
         semaphore.signal()
     }
-    guard semaphore.wait(timeout: .now() + 5) == .success, launchError == nil else {
+    let now = DispatchTime.now().uptimeNanoseconds
+    guard now < deadline,
+          semaphore.wait(timeout: .now() + .nanoseconds(Int(deadline - now))) == .success,
+          launchError == nil
+    else {
         throw launchError ?? CocoaError(.executableLoad)
     }
 }
@@ -180,6 +198,32 @@ private func connect(to socketURL: URL) throws -> Int32 {
     }
     let descriptor = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
     guard descriptor >= 0 else { throw POSIXError(.init(rawValue: errno) ?? .EIO) }
+    var noSignal: Int32 = 1
+    guard setsockopt(
+        descriptor,
+        SOL_SOCKET,
+        SO_NOSIGPIPE,
+        &noSignal,
+        socklen_t(MemoryLayout<Int32>.size)
+    ) == 0 else {
+        let code = errno
+        Darwin.close(descriptor)
+        throw POSIXError(.init(rawValue: code) ?? .EIO)
+    }
+    var socketTimeout = timeval(tv_sec: 15, tv_usec: 0)
+    for option in [SO_RCVTIMEO, SO_SNDTIMEO] {
+        guard setsockopt(
+            descriptor,
+            SOL_SOCKET,
+            option,
+            &socketTimeout,
+            socklen_t(MemoryLayout<timeval>.size)
+        ) == 0 else {
+            let code = errno
+            Darwin.close(descriptor)
+            throw POSIXError(.init(rawValue: code) ?? .EIO)
+        }
+    }
     let result = withUnsafePointer(to: &address) {
         $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
             Darwin.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
@@ -193,14 +237,12 @@ private func connect(to socketURL: URL) throws -> Int32 {
     return descriptor
 }
 
-private func connectWithRetry(to socketURL: URL, attempts: Int) throws -> Int32 {
+private func connectWithRetry(to socketURL: URL, deadline: UInt64) throws -> Int32 {
     var lastError: Error = CocoaError(.executableLoad)
-    for attempt in 0..<attempts {
+    while DispatchTime.now().uptimeNanoseconds < deadline {
         do { return try connect(to: socketURL) } catch {
             lastError = error
-            if attempt + 1 < attempts {
-                usleep(100_000)
-            }
+            Thread.sleep(forTimeInterval: 0.1)
         }
     }
     throw lastError
@@ -208,21 +250,90 @@ private func connectWithRetry(to socketURL: URL, attempts: Int) throws -> Int32 
 
 private func exchange(_ request: TraceCLIRequest, over descriptor: Int32) throws -> TraceCLIReply {
     var data = try JSONEncoder().encode(request)
+    guard data.count <= TraceCLIStream.maximumRequestBytes else {
+        throw TraceCLIStreamError.lineTooLong
+    }
     data.append(0x0A)
-    let written = data.withUnsafeBytes { Darwin.write(descriptor, $0.baseAddress, $0.count) }
-    guard written == data.count else { throw POSIXError(.init(rawValue: errno) ?? .EIO) }
-    var response = Data()
-    var byte: UInt8 = 0
-    while response.count < 4 * 1024 * 1024 {
-        guard Darwin.read(descriptor, &byte, 1) == 1 else { break }
-        if byte == 0x0A { break }
-        response.append(byte)
+    let deadline = DispatchTime.now().uptimeNanoseconds
+        + UInt64(cliExchangeTimeout * 1_000_000_000)
+    var writeInterrupted = false
+    var writeReadinessError: Error?
+    do {
+        try TraceCLIStream.writeAll(
+            data,
+            write: { buffer in
+                do {
+                    try waitForSocket(
+                        descriptor,
+                        events: Int16(POLLOUT),
+                        deadline: deadline
+                    )
+                } catch {
+                    writeReadinessError = error
+                    return -1
+                }
+                let count = Darwin.write(descriptor, buffer.baseAddress, buffer.count)
+                writeInterrupted = count < 0 && errno == EINTR
+                return count
+            },
+            isInterrupted: { writeInterrupted }
+        )
+    } catch {
+        throw writeReadinessError ?? error
+    }
+
+    var readInterrupted = false
+    var readReadinessError: Error?
+    let response: Data
+    do {
+        response = try TraceCLIStream.readLine(
+            maximumBytes: TraceCLIStream.maximumReplyBytes,
+            read: { buffer in
+                do {
+                    try waitForSocket(
+                        descriptor,
+                        events: Int16(POLLIN),
+                        deadline: deadline
+                    )
+                } catch {
+                    readReadinessError = error
+                    return -1
+                }
+                let count = Darwin.read(descriptor, buffer.baseAddress, buffer.count)
+                readInterrupted = count < 0 && errno == EINTR
+                return count
+            },
+            isInterrupted: { readInterrupted }
+        )
+    } catch {
+        throw readReadinessError ?? error
     }
     guard let reply = try? JSONDecoder().decode(TraceCLIReply.self, from: response), reply.v == 1
     else {
         throw CocoaError(.fileReadCorruptFile)
     }
     return reply
+}
+
+private func waitForSocket(_ descriptor: Int32, events: Int16, deadline: UInt64) throws {
+    while true {
+        let now = DispatchTime.now().uptimeNanoseconds
+        guard now < deadline else { throw POSIXError(.ETIMEDOUT) }
+        let remaining = deadline - now
+        let milliseconds = Int32(
+            min(UInt64(Int32.max), max(1, (remaining + 999_999) / 1_000_000))
+        )
+        var pollDescriptor = pollfd(fd: descriptor, events: events, revents: 0)
+        let result = Darwin.poll(&pollDescriptor, 1, milliseconds)
+        if result > 0 {
+            if pollDescriptor.revents & events != 0 { return }
+            throw POSIXError(.ECONNRESET)
+        }
+        if result == 0 { throw POSIXError(.ETIMEDOUT) }
+        if errno != EINTR {
+            throw POSIXError(.init(rawValue: errno) ?? .EIO)
+        }
+    }
 }
 
 private func terminalAncestorPIDs() -> [Int32] {

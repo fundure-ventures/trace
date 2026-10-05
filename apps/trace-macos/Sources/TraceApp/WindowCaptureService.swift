@@ -42,6 +42,23 @@ enum WindowCaptureError: LocalizedError {
 }
 
 final class WindowCaptureService {
+    private let screenCapturePermission: (() -> Bool)?
+    private let frontmostCapture: ((
+        Set<Int32>,
+        @escaping (Result<CapturedWindow, Error>) -> Void
+    ) -> Void)?
+
+    init(
+        screenCapturePermission: (() -> Bool)? = nil,
+        frontmostCapture: ((
+            Set<Int32>,
+            @escaping (Result<CapturedWindow, Error>) -> Void
+        ) -> Void)? = nil
+    ) {
+        self.screenCapturePermission = screenCapturePermission
+        self.frontmostCapture = frontmostCapture
+    }
+
     var frontmostApplicationName: String? {
         do {
             let descriptors = try windowDescriptors(requiresPermission: false)
@@ -60,7 +77,7 @@ final class WindowCaptureService {
     }
 
     var hasPermission: Bool {
-        CGPreflightScreenCaptureAccess()
+        screenCapturePermission?() ?? CGPreflightScreenCaptureAccess()
     }
 
     @discardableResult
@@ -94,6 +111,10 @@ final class WindowCaptureService {
         excludingOwnerPIDs: Set<Int32> = [],
         completion: @escaping (Result<CapturedWindow, Error>) -> Void
     ) {
+        if let frontmostCapture {
+            frontmostCapture(excludingOwnerPIDs, completion)
+            return
+        }
         do {
             let selection = try selectedFrontmostWindow(
                 excludingOwnerPIDs: excludingOwnerPIDs

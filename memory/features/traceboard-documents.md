@@ -22,6 +22,8 @@ it in a board fitted to its content.
   optional voice/transcript, and `tldraw.json` (canvas state).
 - Reopening fits and centers visible shapes; empty documents fall back to the page.
 - Opening one `.traceboard` is a document open, not an image import.
+- A CLI open reports failure if the package cannot be loaded or the current
+  document cannot be saved; the current board and its UI error remain intact.
 
 ## FAQ
 - **Where are my traces?** `~/Documents/Trace`.
@@ -37,3 +39,6 @@ it in a board fitted to its content.
   beyond the original page; an empty trace frames the page instead.
 - Opening a single `.traceboard` restores the document rather than adding
   it as an imported image.
+- Running `traceapp path.traceboard` reports a failure for corrupt or
+  unloadable packages and when saving the current trace fails, without
+  replacing the current board.

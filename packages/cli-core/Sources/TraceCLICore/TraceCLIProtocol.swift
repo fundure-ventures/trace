@@ -116,6 +116,39 @@ public struct TraceCLIReply: Codable, Equatable {
     }
 }
 
+public final class TraceCLIReplyGate {
+    private let lock = NSLock()
+    private var hasReplied = false
+    private let handleReply: (TraceCLIReply) -> Void
+
+    public init(handleReply: @escaping (TraceCLIReply) -> Void) {
+        self.handleReply = handleReply
+    }
+
+    public func send(_ reply: TraceCLIReply) {
+        lock.lock()
+        guard !hasReplied else {
+            lock.unlock()
+            return
+        }
+        hasReplied = true
+        lock.unlock()
+        handleReply(reply)
+    }
+}
+
+public enum TraceCLIRefreshPolicy {
+    public static func resolveAfterRefresh<Value>(
+        refresh: (@escaping () -> Void) -> Void,
+        resolve: @escaping () -> Value?,
+        completion: @escaping (Value?) -> Void
+    ) {
+        refresh {
+            completion(resolve())
+        }
+    }
+}
+
 public enum TraceCLIExitCode: Int32 {
     case success = 0
     case usage = 64
@@ -129,7 +162,8 @@ public enum TraceCLIExitCode: Int32 {
         case "invalidRequest", "unknownDevice": .usage
         case "noDocument": .actionFailed
         case "busy": .busy
-        case "unavailable", "timeout": .unavailable
+        case "unavailable": .unavailable
+        case "timeout": .actionFailed
         case "fileNotFound", "unreadable": .file
         default: reply.ok ? .success : .actionFailed
         }
