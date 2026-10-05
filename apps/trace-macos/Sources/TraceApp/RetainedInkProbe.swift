@@ -2218,6 +2218,21 @@ enum TraceRetainedInkProbe {
     private static func verifyOnboardingPresentation() throws {
         let board = TraceBoardWindowController()
         board.prepareOnboardingForPreview(setupPreviewSnapshot())
+        board.setCLIInstallationStateForPreview(.notInstalled)
+        guard board.setupVisibleTextForPreview.contains("Use traceapp from the terminal"),
+              !board.setupVisibleTextForPreview.contains("Not installed"),
+              !board.setupVisibleTextForPreview.contains("Use Trace from Terminal as `traceapp`"),
+              board.setupPendingIndicatorsMutedForPreview
+        else {
+            throw probeError("pending setup items were not muted or CLI setup repeated its subtitle")
+        }
+        board.setCLIInstallationStateForPreview(.installed)
+        guard board.setupVisibleTextForPreview.contains("traceapp"),
+              !board.setupVisibleTextForPreview.contains(where: { $0.contains("Installed at") }),
+              !board.setupVisibleTextForPreview.contains("Use Trace from Terminal as `traceapp`")
+        else {
+            throw probeError("installed CLI setup exposed the install path or repeated its subtitle")
+        }
         let setup = board.setupStateForPreview
         let setupText = board.setupVisibleTextForPreview
         let setupChrome = board.boardWindowChromeForPreview
@@ -2360,10 +2375,11 @@ enum TraceRetainedInkProbe {
         )
         let configuredMicrophone = board.setupStateForPreview
         guard configuredMicrophone.voiceReady,
-              configuredMicrophone.voiceAction == nil
+              configuredMicrophone.voiceAction == nil,
+              board.setupPendingIndicatorsMutedForPreview
         else {
             throw probeError(
-                "voice setup did not model microphone permission separately"
+                "voice setup did not show microphone readiness with muted pending checks"
             )
         }
 
@@ -2374,9 +2390,11 @@ enum TraceRetainedInkProbe {
             )
         )
         let missingVoice = board.setupStateForPreview
-        guard missingVoice.voiceAction == "Allow" else {
+        guard missingVoice.voiceAction == "Allow",
+              board.setupPendingIndicatorsMutedForPreview
+        else {
             throw probeError(
-                "missing Dictation configuration hid microphone recovery"
+                "missing Dictation configuration hid microphone recovery or used warning styling"
             )
         }
 

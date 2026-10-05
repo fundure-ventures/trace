@@ -27,6 +27,9 @@ opens on first launch (onboarding) and later from the menu bar.
 - Onboarding disables board resizing.
 - `./tools/trace --clear` repeats onboarding without deleting saved traces.
 - Command-line installation is optional and never blocks Setup readiness.
+- Pending setup checks use a muted outlined checkmark, not a warning icon.
+- The command-line row reads “Use traceapp from the terminal” before installation
+  and “traceapp” after installation, without a subtitle or install path.
 - Installing or reinstalling `traceapp` can replace a symlink, but never
   overwrites an existing regular file or directory at the install path.
 
@@ -42,6 +45,9 @@ opens on first launch (onboarding) and later from the menu bar.
   actions for the pen, permissions, Dictation key, global shortcuts, and
   optional command-line installation.
 - Users without a pen can complete the setup needed for mouse-driven use.
+- Pending checks appear muted; completed checks remain green.
+- The command-line row shows a single label with Install or Uninstall, without
+  repeating instructions or displaying the installation location.
 - Users can save, replace, or remove their personal OpenRouter key; it is
   kept only in Keychain, and an externally supplied key takes precedence.
 - The onboarding board cannot be resized.

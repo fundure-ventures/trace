@@ -1108,6 +1108,14 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         setupPanel.visibleTextForTesting
     }
 
+    func setCLIInstallationStateForPreview(_ state: TraceCLIInstallationState) {
+        setupPanel.updateCLIInstallationState(state)
+    }
+
+    var setupPendingIndicatorsMutedForPreview: Bool {
+        setupPanel.pendingIndicatorsMutedForTesting
+    }
+
     func shortcutValidationForPreview(
         _ action: TraceGlobalShortcutAction,
         shortcut: KeyboardShortcuts.Shortcut
@@ -5420,23 +5428,27 @@ private final class SetupPanelView: NSView {
     private func updateCLIInstallationState() {
         let directory = TraceCLIInstallation.directory
         let helper = TraceCLIInstallation.helperURL(for: Bundle.main.bundleURL)
-        switch TraceCLIInstallation.state(directory: directory, helper: helper) {
+        updateCLIInstallationState(TraceCLIInstallation.state(directory: directory, helper: helper))
+    }
+
+    fileprivate func updateCLIInstallationState(_ state: TraceCLIInstallationState) {
+        switch state {
         case .notInstalled:
             cliRow.update(
-                title: "Not installed",
-                detail: "Use Trace from Terminal as `traceapp`",
+                title: "Use traceapp from the terminal",
+                detail: "Install the command-line tool",
                 ready: false,
                 action: "Install"
             )
-            cliDetailLabel.stringValue = "Use Trace from Terminal as `traceapp`"
+            cliDetailLabel.isHidden = true
         case .installed:
             cliRow.update(
-                title: "Installed at \(TraceCLIInstallation.linkURL(in: directory).path)",
-                detail: "Use Trace from Terminal as `traceapp`",
+                title: "traceapp",
+                detail: "Command-line tool installed",
                 ready: true,
                 action: "Uninstall"
             )
-            cliDetailLabel.stringValue = "Installed at \(TraceCLIInstallation.linkURL(in: directory).path)"
+            cliDetailLabel.isHidden = true
         case .pointsElsewhere:
             cliRow.update(
                 title: "Points to another Trace",
@@ -5445,6 +5457,7 @@ private final class SetupPanelView: NSView {
                 action: "Reinstall"
             )
             cliDetailLabel.stringValue = "Reinstall to use this copy of Trace"
+            cliDetailLabel.isHidden = false
         case .broken:
             cliRow.update(
                 title: "Link is broken",
@@ -5453,6 +5466,7 @@ private final class SetupPanelView: NSView {
                 action: "Reinstall"
             )
             cliDetailLabel.stringValue = "Reinstall to restore the `traceapp` command"
+            cliDetailLabel.isHidden = false
         }
     }
 
@@ -5590,6 +5604,12 @@ private final class SetupPanelView: NSView {
             return values + view.subviews.flatMap(collect)
         }
         return collect(from: contentStack)
+    }
+
+    var pendingIndicatorsMutedForTesting: Bool {
+        [penRow, captureRow, voiceRow, cliRow].allSatisfy {
+            $0.readyForTesting || $0.statusTintForTesting == .secondaryLabelColor
+        } && openRouterRow.pendingIndicatorMutedForTesting
     }
 
     func shortcutConflictPolicyForTesting(
@@ -5733,10 +5753,10 @@ private final class OpenRouterSetupRow: NSView {
         statusImage.image = NSImage(
             systemSymbolName: ready
                 ? "checkmark.circle.fill"
-                : "exclamationmark.circle.fill",
-            accessibilityDescription: ready ? "Ready" : "Needs attention"
+                : "checkmark.circle",
+            accessibilityDescription: ready ? "Ready" : "Not set up"
         )
-        statusImage.contentTintColor = ready ? .systemGreen : .systemOrange
+        statusImage.contentTintColor = ready ? .systemGreen : .secondaryLabelColor
         titleLabel.toolTip = detailLabel.stringValue
         let allowsMutation = voiceState.allowsOpenRouterAPIKeyMutation
         apiKeyField.isEnabled = allowsMutation
@@ -5770,6 +5790,10 @@ private final class OpenRouterSetupRow: NSView {
     }
 
 #if DEBUG
+    var pendingIndicatorMutedForTesting: Bool {
+        apiKeyField.isHidden || statusImage.contentTintColor == .secondaryLabelColor
+    }
+
     var usesRegularTitleFontForTesting: Bool {
         titleLabel.font == .systemFont(ofSize: 12, weight: .regular)
     }
@@ -5842,10 +5866,10 @@ private final class SetupCapabilityRow: NSView {
         statusImage.image = NSImage(
             systemSymbolName: ready
                 ? "checkmark.circle.fill"
-                : "exclamationmark.circle.fill",
-            accessibilityDescription: ready ? "Ready" : "Needs attention"
+                : "checkmark.circle",
+            accessibilityDescription: ready ? "Ready" : "Not set up"
         )
-        statusImage.contentTintColor = ready ? .systemGreen : .systemOrange
+        statusImage.contentTintColor = ready ? .systemGreen : .secondaryLabelColor
         actionButton.title = action ?? ""
         actionButton.isHidden = action == nil
         setAccessibilityLabel("\(title), \(detail)")
@@ -5856,6 +5880,7 @@ private final class SetupCapabilityRow: NSView {
     }
 
 #if DEBUG
+    var statusTintForTesting: NSColor? { statusImage.contentTintColor }
     var titleForTesting: String { titleLabel.stringValue }
     var detailForTesting: String { detailLabel.stringValue }
     var actionForTesting: String? {
