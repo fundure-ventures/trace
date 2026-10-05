@@ -123,18 +123,28 @@ public struct TraceAutosaveGate: Equatable, Sendable {
 }
 
 public struct TraceCLIActionGate: Equatable, Sendable {
-    public private(set) var isBusy = false
+    private var activeAction: UUID?
 
-    public init() {}
-
-    public mutating func begin() -> Bool {
-        guard !isBusy else { return false }
-        isBusy = true
-        return true
+    public var isBusy: Bool {
+        activeAction != nil
     }
 
-    public mutating func finish() {
-        isBusy = false
+    public init() {
+        activeAction = nil
+    }
+
+    public mutating func begin() -> UUID? {
+        guard activeAction == nil else { return nil }
+        let action = UUID()
+        activeAction = action
+        return action
+    }
+
+    @discardableResult
+    public mutating func finish(_ action: UUID) -> Bool {
+        guard activeAction == action else { return false }
+        activeAction = nil
+        return true
     }
 }
 

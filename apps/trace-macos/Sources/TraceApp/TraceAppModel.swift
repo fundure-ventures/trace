@@ -1223,11 +1223,21 @@ final class TraceAppModel {
     }
 
     func finishVoiceForCopy(
+        expectedDocumentID: UUID,
         completion: @escaping (Result<String?, Error>) -> Void
     ) {
         TraceLogger.shared.record(.debug, category: .dictation, "Finishing dictation for copy")
         voiceController.finish { [weak self] result in
             guard let self else {
+                return
+            }
+            guard TraceCLIActionPolicy.isCurrentDocument(
+                expectedID: expectedDocumentID,
+                currentID: self.currentDocument?.manifest.id
+            ) else {
+                completion(
+                    .failure(self.cliActionError("The open trace changed while finishing Dictation."))
+                )
                 return
             }
             do {

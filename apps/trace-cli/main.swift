@@ -52,6 +52,9 @@ private func main() -> Int32 {
         fputs("Unknown format: \(format)\n", stderr)
         printFormats()
         return TraceCLIExitCode.usage.rawValue
+    } catch TraceCLIParseError.invalidOption(let option) {
+        fputs("Unknown option: \(option)\n\(usage)", stderr)
+        return TraceCLIExitCode.usage.rawValue
     } catch {
         fputs("\(error)\n\(usage)", stderr)
         return TraceCLIExitCode.usage.rawValue

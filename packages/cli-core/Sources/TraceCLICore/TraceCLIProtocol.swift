@@ -138,13 +138,15 @@ public final class TraceCLIReplyGate {
 }
 
 public enum TraceCLIRefreshPolicy {
-    public static func resolveAfterRefresh<Value>(
+    public static func resolveAfterRefresh<Anchor, Value>(
+        captureOrigin: () -> Anchor,
         refresh: (@escaping () -> Void) -> Void,
         resolve: @escaping () -> Value?,
-        completion: @escaping (Value?) -> Void
+        completion: @escaping (Anchor, Value?) -> Void
     ) {
+        let origin = captureOrigin()
         refresh {
-            completion(resolve())
+            completion(origin, resolve())
         }
     }
 }

@@ -94,7 +94,7 @@ uses `image-dictation`, independent of the Copy format setting.
 | Code | Meaning | Example |
 | --- | --- | --- |
 | `0` | Completed successfully. | `traceapp capture devices` |
-| `64` | Invalid command, format, or missing option value. | `traceapp copy --format` |
+| `64` | Invalid command, unknown option, format, or missing option value. | `traceapp --bogus` |
 | `66` | File is missing or unreadable. | `traceapp ./missing.png` |
 | `69` | Trace could not be launched or reached. | `traceapp` when Trace is unavailable |
 | `70` | Trace action failed, or no trace is open for copy/export. | `traceapp copy` with no open trace |

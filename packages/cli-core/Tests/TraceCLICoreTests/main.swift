@@ -64,6 +64,16 @@ test("format or device flags without values are usage errors") {
     }
 }
 
+test("unknown options are usage errors before the option separator") {
+    for arguments in [["--bogus"], ["copy", "--frmat", "image"]] {
+        do {
+            _ = try TraceCLIArguments.parse(arguments)
+            throw TestFailure(description: "unknown option was accepted")
+        } catch TraceCLIParseError.invalidOption {
+        }
+    }
+}
+
 test("file arguments retain paths and classify image versus document") {
     let image = try TraceCLIArguments.parse(["--", "a.png", "b.jpeg"])
     try expect(image.action == .openImages(["a.png", "b.jpeg"]), "image paths changed")
@@ -78,11 +88,11 @@ test("file arguments retain paths and classify image versus document") {
 
 test("the option separator keeps every later token literal") {
     let command = try TraceCLIArguments.parse([
-        "--", "--format.png", "--no-recording.png", "--help.jpg", "-device.webp",
+        "--", "--format.png", "--no-recording.png", "--help.jpg", "-device.webp", "-dash.png",
     ])
     try expect(
         command.action == .openImages([
-            "--format.png", "--no-recording.png", "--help.jpg", "-device.webp",
+            "--format.png", "--no-recording.png", "--help.jpg", "-device.webp", "-dash.png",
         ]),
         "tokens after -- were interpreted as options"
     )
@@ -183,15 +193,22 @@ test("device selection resolves against the refreshed inventory") {
     var devices = ["stale"]
     var refreshCompletion: (() -> Void)?
     var selected: String?
+    var documentID = "origin"
+    var selectedDocumentID: String?
     TraceCLIRefreshPolicy.resolveAfterRefresh(
+        captureOrigin: { documentID },
         refresh: { refreshCompletion = $0 },
         resolve: { devices.first(where: { $0 == "new-device" }) },
-        completion: { selected = $0 }
+        completion: { selectedDocumentID = $0; selected = $1 }
     )
     try expect(selected == nil, "device selection ran before discovery completed")
     devices = ["new-device"]
+    documentID = "replacement"
     refreshCompletion?()
-    try expect(selected == "new-device", "device selection did not use refreshed inventory")
+    try expect(
+        selected == "new-device" && selectedDocumentID == "origin",
+        "device selection did not use refreshed inventory and its originating document"
+    )
 }
 
 test("wire messages round-trip and reject unsupported versions") {

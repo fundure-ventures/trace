@@ -820,20 +820,31 @@ final class TraceAppDelegate:
         completion: @escaping (TraceCLIReply) -> Void
     ) {
         let readOnly = request.action == .devices
-        guard readOnly || cliActionGate.begin() else {
+        let actionID = readOnly ? nil : cliActionGate.begin()
+        guard readOnly || actionID != nil else {
             completion(TraceCLIReply(ok: false, code: "busy", message: "Trace is busy with another CLI action."))
             return
         }
-        var completed = false
-        performCLIRequest(request) { [weak self] reply in
+        let replyGate = TraceCLIReplyGate { [weak self] reply in
             DispatchQueue.main.async {
-                guard !completed else { return }
-                completed = true
-                if !readOnly {
-                    self?.cliActionGate.finish()
+                if let actionID {
+                    _ = self?.cliActionGate.finish(actionID)
                 }
                 completion(reply)
             }
+        }
+        let timeout = DispatchWorkItem {
+            replyGate.send(
+                TraceCLIReply(
+                    ok: false,
+                    code: "timeout",
+                    message: "Trace action timed out."
+                ))
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 119, execute: timeout)
+        performCLIRequest(request) { reply in
+            timeout.cancel()
+            replyGate.send(reply)
         }
     }
 
@@ -935,6 +946,7 @@ final class TraceAppDelegate:
             }
         case let .captureDevice(name):
             TraceCLIRefreshPolicy.resolveAfterRefresh(
+                captureOrigin: { self.model.snapshot.currentDocument?.manifest.id },
                 refresh: { [weak self] completion in
                     guard let self else {
                         completion()
@@ -943,7 +955,7 @@ final class TraceAppDelegate:
                     self.deviceScreenshots.refresh(completion: completion)
                 },
                 resolve: { [weak self] in self?.matchDevice(named: name) }
-            ) { [weak self] device in
+            ) { [weak self] expectedDocumentID, device in
                 guard let self else {
                     completion(TraceCLIReply(ok: false, code: "unavailable"))
                     return
@@ -958,7 +970,12 @@ final class TraceAppDelegate:
                         ))
                     return
                 }
-                self.captureCLIDevice(device, noRecording: request.noRecording, completion: completion)
+                self.captureCLIDevice(
+                    device,
+                    expectedDocumentID: expectedDocumentID,
+                    noRecording: request.noRecording,
+                    completion: completion
+                )
             }
         case .copy:
             guard model.snapshot.currentDocument != nil else {
@@ -1022,13 +1039,25 @@ final class TraceAppDelegate:
                     ))
                 return
             }
+            let expectedDocumentID = model.snapshot.currentDocument?.manifest.id
             withFlushedTldrawSnapshot { [weak self] in
                 guard let self else {
                     completion(TraceCLIReply(ok: false, code: "unavailable"))
                     return
                 }
-                if self.model.snapshot.currentDocument != nil {
-                    let expectedDocumentID = self.model.snapshot.currentDocument?.manifest.id
+                guard TraceCLIActionPolicy.isCurrentDocument(
+                    expectedID: expectedDocumentID,
+                    currentID: self.model.snapshot.currentDocument?.manifest.id
+                ) else {
+                    completion(
+                        TraceCLIReply(
+                            ok: false,
+                            code: "actionFailed",
+                            message: "The open trace changed while importing images."
+                        ))
+                    return
+                }
+                if expectedDocumentID != nil {
                     self.insertCLIImages(images, expectedDocumentID: expectedDocumentID) { inserted in
                         completion(
                             TraceCLIReply(
@@ -1078,10 +1107,10 @@ final class TraceAppDelegate:
 
     private func captureCLIDevice(
         _ device: TraceScreenshotDevice,
+        expectedDocumentID: UUID?,
         noRecording: Bool,
         completion: @escaping (TraceCLIReply) -> Void
     ) {
-        let initialDocumentID = model.snapshot.currentDocument?.manifest.id
         deviceScreenshots.capture(device) { [weak self] result in
             guard let self else {
                 completion(TraceCLIReply(ok: false, code: "unavailable"))
@@ -1090,7 +1119,7 @@ final class TraceAppDelegate:
             do {
                 let image = try result.get()
                 guard TraceCLIActionPolicy.isCurrentDocument(
-                    expectedID: initialDocumentID,
+                    expectedID: expectedDocumentID,
                     currentID: self.model.snapshot.currentDocument?.manifest.id
                 ) else {
                     completion(
@@ -1101,7 +1130,7 @@ final class TraceAppDelegate:
                         ))
                     return
                 }
-                if initialDocumentID == nil {
+                if expectedDocumentID == nil {
                     let screen = NSScreen.main ?? NSScreen.screens.first
                     guard self.model.newBlankPage(
                         size: self.model.preferredBlankViewportSize,
@@ -1353,7 +1382,7 @@ final class TraceAppDelegate:
             }
         }
         if needsTranscript {
-            model.finishVoiceForCopy { result in
+            model.finishVoiceForCopy(expectedDocumentID: expectedDocumentID) { result in
                 switch result {
                 case let .success(transcript): finish(transcript)
                 case .failure:
@@ -2702,7 +2731,7 @@ final class TraceAppDelegate:
             )
             return
         }
-        model.finishVoiceForCopy { [weak self] result in
+        model.finishVoiceForCopy(expectedDocumentID: documentID) { [weak self] result in
             guard let self else {
                 completion?(false)
                 return

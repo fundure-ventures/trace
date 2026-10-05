@@ -77,6 +77,9 @@ public enum TraceCLIArguments {
         case "--help", "-h", "help":
             throw TraceCLIParseError.invalidArguments("help")
         default:
+            if first != "--", first.hasPrefix("-") {
+                throw TraceCLIParseError.invalidOption(first)
+            }
             return try parseFiles(args, noRecording: noRecording)
         }
     }
@@ -91,6 +94,7 @@ public enum TraceCLIArguments {
         if arguments == ["devices"] {
             return TraceCLICommand(action: .devices, noRecording: noRecording)
         }
+        try rejectUnknownOptions(in: arguments, allowed: ["--device"])
         guard arguments.count == 2, arguments[0] == "--device" else {
             if arguments.contains("--device") {
                 throw TraceCLIParseError.incompleteOption("--device")
@@ -111,6 +115,7 @@ public enum TraceCLIArguments {
         guard !arguments.isEmpty else {
             return TraceCLICommand(action: action, noRecording: noRecording)
         }
+        try rejectUnknownOptions(in: arguments, allowed: ["--format"])
         guard arguments.count == 2, arguments[0] == "--format" else {
             if arguments.contains("--format") {
                 throw TraceCLIParseError.incompleteOption("--format")
@@ -137,6 +142,9 @@ public enum TraceCLIArguments {
             paths = Array(arguments.dropFirst(separator + 1))
         } else {
             paths = arguments
+            if let option = paths.first(where: { $0.hasPrefix("-") }) {
+                throw TraceCLIParseError.invalidOption(option)
+            }
         }
         guard !paths.isEmpty else {
             throw TraceCLIParseError.invalidArguments("expected image or .traceboard file paths")
@@ -156,5 +164,16 @@ public enum TraceCLIArguments {
             throw TraceCLIParseError.invalidArguments("use one .traceboard or image files only")
         }
         return TraceCLICommand(action: .openImages(paths), noRecording: noRecording)
+    }
+
+    private static func rejectUnknownOptions(
+        in arguments: [String],
+        allowed: Set<String>
+    ) throws {
+        if let option = arguments.first(where: {
+            $0.hasPrefix("-") && $0 != "--" && !allowed.contains($0)
+        }) {
+            throw TraceCLIParseError.invalidOption(option)
+        }
     }
 }

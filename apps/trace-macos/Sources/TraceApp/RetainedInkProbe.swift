@@ -4912,7 +4912,7 @@ enum TraceRetainedInkProbe {
             )
         }
         var copiedTranscript: String?
-        model.finishVoiceForCopy { result in
+        model.finishVoiceForCopy(expectedDocumentID: document.manifest.id) { result in
             copiedTranscript = try? result.get()
         }
         guard copiedTranscript

@@ -254,29 +254,43 @@ test("presenting a document cancels only the stale copy operation") {
     )
 }
 
-test("CLI mutations report busy and stale document callbacks are rejected") {
+test("CLI action timeout releases its gate once without releasing a newer action") {
     var gate = TraceCLIActionGate()
-    try expect(gate.begin(), "first CLI mutation did not acquire the action gate")
-    try expect(!gate.begin(), "concurrent CLI mutation was not rejected")
-    gate.finish()
-    try expect(gate.begin(), "CLI action gate remained busy after completion")
+    guard let timedOutAction = gate.begin() else {
+        throw TestFailure(description: "first CLI mutation did not acquire the action gate")
+    }
+    try expect(gate.begin() == nil, "concurrent CLI mutation was not rejected")
+    try expect(gate.finish(timedOutAction), "timed-out action did not release the gate")
+    guard let nextAction = gate.begin() else {
+        throw TestFailure(description: "CLI action gate remained busy after timeout")
+    }
+    try expect(
+        !gate.finish(timedOutAction) && gate.isBusy,
+        "late completion released the next action's gate"
+    )
+    try expect(gate.finish(nextAction) && !gate.isBusy, "active action could not release the gate")
+}
 
+test("CLI async capture, import, and Dictation callbacks reject changed documents") {
     let originalDocument = UUID()
     let replacementDocument = UUID()
-    try expect(
-        TraceCLIActionPolicy.isCurrentDocument(
-            expectedID: originalDocument,
-            currentID: originalDocument
-        ),
-        "action rejected its original document"
-    )
-    try expect(
-        !TraceCLIActionPolicy.isCurrentDocument(
-            expectedID: originalDocument,
-            currentID: replacementDocument
-        ),
-        "late action was allowed to target a replacement document"
-    )
+    let expectedDocumentID = originalDocument
+    for operation in ["device capture", "image import", "Dictation finish"] {
+        try expect(
+            TraceCLIActionPolicy.isCurrentDocument(
+                expectedID: expectedDocumentID,
+                currentID: originalDocument
+            ),
+            "\(operation) rejected its original document"
+        )
+        try expect(
+            !TraceCLIActionPolicy.isCurrentDocument(
+                expectedID: expectedDocumentID,
+                currentID: replacementDocument
+            ),
+            "\(operation) was allowed to target a replacement document"
+        )
+    }
 }
 
 test("window selection uses the topmost mapped app window") {
