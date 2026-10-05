@@ -38,10 +38,22 @@ if [[ -n "${TRACE_CODE_SIGN_IDENTITY:-}" ]]; then
         fi
         SIGN_ARGS+=(--entitlements "$TRACE_CODE_SIGN_ENTITLEMENTS")
     fi
+    HELPER="$APP/Contents/Helpers/traceapp"
+    if [[ -f "$HELPER" ]]; then
+        codesign "${SIGN_ARGS[@]}" "$HELPER" >/dev/null
+    fi
     codesign "${SIGN_ARGS[@]}" "$APP" >/dev/null
 else
     # The default ad-hoc requirement is cdhash-based, so TCC forgets rebuilt apps.
     REQUIREMENT="=designated => identifier \"$BUNDLE_IDENTIFIER\""
+    HELPER="$APP/Contents/Helpers/traceapp"
+    if [[ -f "$HELPER" ]]; then
+        codesign \
+            --force \
+            --sign - \
+            --requirements "$REQUIREMENT" \
+            "$HELPER" >/dev/null
+    fi
     codesign \
         --force \
         --sign - \

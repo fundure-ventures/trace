@@ -11,12 +11,15 @@ in question, without cropping or window-hunting.
 Neo pen) captures the frontmost app window at 1:1 point size and plays a short
 Monochrome Flash transition from the window's position into a new
 [board](board-window.md).
+`traceapp capture` captures the window the user came from; with a board open,
+the screenshot is inserted there instead of replacing it.
 
 ## Touchpoints
 - [Menu bar agent](menu-bar-agent.md) and File → New Screenshot trace
 - [Global shortcuts](global-shortcuts.md) → Capture Frontmost App
 - [Neo pen](neo-pen.md) cap-off when enabled in [App settings](app-settings.md)
 - Becomes a source submenu when [Device screenshots](device-screenshots.md) are available
+- [Command-line tool](command-line-tool.md) capture
 
 ## Rules
 - Preserve the source window's 1:1 point size whenever screen bounds permit.
@@ -25,6 +28,9 @@ Monochrome Flash transition from the window's position into a new
 - Reduce Motion reveals the board and toolbar directly.
 - Requires Screen Recording permission ([Setup](setup.md)).
 - The captured image is fully opaque, even after Highlighter use.
+- CLI capture skips the invoking terminal when choosing the frontmost window.
+- CLI capture inserts into an open board at its viewport center and leaves the
+  document and zoom intact.
 
 ## FAQ
 - **Which window is captured?** The frontmost app's window.
@@ -42,3 +48,6 @@ Monochrome Flash transition from the window's position into a new
   from Setup.
 - A screenshot remains fully opaque even if Highlighter was used before
   the capture.
+- Running `traceapp capture` from a terminal captures the app the user came
+  from; if a board is open, its screenshot is inserted without replacing the
+  document.

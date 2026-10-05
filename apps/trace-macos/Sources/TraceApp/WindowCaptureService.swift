@@ -91,10 +91,13 @@ final class WindowCaptureService {
     }
 
     func captureFrontmost(
+        excludingOwnerPIDs: Set<Int32> = [],
         completion: @escaping (Result<CapturedWindow, Error>) -> Void
     ) {
         do {
-            let selection = try selectedFrontmostWindow()
+            let selection = try selectedFrontmostWindow(
+                excludingOwnerPIDs: excludingOwnerPIDs
+            )
             capture(selection, completion: completion)
         } catch {
             completion(.failure(error))
@@ -141,12 +144,15 @@ final class WindowCaptureService {
         return selected
     }
 
-    private func selectedFrontmostWindow() throws -> TraceWindowDescriptor {
+    private func selectedFrontmostWindow(
+        excludingOwnerPIDs: Set<Int32> = []
+    ) throws -> TraceWindowDescriptor {
         let descriptors = try windowDescriptors()
         let ownPID = ProcessInfo.processInfo.processIdentifier
         guard let selected = WindowSelectionPolicy.frontmost(
             windowsFrontToBack: descriptors,
-            excludingOwnerPID: ownPID
+            excludingOwnerPID: ownPID,
+            excludingOwnerPIDs: excludingOwnerPIDs
         ) else {
             throw WindowCaptureError.noWindow
         }

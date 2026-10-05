@@ -22,6 +22,7 @@ Each file is the source of truth for
 | --- | --- | --- |
 | [Menu bar agent](memory/features/menu-bar-agent.md) | `#app` | Trace lives in the menu bar, with no dock icon or app shell |
 | [Setup](memory/features/setup.md) | `#app` | One panel for permissions, pen, Dictation key, and shortcuts |
+| [Command-line tool](memory/features/command-line-tool.md) | `#app` | Install and use Trace from Terminal |
 | [Global shortcuts](memory/features/global-shortcuts.md) | `#app` | System-wide New Blank Trace and Capture Frontmost App |
 | [App settings](memory/features/app-settings.md) | `#app` | Pen, copy, Dictation, and login behavior |
 | [Projection](memory/features/projection.md) | `#app` | Mirror or Project a trace on an external display |
@@ -100,6 +101,8 @@ Every `memory/features/<feature-name>.md` uses these sections, in order:
 - Keep Acceptance criteria independent of test filenames, symbols, and
   coverage status. They describe what users should experience, not how the
   repository currently checks it.
+- Update [APP.md](APP.md) and [CLI.md](CLI.md) in the same change when shipped
+  app or command-line behavior changes.
 
 ## Feature template
 

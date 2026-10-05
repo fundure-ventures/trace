@@ -18,6 +18,7 @@ is shaped the way it is.
 | [0006](memory/adr/0006-unified-timed-annotations.md) | Unify timed Neo and tldraw annotations |
 | [0007](memory/adr/0007-batched-finder-image-import.md) | Import Finder image batches into one canvas |
 | [0008](memory/adr/0008-background-derived-color-theming.md) | Derive annotation colors from the page background |
+| [0009](memory/adr/0009-cli-unix-socket-ipc.md) | Use a per-user Unix socket for the command-line interface |
 
 ## Documentation principles
 

@@ -18,7 +18,10 @@ let package = Package(
         .library(name: "TraceStrokeProcessing", targets: ["TraceStrokeProcessing"]),
         .library(name: "TraceVoice", targets: ["TraceVoice"]),
         .library(name: "TraceLogging", targets: ["TraceLogging"]),
+        .library(name: "TraceCLICore", targets: ["TraceCLICore"]),
         .executable(name: "trace-logging-tests", targets: ["TraceLoggingTests"]),
+        .executable(name: "trace-cli-core-tests", targets: ["TraceCLICoreTests"]),
+        .executable(name: "traceapp", targets: ["TraceCLI"]),
         .executable(name: "trace-neo-diagnostics", targets: ["TraceNeoDiagnostics"]),
         .executable(name: "trace", targets: ["TraceApp"]),
         .executable(name: "trace-input-lab", targets: ["TraceInputLab"]),
@@ -52,6 +55,21 @@ let package = Package(
         ),
     ],
     targets: [
+        .target(
+            name: "TraceCLICore",
+            path: "packages/cli-core/Sources/TraceCLICore"
+        ),
+        .executableTarget(
+            name: "TraceCLICoreTests",
+            dependencies: ["TraceCLICore"],
+            path: "packages/cli-core/Tests/TraceCLICoreTests"
+        ),
+        .executableTarget(
+            name: "TraceCLI",
+            dependencies: ["TraceCLICore"],
+            path: "apps/trace-cli",
+            linkerSettings: [.linkedFramework("AppKit")]
+        ),
         .target(
             name: "TraceLogging",
             path: "packages/logging/Sources/TraceLogging"
@@ -160,6 +178,7 @@ let package = Package(
                 "TraceStrokeProcessing",
                 "TraceVoice",
                 "TraceLogging",
+                "TraceCLICore",
             ],
             path: "apps/trace-macos/Sources/TraceApp",
             linkerSettings: [

@@ -5204,8 +5204,13 @@ private final class SetupPanelView: NSView {
     private let captureShortcutRow = SetupShortcutRecorderRow(
         action: .captureFrontmostApp
     )
+    private let cliHeading = NSTextField(labelWithString: "Command line tool")
+    private let cliRow = SetupCapabilityRow()
+    private let cliDetailLabel = NSTextField(labelWithString: "")
+    private let cliDocsButton = NSButton()
     private let errorLabel = NSTextField(wrappingLabelWithString: "")
     private let contentStack = NSStackView()
+    private var cliErrorMessage: String?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -5229,6 +5234,18 @@ private final class SetupPanelView: NSView {
         captureShortcutRow.onChange = { [weak self] in
             self?.onGlobalShortcutsChange?()
         }
+        cliRow.onAction = { [weak self] in self?.updateCLIInstallation() }
+        cliDocsButton.title = "CLI docs"
+        cliDocsButton.bezelStyle = .inline
+        cliDocsButton.isBordered = false
+        cliDocsButton.controlSize = .small
+        cliDocsButton.contentTintColor = .linkColor
+        cliDocsButton.target = self
+        cliDocsButton.action = #selector(openCLIDocs)
+        cliDetailLabel.font = .systemFont(ofSize: 11)
+        cliDetailLabel.textColor = .secondaryLabelColor
+        cliDetailLabel.lineBreakMode = .byWordWrapping
+        cliHeading.font = .systemFont(ofSize: 13, weight: .semibold)
         errorLabel.font = .systemFont(ofSize: 11)
         errorLabel.textColor = .systemRed
         errorLabel.lineBreakMode = .byWordWrapping
@@ -5258,6 +5275,10 @@ private final class SetupPanelView: NSView {
             shortcutHeading,
             blankShortcutRow,
             captureShortcutRow,
+            cliHeading,
+            cliRow,
+            cliDetailLabel,
+            cliDocsButton,
             errorLabel,
         ].forEach(contentStack.addArrangedSubview)
         contentStack.translatesAutoresizingMaskIntoConstraints = false
@@ -5276,6 +5297,10 @@ private final class SetupPanelView: NSView {
             shortcutHeading,
             blankShortcutRow,
             captureShortcutRow,
+            cliHeading,
+            cliRow,
+            cliDetailLabel,
+            cliDocsButton,
             errorLabel,
         ].forEach {
             $0.widthAnchor.constraint(equalTo: contentStack.widthAnchor)
@@ -5291,6 +5316,9 @@ private final class SetupPanelView: NSView {
         contentStack.setCustomSpacing(14, after: divider)
         contentStack.setCustomSpacing(8, after: shortcutHeading)
         contentStack.setCustomSpacing(10, after: blankShortcutRow)
+        contentStack.setCustomSpacing(8, after: captureShortcutRow)
+        contentStack.setCustomSpacing(8, after: cliHeading)
+        contentStack.setCustomSpacing(5, after: cliRow)
         addSubview(contentStack)
         NSLayoutConstraint.activate([
             contentStack.topAnchor.constraint(
@@ -5384,8 +5412,80 @@ private final class SetupPanelView: NSView {
         captureShortcutRow.update(
             shortcuts.state(for: .captureFrontmostApp)
         )
-        errorLabel.stringValue = snapshot.lastError ?? ""
-        errorLabel.isHidden = snapshot.lastError == nil
+        updateCLIInstallationState()
+        errorLabel.stringValue = snapshot.lastError ?? cliErrorMessage ?? ""
+        errorLabel.isHidden = snapshot.lastError == nil && cliErrorMessage == nil
+    }
+
+    private func updateCLIInstallationState() {
+        let directory = TraceCLIInstallation.directory
+        let helper = TraceCLIInstallation.helperURL(for: Bundle.main.bundleURL)
+        switch TraceCLIInstallation.state(directory: directory, helper: helper) {
+        case .notInstalled:
+            cliRow.update(
+                title: "Not installed",
+                detail: "Use Trace from Terminal as `traceapp`",
+                ready: false,
+                action: "Install"
+            )
+            cliDetailLabel.stringValue = "Use Trace from Terminal as `traceapp`"
+        case .installed:
+            cliRow.update(
+                title: "Installed at \(TraceCLIInstallation.linkURL(in: directory).path)",
+                detail: "Use Trace from Terminal as `traceapp`",
+                ready: true,
+                action: "Uninstall"
+            )
+            cliDetailLabel.stringValue = "Installed at \(TraceCLIInstallation.linkURL(in: directory).path)"
+        case .pointsElsewhere:
+            cliRow.update(
+                title: "Points to another Trace",
+                detail: "Reinstall to use this copy of Trace",
+                ready: false,
+                action: "Reinstall"
+            )
+            cliDetailLabel.stringValue = "Reinstall to use this copy of Trace"
+        case .broken:
+            cliRow.update(
+                title: "Link is broken",
+                detail: "Reinstall to restore the `traceapp` command",
+                ready: false,
+                action: "Reinstall"
+            )
+            cliDetailLabel.stringValue = "Reinstall to restore the `traceapp` command"
+        }
+    }
+
+    private func updateCLIInstallation() {
+        let directory = TraceCLIInstallation.directory
+        let helper = TraceCLIInstallation.helperURL(for: Bundle.main.bundleURL)
+        let installed = TraceCLIInstallation.state(
+            directory: directory,
+            helper: helper
+        ) == .installed
+        do {
+            try TraceCLIInstallation.perform(
+                install: !installed,
+                directory: directory,
+                helper: helper,
+                requiresAuthorization:
+                    ProcessInfo.processInfo.environment[
+                        "TRACE_CLI_INSTALL_DIRECTORY"
+                    ] == nil
+            )
+            cliErrorMessage = nil
+        } catch {
+            cliErrorMessage = error.localizedDescription
+        }
+        updateCLIInstallationState()
+        errorLabel.stringValue = cliErrorMessage ?? ""
+        errorLabel.isHidden = cliErrorMessage == nil
+    }
+
+    @objc private func openCLIDocs() {
+        if let url = URL(string: "https://github.com/fundure-ventures/trace/blob/main/CLI.md") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func connectionText(_ state: PenConnectionState) -> String {

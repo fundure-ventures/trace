@@ -3,6 +3,16 @@ import Darwin
 
 #if DEBUG
 let environment = ProcessInfo.processInfo.environment
+if environment["TRACE_CLI_INSTALL_PROBE"] == "1" {
+    do {
+        try TraceCLIInstallation.runProbe()
+        print("CLI installation probe passed")
+        exit(0)
+    } catch {
+        fputs("CLI installation probe failed\n", stderr)
+        exit(1)
+    }
+}
 if environment["TRACE_DEVICE_SCREENSHOT_PROBE"] == "1" {
     _ = NSApplication.shared
     do {

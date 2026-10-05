@@ -264,6 +264,7 @@ final class DeviceScreenshotService {
     private var warmupPolicy = TraceDeviceWarmupPolicy()
     private var timer: Timer?
     private var refreshing = false
+    private var refreshCompletions: [() -> Void] = []
     private var lastDiscoveryError: String?
     private var tools: (adb: URL?, ios: URL?)?
 
@@ -311,10 +312,14 @@ final class DeviceScreenshotService {
         }
     }
 
-    func refresh() {
-        guard !refreshing else { return }
+    func refresh(completion: (() -> Void)? = nil) {
+        if refreshing {
+            if let completion { refreshCompletions.append(completion) }
+            return
+        }
         TraceLogger.shared.record(.debug, category: .capture, "Device discovery started")
         refreshing = true
+        if let completion { refreshCompletions.append(completion) }
         let cachedTools = tools
         discoveryQueue.async {
             let runner = TraceDeviceCommandRunner()
@@ -362,6 +367,9 @@ final class DeviceScreenshotService {
                     self.devices = found
                     self.onDevicesChange?()
                 }
+                let completions = self.refreshCompletions
+                self.refreshCompletions.removeAll()
+                completions.forEach { $0() }
             }
         }
     }

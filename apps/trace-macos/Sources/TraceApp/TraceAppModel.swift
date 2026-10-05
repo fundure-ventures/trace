@@ -944,7 +944,8 @@ final class TraceAppModel {
         size: NSSize,
         backingScale: CGFloat,
         activatesProjectOutput: Bool = true,
-        allowsInitialSetup: Bool = false
+        allowsInitialSetup: Bool = false,
+        noRecording: Bool = false
     ) -> Bool {
         guard stateMachine.phase != .capturing else {
             return false
@@ -968,7 +969,9 @@ final class TraceAppModel {
             )
             stateMachine.receive(.drawingOpened(document.manifest.id))
             lastError = nil
-            autoStartDictationIfEnabled()
+            if !noRecording {
+                autoStartDictationIfEnabled()
+            }
             presentDocument(
                 TraceDocumentPresentation(
                     document: document,
@@ -1041,12 +1044,16 @@ final class TraceAppModel {
         }
     }
 
-    func newScreenshotPage() {
+    @discardableResult
+    func newScreenshotPage(
+        noRecording: Bool = false,
+        excludingOwnerPIDs: Set<Int32> = []
+    ) -> Bool {
         guard stateMachine.phase != .capturing else {
-            return
+            return false
         }
         guard saveCurrentDocumentReportingError() else {
-            return
+            return false
         }
         resetAnnotationState()
         voiceController.cancel()
@@ -1054,8 +1061,12 @@ final class TraceAppModel {
         currentDocument = nil
         drawingHistory.clear()
         onHideBoard?()
-        beginManualFrontmostCapture()
+        beginManualFrontmostCapture(
+            noRecording: noRecording,
+            excludingOwnerPIDs: excludingOwnerPIDs
+        )
         onStateChange?(snapshot)
+        return captureService.hasPermission
     }
 
     func updatePageBackground(_ color: TraceRGBAColor) {
@@ -2051,7 +2062,10 @@ final class TraceAppModel {
         performFrontmostCapture()
     }
 
-    private func beginManualFrontmostCapture() {
+    private func beginManualFrontmostCapture(
+        noRecording: Bool = false,
+        excludingOwnerPIDs: Set<Int32> = []
+    ) {
         manualCaptureInFlight = false
         guard captureService.hasPermission
         else {
@@ -2064,12 +2078,20 @@ final class TraceAppModel {
         captureInput.startCapture()
         manualCaptureInFlight = true
         stateMachine.receive(.manualCaptureStarted)
-        performFrontmostCapture()
+        performFrontmostCapture(
+            noRecording: noRecording,
+            excludingOwnerPIDs: excludingOwnerPIDs
+        )
     }
 
-    private func performFrontmostCapture() {
+    private func performFrontmostCapture(
+        noRecording: Bool = false,
+        excludingOwnerPIDs: Set<Int32> = []
+    ) {
         TraceLogger.shared.record(.debug, category: .capture, "Frontmost capture started")
-        captureService.captureFrontmost { [weak self] result in
+        captureService.captureFrontmost(
+            excludingOwnerPIDs: excludingOwnerPIDs
+        ) { [weak self] result in
             guard let self else {
                 return
             }
@@ -2102,7 +2124,9 @@ final class TraceAppModel {
                         .captureSucceeded(document.manifest.id)
                     )
                     self.lastError = nil
-                    self.autoStartDictationIfEnabled()
+                    if !noRecording {
+                        self.autoStartDictationIfEnabled()
+                    }
                     self.presentDocument(
                         TraceDocumentPresentation(
                             document: document,

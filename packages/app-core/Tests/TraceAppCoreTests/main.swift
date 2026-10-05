@@ -308,6 +308,38 @@ test("window selection uses the topmost mapped app window") {
     )
 }
 
+test("terminal windows can be excluded while choosing the frontmost capture") {
+    let windows = [
+        TraceWindowDescriptor(
+            id: 10,
+            ownerPID: 500,
+            layer: 0,
+            alpha: 1,
+            bounds: TraceRect(x: 0, y: 0, width: 900, height: 700),
+            ownerName: "Terminal",
+            title: "shell"
+        ),
+        TraceWindowDescriptor(
+            id: 11,
+            ownerPID: 600,
+            layer: 0,
+            alpha: 1,
+            bounds: TraceRect(x: 0, y: 0, width: 900, height: 700),
+            ownerName: "Browser",
+            title: "reference"
+        ),
+    ]
+    let selected = WindowSelectionPolicy.frontmost(
+        windowsFrontToBack: windows,
+        excludingOwnerPID: 999,
+        excludingOwnerPIDs: [500]
+    )
+    try expect(
+        selected?.ownerPID == 600,
+        "the invoking terminal was selected instead of the app behind it"
+    )
+}
+
 test("drawing manifest round trips brushes colors and normalized points") {
     let document = TraceDrawingManifest(
         id: UUID(),

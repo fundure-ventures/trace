@@ -635,19 +635,26 @@ public enum WindowSelectionPolicy {
 
     public static func frontmost<Windows: Sequence>(
         windowsFrontToBack: Windows,
-        excludingOwnerPID: Int32
+        excludingOwnerPID: Int32,
+        excludingOwnerPIDs: Set<Int32> = []
     ) -> TraceWindowDescriptor?
     where Windows.Element == TraceWindowDescriptor {
         windowsFrontToBack.first {
-            isEligible($0, excludingOwnerPID: excludingOwnerPID)
+            isEligible(
+                $0,
+                excludingOwnerPID: excludingOwnerPID,
+                excludingOwnerPIDs: excludingOwnerPIDs
+            )
         }
     }
 
     private static func isEligible(
         _ window: TraceWindowDescriptor,
-        excludingOwnerPID: Int32
+        excludingOwnerPID: Int32,
+        excludingOwnerPIDs: Set<Int32> = []
     ) -> Bool {
         window.ownerPID != excludingOwnerPID
+            && !excludingOwnerPIDs.contains(window.ownerPID)
             && window.layer == 0
             && window.alpha > 0.01
             && window.bounds.width >= 80

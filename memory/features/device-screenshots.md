@@ -25,6 +25,9 @@ becomes a source submenu: `from <frontmost app>.app` first, then
 - Simulators are excluded; ADB/Xcode are never bundled.
 - Opening the submenu warms iOS connections (deduped, 10 s cooldown), without
   taking screenshots or keeping a continuous keep-alive.
+- `traceapp capture devices` lists connected devices. `traceapp capture
+  --device NAME` matches a device by exact name or identifier, then unique
+  prefix; unavailable or ambiguous names are rejected with the device list.
 
 ## FAQ
 - **My iPhone is missing.** It must be paired and available; same Wi‑Fi alone is not enough.
