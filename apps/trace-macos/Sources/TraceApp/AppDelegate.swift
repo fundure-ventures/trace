@@ -1,4 +1,5 @@
 import AppKit
+import TraceLogging
 import Darwin
 import NeoTransport
 import ServiceManagement
@@ -387,6 +388,7 @@ final class TraceAppDelegate:
     private var openFileForwardingObserver: NSObjectProtocol?
     private var startupErrorWorkItem: DispatchWorkItem?
     private var forwardedOpenFiles = false
+    private var persistDebugLogItems: [NSMenuItem] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
 #if DEBUG
@@ -406,11 +408,13 @@ final class TraceAppDelegate:
             do {
                 liveSessionLock = try TracePenSessionLock()
             } catch {
+                TraceLogger.shared.record(.debug, category: .lifecycle, "Forwarding launch to existing Trace instance")
                 becomeOpenFileForwarder(startupError: error)
                 return
             }
             startOpenFileForwardingListener()
         }
+        TraceLogger.shared.record(.notice, category: .lifecycle, "Trace started")
 #if DEBUG
         if runsProductProbe {
             NSApp.setActivationPolicy(.accessory)
@@ -454,6 +458,7 @@ final class TraceAppDelegate:
                         model.snapshot.appSettings.launchInMenuBarAtLogin
                 )
             } catch {
+                TraceLogger.shared.record(.error, category: .lifecycle, "Launch-at-login update failed", error: error)
                 showSettingsError(
                     "Trace could not update its launch-at-login setting: "
                         + error.localizedDescription
@@ -678,6 +683,9 @@ final class TraceAppDelegate:
         deviceScreenshots.stop()
         projection.stop()
         model.stop()
+        TraceLogger.shared.record(.notice, category: .lifecycle, "Trace stopped")
+        do { try TraceLogger.shared.flush() }
+        catch { fputs("Trace local logs could not be fully saved.\n", stderr) }
     }
 
     func applicationShouldTerminate(
@@ -1184,6 +1192,8 @@ final class TraceAppDelegate:
         let projectionAnchor = NSMenuItem.separator()
         menu.addItem(projectionAnchor)
         projectionMenuAnchor = projectionAnchor
+        menu.addItem(diagnosticsMenuItem())
+        menu.addItem(.separator())
 
         let quit = NSMenuItem(
             title: "Quit Trace",
@@ -1209,6 +1219,8 @@ final class TraceAppDelegate:
             action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
             keyEquivalent: ""
         )
+        appMenu.addItem(.separator())
+        appMenu.addItem(diagnosticsMenuItem())
         appMenu.addItem(.separator())
         let quitItem = NSMenuItem(
             title: "Quit Trace",
@@ -1330,6 +1342,51 @@ final class TraceAppDelegate:
             description: statusText(snapshot)
         )
         statusItem?.button?.image?.isTemplate = true
+    }
+
+    private func diagnosticsMenuItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "Diagnostics", action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: "Diagnostics")
+        let persist = NSMenuItem(
+            title: "Persist Debug Logs",
+            action: #selector(toggleDebugLogPersistence(_:)),
+            keyEquivalent: ""
+        )
+        persist.target = self
+        persist.state = TraceLogger.shared.persistDebugLogs ? .on : .off
+        persist.toolTip = "Keep verbose diagnostic events locally across app launches."
+        persistDebugLogItems.append(persist)
+        menu.addItem(persist)
+        let open = NSMenuItem(title: "Open Logs", action: #selector(openLogs), keyEquivalent: "")
+        open.target = self
+        menu.addItem(open)
+        item.submenu = menu
+        return item
+    }
+
+    @objc private func toggleDebugLogPersistence(_ sender: NSMenuItem) {
+        let enabled = sender.state != .on
+        if !enabled {
+            TraceLogger.shared.record(.notice, category: .lifecycle, "Debug log persistence disabled")
+        }
+        UserDefaults.standard.set(enabled, forKey: TraceLogger.debugPreferenceKey)
+        TraceLogger.shared.setPersistDebugLogs(enabled)
+        for item in persistDebugLogItems { item.state = enabled ? .on : .off }
+        if enabled {
+            TraceLogger.shared.record(.notice, category: .lifecycle, "Debug log persistence enabled")
+        }
+    }
+
+    @objc private func openLogs() {
+        do {
+            try TraceLogger.shared.prepareDirectory()
+            guard NSWorkspace.shared.open(TraceLogger.shared.directory) else {
+                throw CocoaError(.fileReadUnknown)
+            }
+        } catch {
+            TraceLogger.shared.record(.error, category: .lifecycle, "Opening logs failed", error: error)
+            showSettingsError("Trace could not open its logs folder: " + error.localizedDescription)
+        }
     }
 
     private func configureGlobalShortcuts() {
@@ -1651,7 +1708,7 @@ final class TraceAppDelegate:
                 }
                 self.board.setEditorVisible(true)
             } catch {
-                NSLog("Trace device screenshot failed: %@", error.localizedDescription)
+                TraceLogger.shared.record(.error, category: .capture, "Device screenshot failed", error: error)
                 let alert = NSAlert()
                 alert.alertStyle = .warning
                 alert.messageText = "Trace could not capture the device"
@@ -1709,6 +1766,7 @@ final class TraceAppDelegate:
             try updateLaunchInMenuBarAtLogin(enabled: enabled)
             model.setLaunchInMenuBarAtLogin(enabled)
         } catch {
+            TraceLogger.shared.record(.error, category: .lifecycle, "Launch-at-login update failed", error: error)
             showSettingsError(
                 "Trace could not update its launch-at-login setting: "
                     + error.localizedDescription
@@ -1792,6 +1850,7 @@ final class TraceAppDelegate:
     }
 
     @objc private func copyDrawing(_ sender: Any?) {
+        TraceLogger.shared.record(.debug, category: .clipboard, "Copy requested")
         if let textView = NSApp.keyWindow?.firstResponder as? NSTextView,
            textView.isSelectable
         {
@@ -1818,7 +1877,7 @@ final class TraceAppDelegate:
                         )
                 )
             } catch {
-                NSLog("Trace Copy rejected: %@", error.localizedDescription)
+                TraceLogger.shared.record(.error, category: .clipboard, "Copy rejected", error: error)
                 NSSound.beep()
             }
         }
@@ -1881,6 +1940,7 @@ final class TraceAppDelegate:
     }
 
     @objc private func pasteImage(_ sender: Any?) {
+        TraceLogger.shared.record(.debug, category: .clipboard, "Paste requested")
         if let textView = NSApp.keyWindow?.firstResponder as? NSTextView,
            textView.isEditable
         {
@@ -1892,13 +1952,14 @@ final class TraceAppDelegate:
         case let .success(decoded):
             images = decoded
         case let .failure(error):
-            NSLog("Trace paste rejected: %@", error.localizedDescription)
+            TraceLogger.shared.record(.error, category: .clipboard, "Paste rejected", error: error)
             NSSound.beep()
             return
         }
         if board.insertImages(images) {
             return
         }
+        TraceLogger.shared.record(.error, category: .clipboard, "Pasted images could not be inserted")
         NSSound.beep()
     }
 
@@ -2181,6 +2242,7 @@ final class TraceAppDelegate:
     }
 
     private func failCopy(for documentID: UUID) {
+        TraceLogger.shared.record(.error, category: .clipboard, "Drawing copy failed")
         endCopyProgress(for: documentID)
         model.copyFailed()
         NSSound.beep()
@@ -2217,6 +2279,7 @@ final class TraceAppDelegate:
     }
 
     private func showStartupError(_ error: Error) {
+        TraceLogger.shared.record(.error, category: .lifecycle, "Startup pen access failed", error: error)
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Trace could not access the pen"

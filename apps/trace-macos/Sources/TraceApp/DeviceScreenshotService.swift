@@ -1,4 +1,5 @@
 import AppKit
+import TraceLogging
 import Darwin
 
 struct TraceScreenshotDevice: Equatable {
@@ -203,7 +204,9 @@ final class TraceDeviceCommandRunner {
         )
         defer {
             do { try files.removeItem(at: directory) }
-            catch { NSLog("Trace could not remove device command files: %@", error.localizedDescription) }
+            catch {
+                TraceLogger.shared.record(.error, category: .capture, "Device command cleanup failed", error: error)
+            }
         }
         let outputURL = directory.appendingPathComponent("stdout")
         let errorURL = directory.appendingPathComponent("stderr")
@@ -296,7 +299,7 @@ final class DeviceScreenshotService {
                         timeout: 6
                     )
                 } catch {
-                    NSLog("Trace iOS connection warm-up failed: %@", error.localizedDescription)
+                    TraceLogger.shared.record(.error, category: .capture, "iOS connection warm-up failed", error: error)
                 }
                 DispatchQueue.main.async {
                     self.warmupPolicy.finish(
@@ -310,6 +313,7 @@ final class DeviceScreenshotService {
 
     func refresh() {
         guard !refreshing else { return }
+        TraceLogger.shared.record(.debug, category: .capture, "Device discovery started")
         refreshing = true
         let cachedTools = tools
         discoveryQueue.async {
@@ -327,6 +331,7 @@ final class DeviceScreenshotService {
                     let data = try runner.run(executable: adb, arguments: ["devices", "-l"])
                     devices += TraceDeviceScreenshotDiscovery.androidDevices(String(decoding: data, as: UTF8.self))
                 } catch {
+                    TraceLogger.shared.record(.error, category: .capture, "Android discovery failed", error: error)
                     failures.append("Android discovery: \(error.localizedDescription)")
                 }
             }
@@ -343,6 +348,7 @@ final class DeviceScreenshotService {
                     devices += try TraceDeviceScreenshotDiscovery.iosDevices(data)
                 }
             } catch {
+                TraceLogger.shared.record(.error, category: .capture, "iOS discovery failed", error: error)
                 failures.append("iOS discovery: \(error.localizedDescription)")
             }
             let found = devices
@@ -350,9 +356,7 @@ final class DeviceScreenshotService {
             DispatchQueue.main.async {
                 self.refreshing = false
                 self.tools = resolvedTools
-                if let error, error != self.lastDiscoveryError {
-                    NSLog("Trace device discovery failed: %@", error)
-                }
+                TraceLogger.shared.record(.debug, category: .capture, "Device discovery completed")
                 self.lastDiscoveryError = error
                 if self.devices != found {
                     self.devices = found
@@ -366,6 +370,7 @@ final class DeviceScreenshotService {
         _ device: TraceScreenshotDevice,
         completion: @escaping (Result<NSImage, Error>) -> Void
     ) {
+        TraceLogger.shared.record(.debug, category: .capture, "Device screenshot requested")
         guard !isCapturing else {
             completion(.failure(TraceDeviceScreenshotError.failed("A device screenshot is already being captured.")))
             return
@@ -401,7 +406,9 @@ final class DeviceScreenshotService {
                     )
                     defer {
                         do { try FileManager.default.removeItem(at: directory) }
-                        catch { NSLog("Trace could not remove device screenshot: %@", error.localizedDescription) }
+                        catch {
+                            TraceLogger.shared.record(.error, category: .capture, "Device screenshot cleanup failed", error: error)
+                        }
                     }
                     let destination = directory.appendingPathComponent("screenshot.png")
                     _ = try runner.run(
@@ -428,6 +435,7 @@ final class DeviceScreenshotService {
                 }
                 let image = NSImage(size: NSSize(width: bitmap.pixelsWide, height: bitmap.pixelsHigh))
                 image.addRepresentation(bitmap)
+                TraceLogger.shared.record(.debug, category: .capture, "Device screenshot completed")
                 result = .success(image)
             } catch {
                 result = .failure(error)
@@ -478,7 +486,7 @@ final class DeviceScreenshotService {
                 )
                 return tool
             } catch {
-                NSLog("Trace iOS screenshot tool unavailable: %@", error.localizedDescription)
+                TraceLogger.shared.record(.error, category: .capture, "iOS screenshot tool unavailable", error: error)
             }
         }
         return nil

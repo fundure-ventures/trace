@@ -17,6 +17,8 @@ let package = Package(
         .library(name: "TraceAppCore", targets: ["TraceAppCore"]),
         .library(name: "TraceStrokeProcessing", targets: ["TraceStrokeProcessing"]),
         .library(name: "TraceVoice", targets: ["TraceVoice"]),
+        .library(name: "TraceLogging", targets: ["TraceLogging"]),
+        .executable(name: "trace-logging-tests", targets: ["TraceLoggingTests"]),
         .executable(name: "trace-neo-diagnostics", targets: ["TraceNeoDiagnostics"]),
         .executable(name: "trace", targets: ["TraceApp"]),
         .executable(name: "trace-input-lab", targets: ["TraceInputLab"]),
@@ -50,6 +52,15 @@ let package = Package(
         ),
     ],
     targets: [
+        .target(
+            name: "TraceLogging",
+            path: "packages/logging/Sources/TraceLogging"
+        ),
+        .executableTarget(
+            name: "TraceLoggingTests",
+            dependencies: ["TraceLogging"],
+            path: "packages/logging/Tests/TraceLoggingTests"
+        ),
         .target(
             name: "NeoTransport",
             path: "packages/neo-transport/Sources/NeoTransport",
@@ -148,6 +159,7 @@ let package = Package(
                 "TraceGeometry",
                 "TraceStrokeProcessing",
                 "TraceVoice",
+                "TraceLogging",
             ],
             path: "apps/trace-macos/Sources/TraceApp",
             linkerSettings: [

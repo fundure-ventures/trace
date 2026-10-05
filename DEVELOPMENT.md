@@ -156,7 +156,54 @@ swift run trace-stroke-processing-tests
 swift run trace-lab-replay-tests
 swift run trace-app-core-tests
 swift run trace-voice-tests
+swift run trace-logging-tests
 ```
+
+### Local diagnostic logs
+
+Trace uses Apple's unified `Logger` in Debug and Release. Filter Console by
+the app's bundle identifier and category: lifecycle, capture, storage, canvas,
+dictation, input, or clipboard.
+
+Debug builds also retain notices, errors, and faults in
+`~/Library/Logs/Trace Debug/`. Release builds use only unified logging unless
+verbose persistence is enabled. Enable **Diagnostics → Persist Debug Logs**
+from the Trace menu-bar menu or application menu to retain debug breadcrumbs
+across launches, without restarting. This opt-in also enables local files in
+Release, under `~/Library/Logs/Trace/`. **Diagnostics → Open Logs** opens the
+current build's folder.
+
+For a launch-time override, set `TRACE_PERSIST_DEBUG_LOGS=1` to enable verbose
+persistence, or `0` to disable it. It overrides the saved preference at startup;
+the menu can still change it for the running process. For example, launch an
+already built Debug app from Terminal:
+
+```sh
+TRACE_PERSIST_DEBUG_LOGS=1 "/Applications/Trace Debug.app/Contents/MacOS/trace"
+```
+
+Alternatively, enable the saved preference before launching from Finder:
+
+```sh
+defaults write "$( /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
+  '/Applications/Trace Debug.app/Contents/Info.plist' )" TracePersistDebugLogs -bool true
+```
+
+Logs are JSON Lines (`trace.jsonl` and four rotated files), capped at 2 MiB
+per file / 10 MiB total. Files older than seven days are removed on the next
+write; inactive apps do not run a background cleanup service. Writes run on a
+serial utility queue, coordinate across app instances, and drain on normal
+termination. Forced termination can lose queued entries. Logs are owner-only,
+excluded from backups, and never uploaded automatically.
+
+Entries include timestamp, session ID, version/build, category, operation,
+source file/function/line, and safe error type/domain/code. Messages are static
+labels: keys, device identifiers, file paths, screenshots, strokes, transcripts,
+request/response bodies, arbitrary error descriptions, and JavaScript error
+payloads are not recorded. Unknown error domains are replaced with `custom`.
+This policy applies even when verbose persistence is enabled. Input Lab,
+Neo diagnostics, and the explicitly enabled Sidecar input probe keep their
+separate existing logging behavior.
 
 Hardware-free checks:
 

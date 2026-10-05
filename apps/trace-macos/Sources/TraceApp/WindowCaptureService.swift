@@ -1,4 +1,5 @@
 import AppKit
+import TraceLogging
 import CoreGraphics
 import ScreenCaptureKit
 import TraceAppCore
@@ -53,6 +54,7 @@ final class WindowCaptureService {
             return NSRunningApplication(processIdentifier: window.ownerPID)?
                 .bundleURL?.lastPathComponent ?? window.ownerName
         } catch {
+            TraceLogger.shared.record(.error, category: .capture, "Frontmost application lookup failed", error: error)
             return nil
         }
     }
