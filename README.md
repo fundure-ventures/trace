@@ -89,7 +89,7 @@ across tool switches and app restarts.
   and diagnostics
 - [Troubleshooting](TROUBLESHOOTING.md) — known issues and fixes
 - [Features](FEATURES.md) — every user-facing feature and its rules
-- [Architecture decision records](memory/adr/README.md) — current durable
+- [Architecture decision records](ADR.md) — current durable
   implementation decisions
 
 Without an externally supplied key, Dictation can use a personal

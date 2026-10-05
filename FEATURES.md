@@ -3,7 +3,7 @@
 Trace's user-facing behavior, one file per feature in
 [`memory/features/`](memory/features/). Each file is the source of truth for
 *what* the feature does and *which rules must not regress*. Implementation
-rationale lives in [ADRs](memory/adr/README.md).
+rationale lives in [ADR.md](ADR.md).
 
 ## Tags
 
@@ -59,6 +59,57 @@ Every `memory/features/<feature-name>.md` uses these sections, in order:
    invariant; acceptance criteria show how to recognize it in use.
    Write these independently of the implementation: no test filenames,
    symbols, commands, coverage claims, or `Gap` bookkeeping.
+
+## Documentation principles
+
+- Describe one coherent user-facing capability per file, using a stable
+  kebab-case filename in `memory/features/`.
+- Explain the user's problem and workflow, not classes, bridges, or algorithms.
+  Keep implementation rationale in [ADR.md](ADR.md), engineering practice in
+  [DEVELOPMENT.md](DEVELOPMENT.md), and design guidance in [DESIGN.md](DESIGN.md).
+- Use one existing top-level tag for the primary UX surface. Link related
+  features by name under Touchpoints instead of duplicating their contracts.
+- Keep Rules durable and Acceptance criteria observable. Include entry points,
+  persistence, errors, and relevant edge cases when they affect the user.
+- Describe shipped behavior verified against the app. Clearly distinguish
+  proposals from existing capabilities; do not turn examples into requirements.
+- Update the file and inventory in the same change as the feature. Remove both
+  when the feature is removed.
+
+## Feature template
+
+Copy this structure into `memory/features/<feature-name>.md`, replacing the
+placeholders. Add enough acceptance criteria to demonstrate the Rules without
+referencing tests or implementation details.
+
+```markdown
+# Feature name
+
+**Tag:** `#existing-tag`
+
+## Problem
+What users are trying to accomplish and what gets in their way.
+
+## Solution
+How users accomplish it in Trace, including the primary entry point.
+
+## Touchpoints
+- [Related feature](related-feature.md) - how users arrive here or continue.
+
+## Rules
+- A durable user-facing invariant.
+
+## FAQ
+- **Common question?** A concise user-facing answer.
+- **Second question?** Answer.
+- **Third question?** Answer.
+
+## Acceptance criteria
+- From the entry point, users can perform the action and see the expected result.
+- After the relevant transition or restart, the expected behavior is preserved.
+- When a relevant failure occurs, users see the expected explanation and retain
+  their existing work.
+```
 
 ## Testing philosophy
 

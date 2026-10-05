@@ -6,9 +6,8 @@ Trace keeps durable product knowledge in the repository:
 
 | Location | Contains |
 | --- | --- |
-| [`FEATURES.md`](FEATURES.md) | Feature inventory, tags, file format, testing philosophy |
-| [`memory/features/`](memory/features/) | One file per feature: problem, solution, touchpoints, rules, FAQ, acceptance criteria |
-| [`memory/adr/`](memory/adr/README.md) | Durable implementation decisions and their reasons |
+| [`FEATURES.md`](FEATURES.md) | Feature inventory, documentation template, UX principles, and testing philosophy |
+| [`ADR.md`](ADR.md) | Decision inventory, documentation template, and principles for architectural rationale |
 | [`DEVELOPMENT.md`](DEVELOPMENT.md) | Development setup, commands, and engineering best practices only |
 | [`DESIGN.md`](DESIGN.md) | Visual and interaction design guidelines only |
 
@@ -17,7 +16,8 @@ Trace keeps durable product knowledge in the repository:
 1. Find the affected features in `FEATURES.md` and read their files.
 2. Treat each **Rule** as a requirement. If the change breaks one, confirm with
    the user before proceeding and update the rule explicitly.
-3. Read linked ADRs before changing an implementation they cover.
+3. Find relevant decisions in `ADR.md` and read linked ADRs before changing
+   an implementation they cover.
 
 ## After changing behavior
 
@@ -28,8 +28,8 @@ Trace keeps durable product knowledge in the repository:
 - New rule: describe its observable outcome under Acceptance criteria and add
   an appropriate guard (probe, test, or lint). If a guard is missing, disclose
   that in the change description, not in the feature's UX contract.
-- New durable implementation decision: add an ADR in `memory/adr/` and its
-  index row.
+- New durable implementation decision: follow the template and principles in
+  `ADR.md`, add the record in `memory/adr/`, and update its inventory.
 - Keep feature files UX-focused. Commands and engineering practice belong in
   `DEVELOPMENT.md`; visual guidelines belong in `DESIGN.md`.
 - Keep Acceptance criteria independent of test filenames, symbols, and
