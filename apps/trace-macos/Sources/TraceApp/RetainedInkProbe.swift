@@ -2218,6 +2218,26 @@ enum TraceRetainedInkProbe {
     private static func verifyOnboardingPresentation() throws {
         let board = TraceBoardWindowController()
         board.prepareOnboardingForPreview(setupPreviewSnapshot())
+        board.showSetupWindowsForPreview(setupPreviewSnapshot())
+        guard board.setupWindowsVisibleForPreview else {
+            throw probeError("Setup close regression did not start with visible windows")
+        }
+        board.hideBoard()
+        board.updateOnboarding(setupPreviewSnapshot())
+        guard board.window?.isVisible != true,
+              !board.setupWindowsVisibleForPreview
+        else {
+            throw probeError("closing a trace during Setup left orphan windows after a state refresh")
+        }
+        board.prepareOnboardingForPreview(setupPreviewSnapshot())
+        board.showSetupWindowsForPreview(setupPreviewSnapshot())
+        guard board.window?.isVisible == true,
+              board.setupWindowsVisibleForPreview
+        else {
+            throw probeError("Setup could not reopen after closing the previous trace")
+        }
+        board.hideBoard()
+        board.prepareOnboardingForPreview(setupPreviewSnapshot())
         board.setCLIInstallationStateForPreview(.notInstalled)
         guard board.setupVisibleTextForPreview.contains("Use traceapp from the terminal"),
               !board.setupVisibleTextForPreview.contains("Not installed"),

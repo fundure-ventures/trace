@@ -31,6 +31,8 @@ opens on first launch (onboarding) and later from the menu bar.
 - The command-line row reads “Use traceapp from the terminal” before installation
   and “traceapp” after installation, without a subtitle or install path.
 - Command-line documentation is linked inline beside the row label as “· docs”.
+- Closing a trace while Setup is open closes the canvas, toolbar, and Setup
+  panel together. Background status updates do not reopen them.
 - Installing or reinstalling `traceapp` can replace a symlink, but never
   overwrites an existing regular file or directory at the install path.
 
@@ -47,6 +49,8 @@ opens on first launch (onboarding) and later from the menu bar.
   optional command-line installation.
 - Users without a pen can complete the setup needed for mouse-driven use.
 - Pending checks appear muted; completed checks remain green.
+- Closing a trace with Setup open leaves no floating Setup panel or orphan
+  canvas, including after permission or device statuses refresh.
 - The command-line row shows a single label with Install or Uninstall, without
   repeating instructions or displaying the installation location.
 - Users can save, replace, or remove their personal OpenRouter key; it is

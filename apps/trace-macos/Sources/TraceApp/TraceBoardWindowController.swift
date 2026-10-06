@@ -542,6 +542,7 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func hideBoard() {
+        showingDocument = false
         transitionController.cancel()
         blankCanvasRevealPending = false
         hideAnnotationToolbar()
@@ -1118,6 +1119,15 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
 
     var setupCLIDocsInlineForPreview: Bool {
         setupPanel.cliDocsInlineForTesting
+    }
+
+    var setupWindowsVisibleForPreview: Bool {
+        setupWindow.isVisible || toolbarWindow.isVisible
+    }
+
+    func showSetupWindowsForPreview(_ snapshot: TraceAppSnapshot) {
+        suppressFloatingToolbarOrderingForTesting = false
+        showOnboarding(snapshot)
     }
 
     func shortcutValidationForPreview(
