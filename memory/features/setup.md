@@ -30,6 +30,7 @@ opens on first launch (onboarding) and later from the menu bar.
 - Pending setup checks use a muted outlined checkmark, not a warning icon.
 - The command-line row reads “Use traceapp from the terminal” before installation
   and “traceapp” after installation, without a subtitle or install path.
+- Command-line documentation is linked inline beside the row label as “· docs”.
 - Installing or reinstalling `traceapp` can replace a symlink, but never
   overwrites an existing regular file or directory at the install path.
 

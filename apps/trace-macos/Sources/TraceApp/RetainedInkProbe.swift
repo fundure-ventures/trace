@@ -2227,6 +2227,9 @@ enum TraceRetainedInkProbe {
             throw probeError("pending setup items were not muted or CLI setup repeated its subtitle")
         }
         board.setCLIInstallationStateForPreview(.installed)
+        guard board.setupCLIDocsInlineForPreview else {
+            throw probeError("CLI documentation was not available inline beside the command")
+        }
         guard board.setupVisibleTextForPreview.contains("traceapp"),
               !board.setupVisibleTextForPreview.contains(where: { $0.contains("Installed at") }),
               !board.setupVisibleTextForPreview.contains("Use Trace from Terminal as `traceapp`")

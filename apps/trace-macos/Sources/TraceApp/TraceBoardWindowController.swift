@@ -1116,6 +1116,10 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         setupPanel.pendingIndicatorsMutedForTesting
     }
 
+    var setupCLIDocsInlineForPreview: Bool {
+        setupPanel.cliDocsInlineForTesting
+    }
+
     func shortcutValidationForPreview(
         _ action: TraceGlobalShortcutAction,
         shortcut: KeyboardShortcuts.Shortcut
@@ -5243,13 +5247,15 @@ private final class SetupPanelView: NSView {
             self?.onGlobalShortcutsChange?()
         }
         cliRow.onAction = { [weak self] in self?.updateCLIInstallation() }
-        cliDocsButton.title = "CLI docs"
+        cliDocsButton.title = "docs"
+        cliDocsButton.setAccessibilityLabel("Command-line tool documentation")
         cliDocsButton.bezelStyle = .inline
         cliDocsButton.isBordered = false
         cliDocsButton.controlSize = .small
         cliDocsButton.contentTintColor = .linkColor
         cliDocsButton.target = self
         cliDocsButton.action = #selector(openCLIDocs)
+        cliRow.addInlineLink(cliDocsButton)
         cliDetailLabel.font = .systemFont(ofSize: 11)
         cliDetailLabel.textColor = .secondaryLabelColor
         cliDetailLabel.lineBreakMode = .byWordWrapping
@@ -5286,7 +5292,6 @@ private final class SetupPanelView: NSView {
             cliHeading,
             cliRow,
             cliDetailLabel,
-            cliDocsButton,
             errorLabel,
         ].forEach(contentStack.addArrangedSubview)
         contentStack.translatesAutoresizingMaskIntoConstraints = false
@@ -5308,7 +5313,6 @@ private final class SetupPanelView: NSView {
             cliHeading,
             cliRow,
             cliDetailLabel,
-            cliDocsButton,
             errorLabel,
         ].forEach {
             $0.widthAnchor.constraint(equalTo: contentStack.widthAnchor)
@@ -5612,6 +5616,13 @@ private final class SetupPanelView: NSView {
         } && openRouterRow.pendingIndicatorMutedForTesting
     }
 
+    var cliDocsInlineForTesting: Bool {
+        cliDocsButton.isDescendant(of: cliRow)
+            && cliDocsButton.title == "docs"
+            && cliDocsButton.action == #selector(openCLIDocs)
+            && cliDocsButton.target === self
+    }
+
     func shortcutConflictPolicyForTesting(
         _ action: TraceGlobalShortcutAction
     ) -> KeyboardShortcuts.ConflictPolicy {
@@ -5818,6 +5829,7 @@ private final class SetupCapabilityRow: NSView {
     private let titleLabel = NSTextField(labelWithString: "")
     private let detailLabel = NSTextField(labelWithString: "")
     private let actionButton = NSButton()
+    private let row = NSStackView()
     private var ready = false
 
     override init(frame frameRect: NSRect) {
@@ -5831,9 +5843,7 @@ private final class SetupCapabilityRow: NSView {
         actionButton.target = self
         actionButton.action = #selector(performAction)
 
-        let row = NSStackView(
-            views: [statusImage, titleLabel, NSView(), actionButton]
-        )
+        [statusImage, titleLabel, NSView(), actionButton].forEach(row.addArrangedSubview)
         row.translatesAutoresizingMaskIntoConstraints = false
         row.orientation = .horizontal
         row.alignment = .centerY
@@ -5851,6 +5861,18 @@ private final class SetupCapabilityRow: NSView {
 
     required init?(coder: NSCoder) {
         nil
+    }
+
+    func addInlineLink(_ button: NSButton) {
+        let separator = NSTextField(labelWithString: "·")
+        separator.font = .systemFont(ofSize: 12)
+        separator.textColor = .secondaryLabelColor
+        let link = NSStackView(views: [separator, button])
+        link.orientation = .horizontal
+        link.alignment = .centerY
+        link.spacing = 4
+        row.insertArrangedSubview(link, at: 2)
+        row.setCustomSpacing(4, after: titleLabel)
     }
 
     func update(
