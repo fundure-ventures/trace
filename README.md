@@ -7,81 +7,29 @@ together with one command.
 ## Requirements
 
 - macOS 13 or later
-- Xcode Command Line Tools or Xcode with Swift 5.10 support
-- Bun 1.4+ for the bundled tldraw canvas
-- Bluetooth for Neo Smartpen input
 - Screen Recording permission for screenshot capture
-- Microphone permission for voice annotation
+- Microphone permission and an OpenRouter API key for Dictation
 
-## Pen and paper support
+## Using Trace
 
-Trace is developed and physically tested with the **Neo Smartpen M1
-(`NWP-F50`)** over Bluetooth. Other Neo models have not been validated.
+- [App guide](APP.md) — capture, annotate, use Dictation, and copy traces
+- [CLI guide](CLI.md) — install `traceapp` and use Trace from Terminal
 
-Pen coordinates require compatible **Neo Ncode paper**; ordinary paper cannot
-provide spatial input. 
+A pen is optional. Trace is physically tested with the **Neo Smartpen M1
+(`NWP-F50`)** over Bluetooth, using compatible **Neo Ncode paper** and
+calibration. Other Neo models have not been validated.
 
-Trace requires a simple calibration before drawing with the pen.
+Dictation accepts a personal OpenRouter API key in Setup, stored in macOS
+Keychain, or an externally supplied key.
 
-## Custom build configuration
+## Build from source
 
-Custom builds use one untracked repository-root `.env`:
-
-```dotenv
-# Optional: enables Dictation.
-OPEN_ROUTER_API_KEY=your-openrouter-api-key
-
-# Required for production builds of the bundled canvas.
-VITE_TLDRAW_LICENSE_KEY=your-tldraw-license-key
-```
-
-`OPENROUTER_API_KEY`, `TRACE_ENV_FILE`, the process environment, and the
-bundle-relative `.env` lookup are also supported. Externally supplied keys take
-precedence over the personal key stored from Trace's Setup panel. Never commit
-credentials.
-
-## Launch
-
-From the repository root:
+See the [development guide](DEVELOPMENT.md) for prerequisites, local
+configuration, and build commands. From a configured checkout, run:
 
 ```sh
 ./tools/trace
 ```
-
-The launcher builds the Swift app and bundled web canvas, signs the local app,
-and opens it. On first launch, grant the requested permissions and complete the
-paper calibration if you want to use a Neo pen.
-
-To repeat onboarding without deleting saved `.traceboard` documents:
-
-```sh
-./tools/trace --clear
-```
-
-## Primary workflow
-
-1. Create a screenshot trace with `Cmd+N`, create a blank trace with
-   `Shift+Cmd+N`, or open one or more images from Finder.
-2. Annotate with the Neo pen or the Select, Pen, Highlighter, Rectangle, and
-   Text tools.
-3. Use Dictation when a spoken explanation helps.
-4. With nothing selected, press `Cmd+C` to copy the annotated image and
-   transcript, save the trace, and close the board.
-
-With objects or text selected, `Cmd+C` copies that selection and keeps the
-board open. While editing text, it stays a text-copy command even with only a
-caret. The toolbar's Copy action always copies the trace.
-
-Finder **Open With** accepts an image batch and places the images together on
-one blank canvas.
-
-Use **Text** (`T`) and click the canvas to add a text box, or double-click an
-empty area with **Select** (`V`). Pen strokes span **1-12 pt**, while
-Highlighter spans **16-124 pt**.
-With Text selected, the slider controls **12-124 pt** font size instead of
-stroke width. Rectangle outlines use the Pen's **1-12 pt** width. All three
-size settings use whole-point values and remember their own value
-across tool switches and app restarts.
 
 ## More detail
 
@@ -89,14 +37,8 @@ across tool switches and app restarts.
   and diagnostics
 - [Troubleshooting](TROUBLESHOOTING.md) — known issues and fixes
 - [Features](FEATURES.md) — every user-facing feature and its rules
-- [App guide](APP.md) — how to use Trace
-- [CLI guide](CLI.md) — install and use `traceapp`
 - [Architecture decision records](ADR.md) — current durable
   implementation decisions
-
-Without an externally supplied key, Dictation can use a personal
-OpenRouter API key saved from Trace's Setup panel. Trace stores it only in
-macOS Keychain; Setup supports replacing or removing it.
 
 ## License and contributing
 

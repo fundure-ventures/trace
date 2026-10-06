@@ -9,4 +9,5 @@ Read and follow the relevant guide before changing code or behavior:
 | [`DEVELOPMENT.md`](DEVELOPMENT.md) | Development setup, commands, testing quality and engineering best practices. |
 | [`DESIGN.md`](DESIGN.md) | Visual and interaction design guidelines only |
 | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Known issues and troubleshooting guidance. |
+| [`APP.md`](APP.md) | App features, workflows, and where to find them. |
 | [`CLI.md`](CLI.md) | Command-line tool installation, commands, and usage. |
