@@ -43,6 +43,21 @@ ln -s /Applications/Trace.app/Contents/Helpers/traceapp ~/.local/bin/traceapp
 Make sure `~/.local/bin` is on your `PATH`. Debug builds contain their own
 helper at `Trace Debug.app/Contents/Helpers/traceapp`.
 
+### Where is the tool stored?
+
+Setup installs a symbolic link at `/usr/local/bin/traceapp`, not a separate
+copy of the executable. The executable stays inside the app:
+
+| Location | Purpose |
+| --- | --- |
+| `/usr/local/bin/traceapp` | Command installed by Setup; links to the app used to install it |
+| `/Applications/Trace.app/Contents/Helpers/traceapp` | Bundled production executable |
+| `/Applications/Trace Debug.app/Contents/Helpers/traceapp` | Bundled Debug executable |
+
+If you keep Trace outside `/Applications`, the bundled executable is still at
+`Contents/Helpers/traceapp` inside that app. To see which app your installed
+command points to, run `readlink /usr/local/bin/traceapp`.
+
 ## A–Z command glossary
 
 ### `--`
