@@ -295,6 +295,8 @@ grep -Fq 'rm -rf -- "$BUILD_APP"' "$LAUNCHER"
 grep -Fq 'if [[ "${TRACE_SKIP_SIGNING:-0}" != "1" ]]' "$LAUNCHER"
 grep -Fq 'if $INCLUDE_LOCAL_ENV && [[ -f "$ROOT/.env" ]]' "$LAUNCHER"
 grep -Fq 'if [[ "$CONFIGURATION" != "debug" ]]' "$LAUNCHER"
+grep -Fq 'if [[ -n "${TRACE_PERSIST_DEBUG_LOGS:-}" ]]' "$LAUNCHER"
+grep -Fq 'open "$APP" --env "TRACE_PERSIST_DEBUG_LOGS=$TRACE_PERSIST_DEBUG_LOGS"' "$LAUNCHER"
 
 icon_line=$(grep -nF 'xcrun actool' "$LAUNCHER" | head -n 1 | cut -d: -f1)
 icon_merge_line=$(grep -nF 'Merge $ICON_INFO_PLIST' "$LAUNCHER" | head -n 1 | cut -d: -f1)
@@ -312,7 +314,7 @@ grep -Fq -- '--minimum-deployment-target 13.0' "$LAUNCHER"
 cat > "$TEMP_ROOT/expected-github-app.yml" <<'EOF'
 scripts:
   - name: Launch Debug
-    command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/trace
+    command: cd "$COPILOT_WORKSPACE_PATH" && TRACE_PERSIST_DEBUG_LOGS=1 ./tools/trace
   - name: Build Release
     command: cd "$COPILOT_WORKSPACE_PATH" && ./tools/build-release
   - name: Sign Release

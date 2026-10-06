@@ -1,4 +1,5 @@
 import AppKit
+import TraceLogging
 import CoreBluetooth
 import NeoInput
 import NeoTransport
@@ -514,7 +515,13 @@ final class TraceAppModel {
     private var inputEnabled = false
     private var currentPage: PenPageID?
     private var currentDocument: TraceDrawingSession?
-    private var lastError: String?
+    private var lastError: String? {
+        didSet {
+            if lastError != nil, lastError != oldValue {
+                TraceLogger.shared.record(.error, category: .lifecycle, "User-visible error reported")
+            }
+        }
+    }
     private var isStarted = false
     private var didRequestConnection = false
     private var clockSyncRequested = false
@@ -622,8 +629,11 @@ final class TraceAppModel {
             .appendingPathComponent("\(paperProfile).json")
         calibrationStore = LocalCalibrationStore(fileURL: calibrationURL)
 
-        let savedCalibration = try? calibrationStore.load()
-        calibratedSurface = savedCalibration ?? nil
+        do {
+            calibratedSurface = try calibrationStore.load()
+        } catch {
+            TraceLogger.shared.record(.error, category: .storage, "Calibration load failed", error: error)
+        }
         let setupSeen = defaults.bool(
             forKey: "TraceOnboardingComplete"
         )
@@ -639,6 +649,7 @@ final class TraceAppModel {
                 return
             }
             if case let .failed(message) = state {
+                TraceLogger.shared.record(.error, category: .dictation, "Dictation failed")
                 self.lastError =
                     "Trace Dictation failed: \(message)"
             } else if self.lastError?.hasPrefix(
@@ -823,6 +834,7 @@ final class TraceAppModel {
     }
 
     func saveOpenRouterAPIKey(_ apiKey: String) {
+        TraceLogger.shared.record(.debug, category: .dictation, "Saving API key")
         guard voiceController.state.allowsOpenRouterAPIKeyMutation else {
             lastError = TraceVoiceConfigurationError.captureInProgress
                 .localizedDescription
@@ -834,12 +846,14 @@ final class TraceAppModel {
             try voiceController.reloadConfiguration()
             lastError = nil
         } catch {
+            TraceLogger.shared.record(.error, category: .dictation, "API key save failed", error: error)
             lastError = error.localizedDescription
         }
         onStateChange?(snapshot)
     }
 
     func removeOpenRouterAPIKey() {
+        TraceLogger.shared.record(.debug, category: .dictation, "Removing API key")
         guard voiceController.state.allowsOpenRouterAPIKeyMutation else {
             lastError = TraceVoiceConfigurationError.captureInProgress
                 .localizedDescription
@@ -851,6 +865,7 @@ final class TraceAppModel {
             try voiceController.reloadConfiguration()
             lastError = nil
         } catch {
+            TraceLogger.shared.record(.error, category: .dictation, "API key removal failed", error: error)
             lastError = error.localizedDescription
         }
         onStateChange?(snapshot)
@@ -929,7 +944,8 @@ final class TraceAppModel {
         size: NSSize,
         backingScale: CGFloat,
         activatesProjectOutput: Bool = true,
-        allowsInitialSetup: Bool = false
+        allowsInitialSetup: Bool = false,
+        noRecording: Bool = false
     ) -> Bool {
         guard stateMachine.phase != .capturing else {
             return false
@@ -953,7 +969,9 @@ final class TraceAppModel {
             )
             stateMachine.receive(.drawingOpened(document.manifest.id))
             lastError = nil
-            autoStartDictationIfEnabled()
+            if !noRecording {
+                autoStartDictationIfEnabled()
+            }
             presentDocument(
                 TraceDocumentPresentation(
                     document: document,
@@ -965,6 +983,7 @@ final class TraceAppModel {
             onStateChange?(snapshot)
             return true
         } catch {
+            TraceLogger.shared.record(.error, category: .storage, "Blank drawing creation failed", error: error)
             lastError = error.localizedDescription
             onStateChange?(snapshot)
             return false
@@ -1020,16 +1039,24 @@ final class TraceAppModel {
         do {
             try drawingStore.save(document)
         } catch {
+            TraceLogger.shared.record(.error, category: .storage, "Calibration drawing save failed", error: error)
             lastError = error.localizedDescription
         }
     }
 
-    func newScreenshotPage() {
+    @discardableResult
+    func newScreenshotPage(
+        noRecording: Bool = false,
+        excludingOwnerPIDs: Set<Int32> = [],
+        completion: ((Result<Void, Error>) -> Void)? = nil
+    ) -> Bool {
         guard stateMachine.phase != .capturing else {
-            return
+            completion?(.failure(cliActionError("A capture is already in progress.")))
+            return false
         }
         guard saveCurrentDocumentReportingError() else {
-            return
+            completion?(.failure(cliActionError("The open trace could not be saved.")))
+            return false
         }
         resetAnnotationState()
         voiceController.cancel()
@@ -1037,8 +1064,13 @@ final class TraceAppModel {
         currentDocument = nil
         drawingHistory.clear()
         onHideBoard?()
-        beginManualFrontmostCapture()
+        beginManualFrontmostCapture(
+            noRecording: noRecording,
+            excludingOwnerPIDs: excludingOwnerPIDs,
+            completion: completion
+        )
         onStateChange?(snapshot)
+        return captureService.hasPermission
     }
 
     func updatePageBackground(_ color: TraceRGBAColor) {
@@ -1112,10 +1144,14 @@ final class TraceAppModel {
         persistAppSettings()
     }
 
-    func openDrawing(from url: URL) {
+    @discardableResult
+    func openDrawing(from url: URL) -> Bool {
+        TraceLogger.shared.record(.debug, category: .storage, "Opening drawing")
+        var opened = false
         do {
             guard saveCurrentDocumentReportingError() else {
-                return
+                onStateChange?(snapshot)
+                return false
             }
             resetAnnotationState()
             voiceController.cancel()
@@ -1134,10 +1170,13 @@ final class TraceAppModel {
                     capture: nil
                 )
             )
+            opened = true
         } catch {
+            TraceLogger.shared.record(.error, category: .storage, "Drawing open failed", error: error)
             lastError = error.localizedDescription
         }
         onStateChange?(snapshot)
+        return opened
     }
 
     func closeBoard() {
@@ -1184,10 +1223,21 @@ final class TraceAppModel {
     }
 
     func finishVoiceForCopy(
+        expectedDocumentID: UUID,
         completion: @escaping (Result<String?, Error>) -> Void
     ) {
+        TraceLogger.shared.record(.debug, category: .dictation, "Finishing dictation for copy")
         voiceController.finish { [weak self] result in
             guard let self else {
+                return
+            }
+            guard TraceCLIActionPolicy.isCurrentDocument(
+                expectedID: expectedDocumentID,
+                currentID: self.currentDocument?.manifest.id
+            ) else {
+                completion(
+                    .failure(self.cliActionError("The open trace changed while finishing Dictation."))
+                )
                 return
             }
             do {
@@ -1235,6 +1285,7 @@ final class TraceAppModel {
                 }
                 self.onStateChange?(self.snapshot)
             } catch {
+                TraceLogger.shared.record(.error, category: .dictation, "Dictation finish failed", error: error)
                 self.copyFailed()
                 self.lastError =
                     "Trace could not finish Dictation: "
@@ -1246,6 +1297,7 @@ final class TraceAppModel {
     }
 
     func toggleVoiceRecording() {
+        TraceLogger.shared.record(.debug, category: .dictation, "Dictation toggle requested")
         do {
             switch voiceController.toggleIntent(
                 hasDocument: currentDocument != nil
@@ -1264,6 +1316,7 @@ final class TraceAppModel {
                 return
             }
         } catch {
+            TraceLogger.shared.record(.error, category: .dictation, "Dictation toggle failed", error: error)
             lastError =
                 "Trace Dictation failed: "
                 + error.localizedDescription
@@ -1317,6 +1370,7 @@ final class TraceAppModel {
                 withIntermediateDirectories: true
             )
         } catch {
+            TraceLogger.shared.record(.error, category: .storage, "Drawing directory creation failed", error: error)
             lastError = "Trace could not open its drawings folder: "
                 + error.localizedDescription
             onStateChange?(snapshot)
@@ -1518,6 +1572,19 @@ final class TraceAppModel {
             didRequestConnection = true
             transport.connect(to: device.id)
         case let .connectionState(state, _):
+            let event: StaticString
+            switch state {
+            case .idle: event = "Pen idle"
+            case .waitingForBluetooth: event = "Pen waiting for Bluetooth"
+            case .discovering: event = "Pen discovery started"
+            case .connecting: event = "Pen connecting"
+            case .connected: event = "Pen connected"
+            case .disconnecting: event = "Pen disconnecting"
+            case .disconnected: event = "Pen disconnected"
+            case .reconnecting: event = "Pen reconnecting"
+            case .failed: event = "Pen connection failed"
+            }
+            TraceLogger.shared.record(.debug, category: .input, event)
             connectionState = state
             if state == .disconnected
                 || state == .reconnecting
@@ -1618,6 +1685,7 @@ final class TraceAppModel {
                 lastError = nil
             }
         case let .failure(failure):
+            TraceLogger.shared.record(.error, category: .input, "Pen transport failed")
             hoverSyncRequestPending = false
             lastError = "\(failure.stage): \(failure.message)"
         default:
@@ -1890,7 +1958,11 @@ final class TraceAppModel {
         else {
             return
         }
-        try? startReplacementVoiceRecording(restarting: false)
+        do {
+            try startReplacementVoiceRecording(restarting: false)
+        } catch {
+            TraceLogger.shared.record(.error, category: .dictation, "Automatic dictation start failed", error: error)
+        }
     }
 
     private func resetVoiceAnnotationForNewRecording() throws {
@@ -1996,6 +2068,7 @@ final class TraceAppModel {
         do {
             try voiceController.start()
         } catch {
+            TraceLogger.shared.record(.error, category: .dictation, "Capture dictation start failed", error: error)
             setupVisible = true
             lastError = error.localizedDescription
             onShowOnboarding?()
@@ -2008,7 +2081,11 @@ final class TraceAppModel {
         performFrontmostCapture()
     }
 
-    private func beginManualFrontmostCapture() {
+    private func beginManualFrontmostCapture(
+        noRecording: Bool = false,
+        excludingOwnerPIDs: Set<Int32> = [],
+        completion: ((Result<Void, Error>) -> Void)? = nil
+    ) {
         manualCaptureInFlight = false
         guard captureService.hasPermission
         else {
@@ -2016,22 +2093,35 @@ final class TraceAppModel {
             lastError =
                 "Allow Screen Recording before creating a screenshot page."
             onShowOnboarding?()
+            completion?(.failure(cliActionError(lastError ?? "Screen Recording permission is required.")))
             return
         }
         captureInput.startCapture()
         manualCaptureInFlight = true
         stateMachine.receive(.manualCaptureStarted)
-        performFrontmostCapture()
+        performFrontmostCapture(
+            noRecording: noRecording,
+            excludingOwnerPIDs: excludingOwnerPIDs,
+            completion: completion
+        )
     }
 
-    private func performFrontmostCapture() {
-        captureService.captureFrontmost { [weak self] result in
+    private func performFrontmostCapture(
+        noRecording: Bool = false,
+        excludingOwnerPIDs: Set<Int32> = [],
+        completion: ((Result<Void, Error>) -> Void)? = nil
+    ) {
+        TraceLogger.shared.record(.debug, category: .capture, "Frontmost capture started")
+        captureService.captureFrontmost(
+            excludingOwnerPIDs: excludingOwnerPIDs
+        ) { [weak self] result in
             guard let self else {
                 return
             }
             guard self.stateMachine.phase == .capturing else {
                 self.captureInput.cancelCapture()
                 self.manualCaptureInFlight = false
+                completion?(.failure(self.cliActionError("The capture was cancelled.")))
                 return
             }
             switch result {
@@ -2058,7 +2148,9 @@ final class TraceAppModel {
                         .captureSucceeded(document.manifest.id)
                     )
                     self.lastError = nil
-                    self.autoStartDictationIfEnabled()
+                    if !noRecording {
+                        self.autoStartDictationIfEnabled()
+                    }
                     self.presentDocument(
                         TraceDocumentPresentation(
                             document: document,
@@ -2069,17 +2161,22 @@ final class TraceAppModel {
                     for event in self.captureInput.finishCapture() {
                         self.processDrawingInput(event)
                     }
+                    TraceLogger.shared.record(.debug, category: .capture, "Frontmost capture completed")
+                    completion?(.success(()))
                 } catch {
                     self.handleCaptureFailure(error)
+                    completion?(.failure(error))
                 }
             case let .failure(error):
                 self.handleCaptureFailure(error)
+                completion?(.failure(error))
             }
             self.onStateChange?(self.snapshot)
         }
     }
 
     private func handleCaptureFailure(_ error: Error) {
+        TraceLogger.shared.record(.error, category: .capture, "Frontmost capture failed", error: error)
         captureInput.cancelCapture()
         voiceController.cancel()
         stateMachine.receive(.captureFailed)
@@ -2097,6 +2194,14 @@ final class TraceAppModel {
             (error as? LocalizedError)?.recoverySuggestion,
         ].compactMap { $0 }.joined(separator: " ")
         onShowOnboarding?()
+    }
+
+    private func cliActionError(_ message: String) -> NSError {
+        NSError(
+            domain: "TraceAppModel",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: message]
+        )
     }
 
     private func apply(
@@ -2318,7 +2423,9 @@ final class TraceAppModel {
 
     private func writeCurrentDocument() throws {
         if let currentDocument {
+            TraceLogger.shared.record(.debug, category: .storage, "Drawing save started")
             try drawingStore.save(currentDocument)
+            TraceLogger.shared.record(.debug, category: .storage, "Drawing save completed")
         }
     }
 
@@ -2366,6 +2473,7 @@ final class TraceAppModel {
     }
 
     private func reportSaveError(_ error: Error) {
+        TraceLogger.shared.record(.error, category: .storage, "Drawing save failed", error: error)
         lastError = "Trace could not autosave this drawing: "
             + error.localizedDescription
             + " The board will stay open so the work is not discarded."

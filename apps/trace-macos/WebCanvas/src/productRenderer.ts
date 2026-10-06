@@ -1774,6 +1774,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     }
     if (event.key === 'Meta') {
       commandSelectHeld = true
+      if (editor.getSelectedShapeIds().length > 0) return
       if (
         temporarySelectActive
         && currentTool.tool !== 'select'

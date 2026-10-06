@@ -542,6 +542,7 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func hideBoard() {
+        showingDocument = false
         transitionController.cancel()
         blankCanvasRevealPending = false
         hideAnnotationToolbar()
@@ -1106,6 +1107,27 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
 
     var setupVisibleTextForPreview: [String] {
         setupPanel.visibleTextForTesting
+    }
+
+    func setCLIInstallationStateForPreview(_ state: TraceCLIInstallationState) {
+        setupPanel.updateCLIInstallationState(state)
+    }
+
+    var setupPendingIndicatorsMutedForPreview: Bool {
+        setupPanel.pendingIndicatorsMutedForTesting
+    }
+
+    var setupCLIDocsInlineForPreview: Bool {
+        setupPanel.cliDocsInlineForTesting
+    }
+
+    var setupWindowsVisibleForPreview: Bool {
+        setupWindow.isVisible || toolbarWindow.isVisible
+    }
+
+    func showSetupWindowsForPreview(_ snapshot: TraceAppSnapshot) {
+        suppressFloatingToolbarOrderingForTesting = false
+        showOnboarding(snapshot)
     }
 
     func shortcutValidationForPreview(
@@ -5174,8 +5196,13 @@ private final class SetupPanelView: NSView {
     private let captureShortcutRow = SetupShortcutRecorderRow(
         action: .captureFrontmostApp
     )
+    private let cliHeading = NSTextField(labelWithString: "Command line tool")
+    private let cliRow = SetupCapabilityRow()
+    private let cliDetailLabel = NSTextField(labelWithString: "")
+    private let cliDocsButton = NSButton()
     private let errorLabel = NSTextField(wrappingLabelWithString: "")
     private let contentStack = NSStackView()
+    private var cliErrorMessage: String?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -5199,6 +5226,20 @@ private final class SetupPanelView: NSView {
         captureShortcutRow.onChange = { [weak self] in
             self?.onGlobalShortcutsChange?()
         }
+        cliRow.onAction = { [weak self] in self?.updateCLIInstallation() }
+        cliDocsButton.title = "docs"
+        cliDocsButton.setAccessibilityLabel("Command-line tool documentation")
+        cliDocsButton.bezelStyle = .inline
+        cliDocsButton.isBordered = false
+        cliDocsButton.controlSize = .small
+        cliDocsButton.contentTintColor = .linkColor
+        cliDocsButton.target = self
+        cliDocsButton.action = #selector(openCLIDocs)
+        cliRow.addInlineLink(cliDocsButton)
+        cliDetailLabel.font = .systemFont(ofSize: 11)
+        cliDetailLabel.textColor = .secondaryLabelColor
+        cliDetailLabel.lineBreakMode = .byWordWrapping
+        cliHeading.font = .systemFont(ofSize: 13, weight: .semibold)
         errorLabel.font = .systemFont(ofSize: 11)
         errorLabel.textColor = .systemRed
         errorLabel.lineBreakMode = .byWordWrapping
@@ -5228,6 +5269,9 @@ private final class SetupPanelView: NSView {
             shortcutHeading,
             blankShortcutRow,
             captureShortcutRow,
+            cliHeading,
+            cliRow,
+            cliDetailLabel,
             errorLabel,
         ].forEach(contentStack.addArrangedSubview)
         contentStack.translatesAutoresizingMaskIntoConstraints = false
@@ -5246,6 +5290,9 @@ private final class SetupPanelView: NSView {
             shortcutHeading,
             blankShortcutRow,
             captureShortcutRow,
+            cliHeading,
+            cliRow,
+            cliDetailLabel,
             errorLabel,
         ].forEach {
             $0.widthAnchor.constraint(equalTo: contentStack.widthAnchor)
@@ -5261,6 +5308,9 @@ private final class SetupPanelView: NSView {
         contentStack.setCustomSpacing(14, after: divider)
         contentStack.setCustomSpacing(8, after: shortcutHeading)
         contentStack.setCustomSpacing(10, after: blankShortcutRow)
+        contentStack.setCustomSpacing(8, after: captureShortcutRow)
+        contentStack.setCustomSpacing(8, after: cliHeading)
+        contentStack.setCustomSpacing(5, after: cliRow)
         addSubview(contentStack)
         NSLayoutConstraint.activate([
             contentStack.topAnchor.constraint(
@@ -5354,8 +5404,86 @@ private final class SetupPanelView: NSView {
         captureShortcutRow.update(
             shortcuts.state(for: .captureFrontmostApp)
         )
-        errorLabel.stringValue = snapshot.lastError ?? ""
-        errorLabel.isHidden = snapshot.lastError == nil
+        updateCLIInstallationState()
+        errorLabel.stringValue = snapshot.lastError ?? cliErrorMessage ?? ""
+        errorLabel.isHidden = snapshot.lastError == nil && cliErrorMessage == nil
+    }
+
+    private func updateCLIInstallationState() {
+        let directory = TraceCLIInstallation.directory
+        let helper = TraceCLIInstallation.helperURL(for: Bundle.main.bundleURL)
+        updateCLIInstallationState(TraceCLIInstallation.state(directory: directory, helper: helper))
+    }
+
+    fileprivate func updateCLIInstallationState(_ state: TraceCLIInstallationState) {
+        switch state {
+        case .notInstalled:
+            cliRow.update(
+                title: "Use traceapp from the terminal",
+                detail: "Install the command-line tool",
+                ready: false,
+                action: "Install"
+            )
+            cliDetailLabel.isHidden = true
+        case .installed:
+            cliRow.update(
+                title: "traceapp",
+                detail: "Command-line tool installed",
+                ready: true,
+                action: "Uninstall"
+            )
+            cliDetailLabel.isHidden = true
+        case .pointsElsewhere:
+            cliRow.update(
+                title: "Points to another Trace",
+                detail: "Reinstall to use this copy of Trace",
+                ready: false,
+                action: "Reinstall"
+            )
+            cliDetailLabel.stringValue = "Reinstall to use this copy of Trace"
+            cliDetailLabel.isHidden = false
+        case .broken:
+            cliRow.update(
+                title: "Link is broken",
+                detail: "Reinstall to restore the `traceapp` command",
+                ready: false,
+                action: "Reinstall"
+            )
+            cliDetailLabel.stringValue = "Reinstall to restore the `traceapp` command"
+            cliDetailLabel.isHidden = false
+        }
+    }
+
+    private func updateCLIInstallation() {
+        let directory = TraceCLIInstallation.directory
+        let helper = TraceCLIInstallation.helperURL(for: Bundle.main.bundleURL)
+        let installed = TraceCLIInstallation.state(
+            directory: directory,
+            helper: helper
+        ) == .installed
+        do {
+            try TraceCLIInstallation.perform(
+                install: !installed,
+                directory: directory,
+                helper: helper,
+                requiresAuthorization:
+                    ProcessInfo.processInfo.environment[
+                        "TRACE_CLI_INSTALL_DIRECTORY"
+                    ] == nil
+            )
+            cliErrorMessage = nil
+        } catch {
+            cliErrorMessage = error.localizedDescription
+        }
+        updateCLIInstallationState()
+        errorLabel.stringValue = cliErrorMessage ?? ""
+        errorLabel.isHidden = cliErrorMessage == nil
+    }
+
+    @objc private func openCLIDocs() {
+        if let url = URL(string: "https://github.com/fundure-ventures/trace/blob/main/CLI.md") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func connectionText(_ state: PenConnectionState) -> String {
@@ -5460,6 +5588,19 @@ private final class SetupPanelView: NSView {
             return values + view.subviews.flatMap(collect)
         }
         return collect(from: contentStack)
+    }
+
+    var pendingIndicatorsMutedForTesting: Bool {
+        [penRow, captureRow, voiceRow, cliRow].allSatisfy {
+            $0.readyForTesting || $0.statusTintForTesting == .secondaryLabelColor
+        } && openRouterRow.pendingIndicatorMutedForTesting
+    }
+
+    var cliDocsInlineForTesting: Bool {
+        cliDocsButton.isDescendant(of: cliRow)
+            && cliDocsButton.title == "docs"
+            && cliDocsButton.action == #selector(openCLIDocs)
+            && cliDocsButton.target === self
     }
 
     func shortcutConflictPolicyForTesting(
@@ -5603,10 +5744,10 @@ private final class OpenRouterSetupRow: NSView {
         statusImage.image = NSImage(
             systemSymbolName: ready
                 ? "checkmark.circle.fill"
-                : "exclamationmark.circle.fill",
-            accessibilityDescription: ready ? "Ready" : "Needs attention"
+                : "checkmark.circle",
+            accessibilityDescription: ready ? "Ready" : "Not set up"
         )
-        statusImage.contentTintColor = ready ? .systemGreen : .systemOrange
+        statusImage.contentTintColor = ready ? .systemGreen : .secondaryLabelColor
         titleLabel.toolTip = detailLabel.stringValue
         let allowsMutation = voiceState.allowsOpenRouterAPIKeyMutation
         apiKeyField.isEnabled = allowsMutation
@@ -5640,6 +5781,10 @@ private final class OpenRouterSetupRow: NSView {
     }
 
 #if DEBUG
+    var pendingIndicatorMutedForTesting: Bool {
+        apiKeyField.isHidden || statusImage.contentTintColor == .secondaryLabelColor
+    }
+
     var usesRegularTitleFontForTesting: Bool {
         titleLabel.font == .systemFont(ofSize: 12, weight: .regular)
     }
@@ -5664,6 +5809,7 @@ private final class SetupCapabilityRow: NSView {
     private let titleLabel = NSTextField(labelWithString: "")
     private let detailLabel = NSTextField(labelWithString: "")
     private let actionButton = NSButton()
+    private let row = NSStackView()
     private var ready = false
 
     override init(frame frameRect: NSRect) {
@@ -5677,9 +5823,7 @@ private final class SetupCapabilityRow: NSView {
         actionButton.target = self
         actionButton.action = #selector(performAction)
 
-        let row = NSStackView(
-            views: [statusImage, titleLabel, NSView(), actionButton]
-        )
+        [statusImage, titleLabel, NSView(), actionButton].forEach(row.addArrangedSubview)
         row.translatesAutoresizingMaskIntoConstraints = false
         row.orientation = .horizontal
         row.alignment = .centerY
@@ -5699,6 +5843,18 @@ private final class SetupCapabilityRow: NSView {
         nil
     }
 
+    func addInlineLink(_ button: NSButton) {
+        let separator = NSTextField(labelWithString: "·")
+        separator.font = .systemFont(ofSize: 12)
+        separator.textColor = .secondaryLabelColor
+        let link = NSStackView(views: [separator, button])
+        link.orientation = .horizontal
+        link.alignment = .centerY
+        link.spacing = 4
+        row.insertArrangedSubview(link, at: 2)
+        row.setCustomSpacing(4, after: titleLabel)
+    }
+
     func update(
         title: String,
         detail: String,
@@ -5712,10 +5868,10 @@ private final class SetupCapabilityRow: NSView {
         statusImage.image = NSImage(
             systemSymbolName: ready
                 ? "checkmark.circle.fill"
-                : "exclamationmark.circle.fill",
-            accessibilityDescription: ready ? "Ready" : "Needs attention"
+                : "checkmark.circle",
+            accessibilityDescription: ready ? "Ready" : "Not set up"
         )
-        statusImage.contentTintColor = ready ? .systemGreen : .systemOrange
+        statusImage.contentTintColor = ready ? .systemGreen : .secondaryLabelColor
         actionButton.title = action ?? ""
         actionButton.isHidden = action == nil
         setAccessibilityLabel("\(title), \(detail)")
@@ -5726,6 +5882,7 @@ private final class SetupCapabilityRow: NSView {
     }
 
 #if DEBUG
+    var statusTintForTesting: NSColor? { statusImage.contentTintColor }
     var titleForTesting: String { titleLabel.stringValue }
     var detailForTesting: String { detailLabel.stringValue }
     var actionForTesting: String? {

@@ -122,6 +122,41 @@ public struct TraceAutosaveGate: Equatable, Sendable {
     }
 }
 
+public struct TraceCLIActionGate: Equatable, Sendable {
+    private var activeAction: UUID?
+
+    public var isBusy: Bool {
+        activeAction != nil
+    }
+
+    public init() {
+        activeAction = nil
+    }
+
+    public mutating func begin() -> UUID? {
+        guard activeAction == nil else { return nil }
+        let action = UUID()
+        activeAction = action
+        return action
+    }
+
+    @discardableResult
+    public mutating func finish(_ action: UUID) -> Bool {
+        guard activeAction == action else { return false }
+        activeAction = nil
+        return true
+    }
+}
+
+public enum TraceCLIActionPolicy {
+    public static func isCurrentDocument(
+        expectedID: UUID?,
+        currentID: UUID?
+    ) -> Bool {
+        expectedID == currentID
+    }
+}
+
 public struct TraceDocumentCopyProgress: Equatable, Sendable {
     private var documentID: UUID?
 
@@ -635,19 +670,26 @@ public enum WindowSelectionPolicy {
 
     public static func frontmost<Windows: Sequence>(
         windowsFrontToBack: Windows,
-        excludingOwnerPID: Int32
+        excludingOwnerPID: Int32,
+        excludingOwnerPIDs: Set<Int32> = []
     ) -> TraceWindowDescriptor?
     where Windows.Element == TraceWindowDescriptor {
         windowsFrontToBack.first {
-            isEligible($0, excludingOwnerPID: excludingOwnerPID)
+            isEligible(
+                $0,
+                excludingOwnerPID: excludingOwnerPID,
+                excludingOwnerPIDs: excludingOwnerPIDs
+            )
         }
     }
 
     private static func isEligible(
         _ window: TraceWindowDescriptor,
-        excludingOwnerPID: Int32
+        excludingOwnerPID: Int32,
+        excludingOwnerPIDs: Set<Int32> = []
     ) -> Bool {
         window.ownerPID != excludingOwnerPID
+            && !excludingOwnerPIDs.contains(window.ownerPID)
             && window.layer == 0
             && window.alpha > 0.01
             && window.bounds.width >= 80

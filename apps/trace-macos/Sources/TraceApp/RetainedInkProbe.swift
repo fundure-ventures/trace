@@ -103,6 +103,8 @@ enum TraceRetainedInkProbe {
         try verifyOpenWithImagePolicy()
         try verifyOpenFileLifecycle()
         try verifyOpenWithRegistration()
+        try verifyCLITraceboardOpenResults()
+        try verifyCLICaptureCompletion()
     }
 
     static func runGridSpacingBaselineCheck() throws {
@@ -2216,6 +2218,44 @@ enum TraceRetainedInkProbe {
     private static func verifyOnboardingPresentation() throws {
         let board = TraceBoardWindowController()
         board.prepareOnboardingForPreview(setupPreviewSnapshot())
+        board.showSetupWindowsForPreview(setupPreviewSnapshot())
+        guard board.setupWindowsVisibleForPreview else {
+            throw probeError("Setup close regression did not start with visible windows")
+        }
+        board.hideBoard()
+        board.updateOnboarding(setupPreviewSnapshot())
+        guard board.window?.isVisible != true,
+              !board.setupWindowsVisibleForPreview
+        else {
+            throw probeError("closing a trace during Setup left orphan windows after a state refresh")
+        }
+        board.prepareOnboardingForPreview(setupPreviewSnapshot())
+        board.showSetupWindowsForPreview(setupPreviewSnapshot())
+        guard board.window?.isVisible == true,
+              board.setupWindowsVisibleForPreview
+        else {
+            throw probeError("Setup could not reopen after closing the previous trace")
+        }
+        board.hideBoard()
+        board.prepareOnboardingForPreview(setupPreviewSnapshot())
+        board.setCLIInstallationStateForPreview(.notInstalled)
+        guard board.setupVisibleTextForPreview.contains("Use traceapp from the terminal"),
+              !board.setupVisibleTextForPreview.contains("Not installed"),
+              !board.setupVisibleTextForPreview.contains("Use Trace from Terminal as `traceapp`"),
+              board.setupPendingIndicatorsMutedForPreview
+        else {
+            throw probeError("pending setup items were not muted or CLI setup repeated its subtitle")
+        }
+        board.setCLIInstallationStateForPreview(.installed)
+        guard board.setupCLIDocsInlineForPreview else {
+            throw probeError("CLI documentation was not available inline beside the command")
+        }
+        guard board.setupVisibleTextForPreview.contains("traceapp"),
+              !board.setupVisibleTextForPreview.contains(where: { $0.contains("Installed at") }),
+              !board.setupVisibleTextForPreview.contains("Use Trace from Terminal as `traceapp`")
+        else {
+            throw probeError("installed CLI setup exposed the install path or repeated its subtitle")
+        }
         let setup = board.setupStateForPreview
         let setupText = board.setupVisibleTextForPreview
         let setupChrome = board.boardWindowChromeForPreview
@@ -2358,10 +2398,11 @@ enum TraceRetainedInkProbe {
         )
         let configuredMicrophone = board.setupStateForPreview
         guard configuredMicrophone.voiceReady,
-              configuredMicrophone.voiceAction == nil
+              configuredMicrophone.voiceAction == nil,
+              board.setupPendingIndicatorsMutedForPreview
         else {
             throw probeError(
-                "voice setup did not model microphone permission separately"
+                "voice setup did not show microphone readiness with muted pending checks"
             )
         }
 
@@ -2372,9 +2413,11 @@ enum TraceRetainedInkProbe {
             )
         )
         let missingVoice = board.setupStateForPreview
-        guard missingVoice.voiceAction == "Allow" else {
+        guard missingVoice.voiceAction == "Allow",
+              board.setupPendingIndicatorsMutedForPreview
+        else {
             throw probeError(
-                "missing Dictation configuration hid microphone recovery"
+                "missing Dictation configuration hid microphone recovery or used warning styling"
             )
         }
 
@@ -3784,6 +3827,177 @@ enum TraceRetainedInkProbe {
         }
     }
 
+    private static func verifyCLITraceboardOpenResults() throws {
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            let suite = "TraceCLITraceboardOpen.\(UUID().uuidString)"
+            guard let defaults = UserDefaults(suiteName: suite) else {
+                throw probeError("could not create CLI open-test preferences")
+            }
+            defer {
+                defaults.removePersistentDomain(forName: suite)
+                try? FileManager.default.removeItem(at: root)
+            }
+            let store = TraceDrawingStore(directoryURL: root)
+            let current = try store.createBlank(
+                size: NSSize(width: 640, height: 480),
+                backingScale: 1,
+                backgroundColor: .blue
+            )
+            let replacement = try store.createBlank(
+                size: NSSize(width: 640, height: 480),
+                backingScale: 1,
+                backgroundColor: .red
+            )
+            if let fixturePath = ProcessInfo.processInfo.environment[
+                "TRACE_CLI_TRACEBOARD_FIXTURE"
+            ] {
+                let fixtureURL = URL(fileURLWithPath: fixturePath)
+                guard !FileManager.default.fileExists(atPath: fixtureURL.path) else {
+                    throw probeError("CLI traceboard fixture destination already exists")
+                }
+                try FileManager.default.copyItem(
+                    at: current.packageURL,
+                    to: fixtureURL
+                )
+            }
+            let corrupt = root.appendingPathComponent(
+                "Corrupt.traceboard",
+                isDirectory: true
+            )
+            try FileManager.default.createDirectory(
+                at: corrupt,
+                withIntermediateDirectories: true
+            )
+            try Data("not a manifest".utf8).write(
+                to: corrupt.appendingPathComponent("document.json")
+            )
+            let model = TraceAppModel(
+                drawingStore: store,
+                defaults: defaults,
+                transportFactory: { HardwareFreeNeoTransport() }
+            )
+            guard model.openDrawing(from: current.packageURL),
+                  let currentID = model.snapshot.currentDocument?.manifest.id
+            else {
+                throw probeError("valid CLI traceboard was rejected")
+            }
+            guard !model.openDrawing(from: corrupt),
+                  model.snapshot.currentDocument?.manifest.id == currentID,
+                  model.snapshot.lastError != nil
+            else {
+                throw probeError("corrupt CLI traceboard reported success or replaced the board")
+            }
+
+            try FileManager.default.removeItem(at: current.packageURL)
+            try Data("blocking save".utf8).write(to: current.packageURL)
+            guard !model.openDrawing(from: replacement.packageURL),
+                  model.snapshot.currentDocument?.manifest.id == currentID,
+                  model.snapshot.lastError?.contains("autosave") == true
+            else {
+                throw probeError("failed save while opening a traceboard reported success")
+            }
+            model.stop()
+        }
+
+        private static func verifyCLICaptureCompletion() throws {
+            var pendingCapture: ((Result<CapturedWindow, Error>) -> Void)?
+            let captureService = WindowCaptureService(
+                screenCapturePermission: { true },
+                frontmostCapture: { _, completion in
+                    pendingCapture = completion
+                }
+            )
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            let suite = "TraceCLICaptureCompletion.\(UUID().uuidString)"
+            guard let defaults = UserDefaults(suiteName: suite) else {
+                throw probeError("could not create CLI capture-test preferences")
+            }
+            defer {
+                defaults.removePersistentDomain(forName: suite)
+                try? FileManager.default.removeItem(at: root)
+            }
+            let model = TraceAppModel(
+                captureService: captureService,
+                drawingStore: TraceDrawingStore(directoryURL: root),
+                defaults: defaults,
+                transportFactory: { HardwareFreeNeoTransport() }
+            )
+            var failure: Result<Void, Error>?
+            guard model.newScreenshotPage(noRecording: true, completion: { failure = $0 }),
+                  failure == nil,
+                  let rejectCapture = pendingCapture
+            else {
+                throw probeError("capture returned before an asynchronous outcome was available")
+            }
+            rejectCapture(.failure(NSError(
+                domain: "TraceCLICaptureProbe",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "simulated capture failure"]
+            )))
+            guard case .failure = failure else {
+                throw probeError("failed screenshot capture reported success")
+            }
+
+            pendingCapture = nil
+            var success: Result<Void, Error>?
+            guard model.newScreenshotPage(noRecording: true, completion: { success = $0 }),
+                  success == nil,
+                  let finishCapture = pendingCapture
+            else {
+                throw probeError("successful screenshot capture did not remain pending")
+            }
+            let representation = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: 32,
+                pixelsHigh: 24,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+            )
+            guard let representation else {
+                throw probeError("could not create CLI capture image")
+            }
+            guard let cgImage = representation.cgImage else {
+                throw probeError("could not create CLI capture bitmap")
+            }
+            let color = NSColor.blue.cgColor
+            for y in 0..<24 {
+                for x in 0..<32 {
+                    representation.setColor(
+                        NSColor(cgColor: color)!,
+                        atX: x,
+                        y: y
+                    )
+                }
+            }
+            let descriptor = TraceWindowDescriptor(
+                id: 1,
+                ownerPID: 2,
+                layer: 0,
+                alpha: 1,
+                bounds: TraceRect(x: 0, y: 0, width: 32, height: 24),
+                ownerName: "Probe",
+                title: "Probe"
+            )
+            finishCapture(.success(CapturedWindow(
+                descriptor: descriptor,
+                cgImage: cgImage,
+                sourceScreenFrame: NSRect(x: 0, y: 0, width: 32, height: 24)
+            )))
+            guard case .success = success,
+                  model.snapshot.currentDocument != nil
+            else {
+                throw probeError("completed screenshot capture did not create a trace")
+            }
+            model.stop()
+        }
+
     private static func verifyOpenWithRegistration() throws {
         guard let documentTypes = Bundle.main.object(
                   forInfoDictionaryKey: "CFBundleDocumentTypes"
@@ -4739,7 +4953,7 @@ enum TraceRetainedInkProbe {
             )
         }
         var copiedTranscript: String?
-        model.finishVoiceForCopy { result in
+        model.finishVoiceForCopy(expectedDocumentID: document.manifest.id) { result in
             copiedTranscript = try? result.get()
         }
         guard copiedTranscript

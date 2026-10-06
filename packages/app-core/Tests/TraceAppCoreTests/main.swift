@@ -254,6 +254,45 @@ test("presenting a document cancels only the stale copy operation") {
     )
 }
 
+test("CLI action timeout releases its gate once without releasing a newer action") {
+    var gate = TraceCLIActionGate()
+    guard let timedOutAction = gate.begin() else {
+        throw TestFailure(description: "first CLI mutation did not acquire the action gate")
+    }
+    try expect(gate.begin() == nil, "concurrent CLI mutation was not rejected")
+    try expect(gate.finish(timedOutAction), "timed-out action did not release the gate")
+    guard let nextAction = gate.begin() else {
+        throw TestFailure(description: "CLI action gate remained busy after timeout")
+    }
+    try expect(
+        !gate.finish(timedOutAction) && gate.isBusy,
+        "late completion released the next action's gate"
+    )
+    try expect(gate.finish(nextAction) && !gate.isBusy, "active action could not release the gate")
+}
+
+test("CLI async capture, import, and Dictation callbacks reject changed documents") {
+    let originalDocument = UUID()
+    let replacementDocument = UUID()
+    let expectedDocumentID = originalDocument
+    for operation in ["device capture", "image import", "Dictation finish"] {
+        try expect(
+            TraceCLIActionPolicy.isCurrentDocument(
+                expectedID: expectedDocumentID,
+                currentID: originalDocument
+            ),
+            "\(operation) rejected its original document"
+        )
+        try expect(
+            !TraceCLIActionPolicy.isCurrentDocument(
+                expectedID: expectedDocumentID,
+                currentID: replacementDocument
+            ),
+            "\(operation) was allowed to target a replacement document"
+        )
+    }
+}
+
 test("window selection uses the topmost mapped app window") {
     let windows = [
         TraceWindowDescriptor(
@@ -305,6 +344,38 @@ test("window selection uses the topmost mapped app window") {
             excludingOwnerPID: 999
         )?.id == 2,
         "frontmost fallback selected the wrong window"
+    )
+}
+
+test("terminal windows can be excluded while choosing the frontmost capture") {
+    let windows = [
+        TraceWindowDescriptor(
+            id: 10,
+            ownerPID: 500,
+            layer: 0,
+            alpha: 1,
+            bounds: TraceRect(x: 0, y: 0, width: 900, height: 700),
+            ownerName: "Terminal",
+            title: "shell"
+        ),
+        TraceWindowDescriptor(
+            id: 11,
+            ownerPID: 600,
+            layer: 0,
+            alpha: 1,
+            bounds: TraceRect(x: 0, y: 0, width: 900, height: 700),
+            ownerName: "Browser",
+            title: "reference"
+        ),
+    ]
+    let selected = WindowSelectionPolicy.frontmost(
+        windowsFrontToBack: windows,
+        excludingOwnerPID: 999,
+        excludingOwnerPIDs: [500]
+    )
+    try expect(
+        selected?.ownerPID == 600,
+        "the invoking terminal was selected instead of the app behind it"
     )
 }
 

@@ -173,6 +173,7 @@ BUILD_ARGS=(
 )
 
 "$SWIFT" build "${BUILD_ARGS[@]}" --product trace
+"$SWIFT" build "${BUILD_ARGS[@]}" --product traceapp
 BIN_DIRECTORY=$("$SWIFT" build "${BUILD_ARGS[@]}" --show-bin-path)
 
 "$ROOT/tools/build-web-canvas" \
@@ -181,8 +182,9 @@ BIN_DIRECTORY=$("$SWIFT" build "${BUILD_ARGS[@]}" --show-bin-path)
     "$ROOT"
 
 rm -rf -- "$BUILD_APP"
-mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
+mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Helpers"
 cp "$BIN_DIRECTORY/trace" "$CONTENTS/MacOS/trace"
+cp "$BIN_DIRECTORY/traceapp" "$CONTENTS/Helpers/traceapp"
 cp "$ROOT/apps/trace-macos/Trace-Info.plist" "$CONTENTS/Info.plist"
 plutil -replace CFBundleDisplayName -string "$PRODUCT_NAME" "$CONTENTS/Info.plist"
 plutil -replace CFBundleName -string "$PRODUCT_NAME" "$CONTENTS/Info.plist"
@@ -249,5 +251,9 @@ cp -R "$BUILD_APP" "$APP"
 "$ROOT/tools/sign-app" "$APP"
 
 register_current_app
-open "$APP"
+if [[ -n "${TRACE_PERSIST_DEBUG_LOGS:-}" ]]; then
+    open "$APP" --env "TRACE_PERSIST_DEBUG_LOGS=$TRACE_PERSIST_DEBUG_LOGS"
+else
+    open "$APP"
+fi
 "$ROOT/tools/wait-for-running-app" "$BUNDLE_IDENTIFIER"

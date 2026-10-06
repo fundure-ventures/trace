@@ -1,5 +1,7 @@
 # Development
 
+This file covers development setup, commands, and engineering best practices.
+
 ## Prerequisites
 
 - macOS 13+
@@ -17,7 +19,7 @@ required macOS 26.5 SDK is not found automatically.
 The repository produces two application bundles:
 
 | Product | Purpose | Output |
-|---|---|---|
+| --- | --- | --- |
 | Trace Debug | Fast local iteration with a separate bundle identity and ad-hoc signature | built at `.build/Trace Debug.app`, launched from `/Applications/Trace Debug.app` |
 | Trace | Production release build, unsigned until the signing step | `.build/Trace.app` |
 
@@ -144,6 +146,30 @@ The skill:
 6. Creates `vVERSION` on the exact release commit and uploads only the
    notarized ZIP and SHA-256 file to GitHub Releases.
 
+## Code testing quality
+
+The **Acceptance criteria** in the feature files listed in
+[`FEATURES.md`](FEATURES.md) are the source of truth for test assertions.
+Only assertions that protect those user-observable outcomes are relevant.
+
+- Before writing or changing a test, identify the feature and acceptance
+  criterion it protects. If an important outcome is missing, document it in
+  the feature file first; do not invent requirements inside tests.
+- Assert what the user can do and what happens, not internal calls, state
+  structure, component layout, or current constants unless the criterion
+  explicitly requires that observable result.
+- Use the smallest reliable test or probe that demonstrates the outcome.
+  Unit tests are useful when they protect an acceptance criterion; a unit
+  test of a helper alone does not prove that the feature works end to end.
+- Confirm each new test fails when the behavior it protects is broken, then
+  restore the behavior. A passing test without this check is not evidence
+  that it prevents the regression.
+- Refactoring without changing acceptance criteria should not require
+  rewriting assertions. Rewrite or remove tests that freeze implementation
+  details instead of protecting the documented outcome.
+- Keep tests independent of feature-file wording: link their intent to the
+  criterion, but exercise behavior rather than matching documentation text.
+
 ## Test
 
 ```sh
@@ -156,7 +182,57 @@ swift run trace-stroke-processing-tests
 swift run trace-lab-replay-tests
 swift run trace-app-core-tests
 swift run trace-voice-tests
+swift run trace-logging-tests
 ```
+
+### Local diagnostic logs
+
+Trace uses Apple's unified `Logger` in Debug and Release. Filter Console by
+the app's bundle identifier and category: lifecycle, capture, storage, canvas,
+dictation, input, or clipboard.
+
+Debug builds also retain notices, errors, and faults in
+`~/Library/Logs/Trace Debug/`. Release builds use only unified logging unless
+verbose persistence is enabled. Enable **Diagnostics → Persist Debug Logs**
+from the Trace menu-bar menu or application menu to retain debug breadcrumbs
+across launches, without restarting. This opt-in also enables local files in
+Release, under `~/Library/Logs/Trace/`. **Diagnostics → Open Logs** opens the
+current build's folder.
+
+For a launch-time override, set `TRACE_PERSIST_DEBUG_LOGS=1` to enable verbose
+persistence, or `0` to disable it. It overrides the saved preference at startup;
+the menu can still change it for the running process. The Copilot app's
+**Launch Debug** operation enables this flag by default, and `tools/trace`
+explicitly forwards it through Launch Services to the app. Release build/sign
+operations do not enable it. For example, launch an
+already built Debug app from Terminal:
+
+```sh
+TRACE_PERSIST_DEBUG_LOGS=1 "/Applications/Trace Debug.app/Contents/MacOS/trace"
+```
+
+Alternatively, enable the saved preference before launching from Finder:
+
+```sh
+defaults write "$( /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
+  '/Applications/Trace Debug.app/Contents/Info.plist' )" TracePersistDebugLogs -bool true
+```
+
+Logs are JSON Lines (`trace.jsonl` and four rotated files), capped at 2 MiB
+per file / 10 MiB total. Files older than seven days are removed on the next
+write; inactive apps do not run a background cleanup service. Writes run on a
+serial utility queue, coordinate across app instances, and drain on normal
+termination. Forced termination can lose queued entries. Logs are owner-only,
+excluded from backups, and never uploaded automatically.
+
+Entries include timestamp, session ID, version/build, category, operation,
+source file/function/line, and safe error type/domain/code. Messages are static
+labels: keys, device identifiers, file paths, screenshots, strokes, transcripts,
+request/response bodies, arbitrary error descriptions, and JavaScript error
+payloads are not recorded. Unknown error domains are replaced with `custom`.
+This policy applies even when verbose persistence is enabled. Input Lab,
+Neo diagnostics, and the explicitly enabled Sidecar input probe keep their
+separate existing logging behavior.
 
 Hardware-free checks:
 

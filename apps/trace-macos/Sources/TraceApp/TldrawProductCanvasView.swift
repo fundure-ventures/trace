@@ -1,4 +1,5 @@
 import AppKit
+import TraceLogging
 import TraceAppCore
 import WebKit
 
@@ -624,6 +625,7 @@ final class TldrawProductCanvasView:
         _ document: TraceDrawingSession,
         toolState: TraceToolState
     ) {
+        TraceLogger.shared.record(.debug, category: .canvas, "Canvas document requested")
         documentGeneration += 1
         appliedDocumentGeneration = nil
         pendingDocumentFrameGeneration = nil
@@ -768,13 +770,16 @@ final class TldrawProductCanvasView:
         pixelRatio: CGFloat,
         completion: @escaping (NSImage?) -> Void
     ) {
+        TraceLogger.shared.record(.debug, category: .canvas, "Canvas image export requested")
         Task { @MainActor [weak self] in
             guard let self, isReady else {
+                TraceLogger.shared.record(.error, category: .canvas, "Image export rejected because canvas is not ready")
                 completion(nil)
                 return
             }
             let generation = documentGeneration
             guard let documentID = currentDocumentID else {
+                TraceLogger.shared.record(.error, category: .canvas, "Image export rejected because document is missing")
                 completion(nil)
                 return
             }
@@ -787,6 +792,7 @@ final class TldrawProductCanvasView:
                   generation == documentGeneration,
                   documentID == currentDocumentID
             else {
+                TraceLogger.shared.record(.error, category: .canvas, "Image export canceled while waiting for canvas")
                 completion(nil)
                 return
             }
@@ -820,6 +826,7 @@ final class TldrawProductCanvasView:
                       generation == documentGeneration,
                       documentID == currentDocumentID
                 else {
+                    TraceLogger.shared.record(.error, category: .canvas, "Image export returned an invalid or stale response")
                     completion(nil)
                     return
                 }
@@ -829,11 +836,15 @@ final class TldrawProductCanvasView:
                         timedShapes(from: result["timedShapes"])
                     )
                 }
-                completion(
-                    (result["dataUrl"] as? String)
-                        .flatMap(imageFromDataURL)
-                )
+                let image = (result["dataUrl"] as? String).flatMap(imageFromDataURL)
+                if image == nil {
+                    TraceLogger.shared.record(.error, category: .canvas, "Image export returned invalid image data")
+                } else {
+                    TraceLogger.shared.record(.debug, category: .canvas, "Canvas image export completed")
+                }
+                completion(image)
             } catch {
+                TraceLogger.shared.record(.error, category: .canvas, "Canvas image export failed", error: error)
                 completion(nil)
             }
         }
@@ -886,7 +897,7 @@ final class TldrawProductCanvasView:
                 }
             } catch {
                 if generation == documentGeneration {
-                    showLoadError(error.localizedDescription)
+                    showLoadError(error.localizedDescription, error: error)
                 }
             }
             completion()
@@ -919,6 +930,7 @@ final class TldrawProductCanvasView:
         }
         switch type {
         case "product-ready":
+            TraceLogger.shared.record(.debug, category: .canvas, "Canvas renderer ready")
             isReady = true
             scheduleOperation()
         case "product-change":
@@ -964,21 +976,7 @@ final class TldrawProductCanvasView:
             guard isCurrentDocumentMessage(body) else {
                 return
             }
-            NSLog(
-                "Trace image export resolution reduced: requested=%@ "
-                    + "effective=%@ bounds=%@ output=%@x%@",
-                String(
-                    describing:
-                        body["requestedPixelRatio"] ?? "unknown"
-                ),
-                String(
-                    describing:
-                        body["effectivePixelRatio"] ?? "unknown"
-                ),
-                String(describing: body["bounds"] ?? "unknown"),
-                String(describing: body["pixelWidth"] ?? "unknown"),
-                String(describing: body["pixelHeight"] ?? "unknown")
-            )
+            TraceLogger.shared.record(.notice, category: .canvas, "Image export resolution reduced")
 #if DEBUG
         case "sidecar-input-probe":
             guard ProcessInfo.processInfo.environment[
@@ -1021,7 +1019,7 @@ final class TldrawProductCanvasView:
         didFail navigation: WKNavigation!,
         withError error: Error
     ) {
-        showLoadError(error.localizedDescription)
+        showLoadError(error.localizedDescription, error: error)
     }
 
     func webView(
@@ -1029,7 +1027,7 @@ final class TldrawProductCanvasView:
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
-        showLoadError(error.localizedDescription)
+        showLoadError(error.localizedDescription, error: error)
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
@@ -1191,7 +1189,7 @@ final class TldrawProductCanvasView:
                 }
             } catch {
                 if generation == documentGeneration {
-                    showLoadError(error.localizedDescription)
+                    showLoadError(error.localizedDescription, error: error)
                 }
             }
         }
@@ -1574,7 +1572,8 @@ final class TldrawProductCanvasView:
             == currentDocumentID.uuidString.lowercased()
     }
 
-    private func showLoadError(_ detail: String) {
+    private func showLoadError(_ detail: String, error: Error? = nil) {
+        TraceLogger.shared.record(.error, category: .canvas, "Canvas unavailable", error: error)
         unavailableReason = detail
         isReady = false
         canUndo = false
@@ -1583,7 +1582,6 @@ final class TldrawProductCanvasView:
         errorLabel.stringValue = "Canvas unavailable\n\(detail)"
         errorLabel.isHidden = false
         onUnavailable?()
-        NSLog("Trace tldraw canvas unavailable: %@", detail)
     }
 }
 
@@ -1645,6 +1643,7 @@ private final class ProductRendererSchemeHandler:
             urlSchemeTask.didReceive(data)
             urlSchemeTask.didFinish()
         } catch {
+            TraceLogger.shared.record(.error, category: .canvas, "Canvas resource load failed", error: error)
             urlSchemeTask.didFailWithError(error)
         }
     }

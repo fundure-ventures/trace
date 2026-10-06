@@ -1,4 +1,5 @@
 import AppKit
+import TraceLogging
 import TraceAppCore
 
 final class TraceDrawingSession {
@@ -82,10 +83,7 @@ final class TraceDrawingStore {
                    try fileManager.moveItem(at: legacy, to: preferred)
                 } catch {
                     resolved = legacy
-                    NSLog(
-                        "Trace could not rename drawing folder: %@",
-                        error.localizedDescription
-                    )
+                    TraceLogger.shared.record(.error, category: .storage, "Drawing folder migration failed", error: error)
                 }
             }
             self.directoryURL = resolved

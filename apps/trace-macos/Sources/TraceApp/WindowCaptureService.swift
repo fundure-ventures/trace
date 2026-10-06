@@ -1,4 +1,5 @@
 import AppKit
+import TraceLogging
 import CoreGraphics
 import ScreenCaptureKit
 import TraceAppCore
@@ -41,6 +42,23 @@ enum WindowCaptureError: LocalizedError {
 }
 
 final class WindowCaptureService {
+    private let screenCapturePermission: (() -> Bool)?
+    private let frontmostCapture: ((
+        Set<Int32>,
+        @escaping (Result<CapturedWindow, Error>) -> Void
+    ) -> Void)?
+
+    init(
+        screenCapturePermission: (() -> Bool)? = nil,
+        frontmostCapture: ((
+            Set<Int32>,
+            @escaping (Result<CapturedWindow, Error>) -> Void
+        ) -> Void)? = nil
+    ) {
+        self.screenCapturePermission = screenCapturePermission
+        self.frontmostCapture = frontmostCapture
+    }
+
     var frontmostApplicationName: String? {
         do {
             let descriptors = try windowDescriptors(requiresPermission: false)
@@ -53,12 +71,13 @@ final class WindowCaptureService {
             return NSRunningApplication(processIdentifier: window.ownerPID)?
                 .bundleURL?.lastPathComponent ?? window.ownerName
         } catch {
+            TraceLogger.shared.record(.error, category: .capture, "Frontmost application lookup failed", error: error)
             return nil
         }
     }
 
     var hasPermission: Bool {
-        CGPreflightScreenCaptureAccess()
+        screenCapturePermission?() ?? CGPreflightScreenCaptureAccess()
     }
 
     @discardableResult
@@ -89,10 +108,17 @@ final class WindowCaptureService {
     }
 
     func captureFrontmost(
+        excludingOwnerPIDs: Set<Int32> = [],
         completion: @escaping (Result<CapturedWindow, Error>) -> Void
     ) {
+        if let frontmostCapture {
+            frontmostCapture(excludingOwnerPIDs, completion)
+            return
+        }
         do {
-            let selection = try selectedFrontmostWindow()
+            let selection = try selectedFrontmostWindow(
+                excludingOwnerPIDs: excludingOwnerPIDs
+            )
             capture(selection, completion: completion)
         } catch {
             completion(.failure(error))
@@ -139,12 +165,15 @@ final class WindowCaptureService {
         return selected
     }
 
-    private func selectedFrontmostWindow() throws -> TraceWindowDescriptor {
+    private func selectedFrontmostWindow(
+        excludingOwnerPIDs: Set<Int32> = []
+    ) throws -> TraceWindowDescriptor {
         let descriptors = try windowDescriptors()
         let ownPID = ProcessInfo.processInfo.processIdentifier
         guard let selected = WindowSelectionPolicy.frontmost(
             windowsFrontToBack: descriptors,
-            excludingOwnerPID: ownPID
+            excludingOwnerPID: ownPID,
+            excludingOwnerPIDs: excludingOwnerPIDs
         ) else {
             throw WindowCaptureError.noWindow
         }

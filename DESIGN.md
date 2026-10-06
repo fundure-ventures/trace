@@ -27,6 +27,8 @@ components:
 
 # Design System: Trace
 
+This file covers visual and interaction design guidelines and best practices.
+
 ## Overview
 
 **Creative North Star: "The Invisible Capture Instrument"**
@@ -44,7 +46,7 @@ light cluster, or permanent frame chrome.
   compact graphite floating toolbar is the only persistent product chrome.
 - Product annotation colors are red, blue, yellow, and green, derived from
   the page background for legibility
-  ([ADR 0008](docs/adr/0008-background-derived-color-theming.md)).
+  ([ADR 0008](memory/adr/0008-background-derived-color-theming.md)).
 
 ## Typography
 
