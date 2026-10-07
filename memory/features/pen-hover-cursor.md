@@ -1,6 +1,6 @@
 # Pen hover cursor
 
-**Tag:** `#pen`
+`#pen`
 
 ## Problem
 With the pen above paper, you cannot see where it will land on screen.
@@ -14,10 +14,17 @@ pen on the board.
 - Needs [Pen calibration](pen-calibration.md) and an open [board](board-window.md)
 
 ## Rules
-- Shown only with Hover Mode on, while annotating, on a compatible page.
-- Ring: 24 diameter, 2 stroke, 2× magnification, 20% opacity; hides after 0.5 s idle.
-- Ignores sub-1.5 px jitter.
-- The user's Hover Mode choice is remembered and re-applied on reconnect.
+```text
+Hover cursor eligibility
+├─ Hover Mode on, annotating, compatible page → show cursor
+└─ Any condition missing → do not show cursor
+Visible cursor
+├─ Ring → 24 diameter; 2 stroke; 2× magnification; 20% opacity
+├─ Movement below 1.5 px → ignore jitter
+└─ Idle for 0.5 s → hide
+Reconnect pen
+└─ Reapply remembered Hover Mode choice
+```
 
 ## FAQ
 - **No circle?** Enable Hover Mode and calibrate.

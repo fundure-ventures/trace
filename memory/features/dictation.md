@@ -1,6 +1,6 @@
 # Dictation
 
-**Tag:** `#voice`
+`#voice`
 
 ## Problem
 Marks alone lose the "why". Typing an explanation afterwards breaks the flow.
@@ -17,11 +17,17 @@ the trace and copied alongside the image.
 - Stored in [Traceboard documents](traceboard-documents.md)
 
 ## Rules
-- Without a key, the button reads **Set up Dictation** and opens Setup instead of recording.
-- States: Start → Stop/Resume → Finishing → Transcript; one visible state at a time.
-- "Start dictation automatically" begins recording for newly created traces
-  (blank or screenshot), and silently does nothing if not authorized/configured.
-- Requires Microphone permission.
+```text
+Dictation button
+├─ No key → "Set up Dictation"; open Setup instead of recording
+└─ Key available → recording requires Microphone permission
+Recording flow
+└─ Start → Stop/Resume → Finishing → Transcript; one visible state at a time
+New blank or screenshot trace
+└─ Start dictation automatically enabled
+   ├─ Configured and authorized → begin recording
+   └─ Not configured or authorized → silently do nothing
+```
 
 ## FAQ
 - **Which provider transcribes?** OpenRouter, with your own key.

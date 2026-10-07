@@ -1,6 +1,6 @@
 # Pen calibration
 
-**Tag:** `#pen`
+`#pen`
 
 ## Problem
 Pen coordinates on paper must map exactly onto the screenshot, or marks land in
@@ -15,9 +15,13 @@ profile and applied to compatible pages.
 - Required by [Neo pen](neo-pen.md) drawing and [Pen hover cursor](pen-hover-cursor.md)
 
 ## Rules
-- Calibration can be cancelled at any time (**Cancel calibration**).
-- Calibration is per paper profile and survives restarts.
-- Pages map aspect-fit; the exact page is kept.
+```text
+Guided calibration
+├─ Any point → "Cancel calibration" available
+└─ Saved calibration → per paper profile; survives restarts
+Map compatible page
+└─ Aspect-fit → keep exact page
+```
 
 ## FAQ
 - **Marks are offset.** Recalibrate from Setup.

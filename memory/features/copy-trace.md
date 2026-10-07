@@ -1,6 +1,6 @@
 # Copy trace
 
-**Tag:** `#output`
+`#output`
 
 ## Problem
 The result must land in Slack, an issue, or a doc in one keystroke, with the
@@ -18,11 +18,23 @@ copies the whole trace; its options menu picks the format.
 - Includes [Dictation](dictation.md) and [Timed annotations](timed-annotations.md)
 
 ## Rules
-- Selection wins: with shapes or text selected, `⌘C` copies the selection and keeps the board open.
-- While editing text, `⌘C` stays text copy, even with only a caret.
-- Selection is read live from the canvas; if it cannot be read, Trace does not fall back to full-trace copy.
-- Formats: image and dictation, image, dictation, `.pdf`.
-- Copied pixels exclude grid and selection bounds.
+```text
+Copy action
+├─ Toolbar Copy → whole trace
+└─ ⌘C
+   ├─ Editing text, even caret only → text copy; keep board open
+   └─ Not editing text → read live canvas selection
+      ├─ Selection unreadable → never fall back to whole-trace copy
+      ├─ Shapes or text selected → selection copy; keep board open
+      └─ Nothing selected → whole trace
+Whole-trace copy
+├─ Format → image and dictation, image, dictation, or .pdf
+└─ Copy and save trace
+   ├─ Close-after-copy enabled → close board
+   └─ Close-after-copy disabled → keep board open
+Copied pixels
+└─ Exclude grid and selection bounds
+```
 
 ## FAQ
 - **`⌘C` copied my shape, not the trace.** Deselect first, or use the toolbar Copy.

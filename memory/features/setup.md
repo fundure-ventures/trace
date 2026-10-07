@@ -1,6 +1,6 @@
 # Setup
 
-**Tag:** `#app`
+`#app`
 
 ## Problem
 Trace depends on macOS permissions, an optional pen, an optional Dictation key,
@@ -21,20 +21,28 @@ opens on first launch (onboarding) and later from the menu bar.
 - Installs [Command-line tool](command-line-tool.md)
 
 ## Rules
-- Every item is optional except what the chosen workflow needs; the pen is never required.
-- Externally supplied keys (env / `.env`) take precedence over the key saved in Setup.
-- The personal OpenRouter key is stored only in macOS Keychain and can be replaced or removed.
-- Onboarding disables board resizing.
-- `./tools/trace --clear` repeats onboarding without deleting saved traces.
-- Command-line installation is optional and never blocks Setup readiness.
-- Pending setup checks use a muted outlined checkmark, not a warning icon.
-- The command-line row reads “Use traceapp from the terminal” before installation
-  and “traceapp” after installation, without a subtitle or install path.
-- Command-line documentation is linked inline beside the row label as “· docs”.
-- Closing a trace while Setup is open closes the canvas, toolbar, and Setup
-  panel together. Background status updates do not reopen them.
-- Installing or reinstalling `traceapp` can replace a symlink, but never
-  overwrites an existing regular file or directory at the install path.
+```text
+Setup requirements
+├─ Chosen workflow → require only what it needs; pen never required
+├─ Command-line installation → optional; never blocks readiness
+└─ Pending check → muted outlined checkmark; never warning icon
+Dictation key
+├─ External key (env / .env) → takes precedence over saved key
+└─ Personal key → macOS Keychain only; can replace or remove
+Onboarding
+├─ Board resizing → disabled
+└─ ./tools/trace --clear → repeat onboarding; preserve saved traces
+Command-line row
+├─ Before installation → "Use traceapp from the terminal"
+├─ After installation → "traceapp"
+└─ Presentation → inline "· docs" link; no subtitle or install path
+Install or reinstall traceapp
+├─ Existing symlink → may replace
+└─ Existing regular file or directory → never overwrite
+Close trace with Setup open
+└─ Close canvas, toolbar, and Setup together
+   └─ Background status updates → never reopen them
+```
 
 ## FAQ
 - **Do I need a Neo pen?** No; mouse/trackpad tools work without it.

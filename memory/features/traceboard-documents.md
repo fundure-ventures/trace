@@ -1,6 +1,6 @@
 # Traceboard documents
 
-**Tag:** `#output`
+`#output`
 
 ## Problem
 Traces should never be lost, and reopening one should show its content, not an
@@ -17,13 +17,24 @@ it in a board fitted to its content.
 - Contains [Dictation](dictation.md) audio/transcript and [Neo pen](neo-pen.md) strokes
 
 ## Rules
-- Autosave after 0.6 s idle; save failures are surfaced, never silent.
-- Package holds source image, `document.json` (authoritative Neo strokes),
-  optional voice/transcript, and `tldraw.json` (canvas state).
-- Reopening fits and centers visible shapes; empty documents fall back to the page.
-- Opening one `.traceboard` is a document open, not an image import.
-- A CLI open reports failure if the package cannot be loaded or the current
-  document cannot be saved; the current board and its UI error remain intact.
+```text
+Edit trace
+└─ Idle for 0.6 s → autosave
+   └─ Save failure → surface error; never fail silently
+Saved package
+├─ Source image
+├─ document.json → authoritative Neo strokes
+├─ Optional voice/transcript
+└─ tldraw.json → canvas state
+Open single .traceboard
+├─ Treat as document → never image import
+└─ Reopen framing
+   ├─ Visible saved shapes → fit and center
+   └─ Empty document → frame page
+CLI open
+└─ Package cannot load or current document cannot save
+   └─ Report failure → preserve current board and its UI error
+```
 
 ## FAQ
 - **Where are my traces?** `~/Documents/Trace`.

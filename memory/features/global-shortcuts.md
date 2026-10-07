@@ -1,6 +1,6 @@
 # Global shortcuts
 
-**Tag:** `#app`
+`#app`
 
 ## Problem
 Capturing should be one keystroke from any app, without first clicking the
@@ -17,10 +17,14 @@ equivalents on the matching File and menu bar items.
 - Shown on the desktop source of [Device screenshots](device-screenshots.md)
 
 ## Rules
-- One shortcut cannot be assigned to both actions ("Already assigned to …").
-- Menu items always display the currently recorded shortcut.
-- Changing a shortcut updates every menu that shows it, immediately.
-- Device screenshot sources never get a shortcut.
+```text
+Assign shortcut
+├─ Already used by other action → reject with "Already assigned to …"
+└─ Accepted change → immediately update every menu that shows it
+Menu shortcuts
+├─ Blank trace / desktop capture → display currently recorded shortcut
+└─ Device screenshot sources → never assign a shortcut
+```
 
 ## FAQ
 - **Can I clear a shortcut?** Yes, in Setup; the action stays in the menu.

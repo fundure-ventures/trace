@@ -49,11 +49,12 @@ Each file is the source of truth for
 Every `memory/features/<feature-name>.md` uses these sections, in order:
 
 1. `# Feature name`
-2. `**Tag:**` one tag from the table above
+2. One bare tag from the table above, such as `` `#app` ``
 3. `## Problem` — the UX problem it solves
 4. `## Solution` — how the UX solves it
 5. `## Touchpoints` — features it is reached from or leads to, as links
-6. `## Rules` — UX invariants that must not regress
+6. `## Rules` — a fenced `text` tree of UX invariants that must not regress,
+   grouped by action, condition, or state
 7. `## FAQ` — 3–5 common questions
 8. `## Acceptance criteria` — explanatory, observable scenarios describing
    what users must be able to do and what must happen. Rules state the
@@ -72,6 +73,14 @@ Every `memory/features/<feature-name>.md` uses these sections, in order:
   features by name under Touchpoints instead of duplicating their contracts.
 - Keep Rules durable and Acceptance criteria observable. Include entry points,
   persistence, errors, and relevant edge cases when they affect the user.
+- Write Rules as readable trees: branches show choices or conditions, and leaves
+  show required outcomes. For non-branching behavior, group invariants beneath
+  the relevant action or state instead of inventing a decision.
+- Keep trees UX-focused, not syntax trees or implementation call graphs. Put
+  links to related features or ADRs outside the fenced block.
+- Keep Acceptance criteria as prose scenarios aligned with the tree's branches.
+  Do not duplicate the tree or merge the two sections: Rules describe the
+  contract; Acceptance criteria describe how users recognize it.
 - Describe shipped behavior verified against the app. Clearly distinguish
   proposals from existing capabilities; do not turn examples into requirements.
 - Update the file and inventory in the same change as the feature. Remove both
@@ -110,10 +119,10 @@ Copy this structure into `memory/features/<feature-name>.md`, replacing the
 placeholders. Add enough acceptance criteria to demonstrate the Rules without
 referencing tests or implementation details.
 
-```markdown
+````markdown
 # Feature name
 
-**Tag:** `#existing-tag`
+`#existing-tag`
 
 ## Problem
 What users are trying to accomplish and what gets in their way.
@@ -125,7 +134,13 @@ How users accomplish it in Trace, including the primary entry point.
 - [Related feature](related-feature.md) - how users arrive here or continue.
 
 ## Rules
-- A durable user-facing invariant.
+```text
+User action
+├─ Condition met → required outcome
+└─ Condition not met → required alternative
+Persistence
+└─ Reopen or restart → required preserved behavior
+```
 
 ## FAQ
 - **Common question?** A concise user-facing answer.
@@ -137,7 +152,9 @@ How users accomplish it in Trace, including the primary entry point.
 - After the relevant transition or restart, the expected behavior is preserved.
 - When a relevant failure occurs, users see the expected explanation and retain
   their existing work.
-```
+````
+
+Use only branches that describe the feature's actual behavior.
 
 ## Testing philosophy
 

@@ -1,6 +1,6 @@
 # Neo pen
 
-**Tag:** `#pen`
+`#pen`
 
 ## Problem
 Pointing with a mouse is imprecise and unnatural while talking; drawing on
@@ -19,10 +19,17 @@ Off with Cap, Auto Power Off, Pressure Sensitivity.
 - Strokes join [Timed annotations](timed-annotations.md)
 
 ## Rules
-- The pen is optional; every product flow works without it.
-- Status reads `Pen disconnected`, `<name> · Connecting`, or `<name> · <battery>%`.
-- Neo strokes are authoritative in `document.json`, separate from canvas shapes.
-- Only the M1 is validated; other models are untested.
+```text
+Pen availability
+├─ No pen → every product flow remains available without it
+└─ Hardware validation → M1 only; other models untested
+Pen status
+├─ Disconnected → "Pen disconnected"
+├─ Connecting → "<name> · Connecting"
+└─ Connected → "<name> · <battery>%"
+Save Neo strokes
+└─ document.json → authoritative strokes, separate from canvas shapes
+```
 
 ## FAQ
 - **Which pens work?** Neo Smartpen M1; others are unvalidated.

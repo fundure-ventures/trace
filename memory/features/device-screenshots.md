@@ -1,6 +1,6 @@
 # Device screenshots
 
-**Tag:** `#capture`
+`#capture`
 
 ## Problem
 Explaining a phone app means screenshotting on the device, transferring the
@@ -17,19 +17,28 @@ becomes a source submenu: `from <frontmost app>.app` first, then
 - Creates a [Blank trace](blank-trace.md) or inserts into the open [board](board-window.md)
 
 ## Rules
-- Desktop source is first and keeps the capture shortcut; devices have none.
-- With no open trace, create a blank one; otherwise insert centered in the
-  current viewport without changing zoom or replacing the document.
-- Capture errors never damage the open trace.
-- Unauthorized/offline Android devices appear disabled with a hint.
-- Simulators are excluded; ADB/Xcode are never bundled.
-- Opening the submenu warms iOS connections (deduped, 10 s cooldown), without
-  taking screenshots or keeping a continuous keep-alive.
-- `traceapp capture devices` lists connected devices. `traceapp capture
-  --device NAME` matches a device by exact name or identifier, then unique
-  prefix; unavailable or ambiguous names are rejected with the device list.
-- Each CLI device capture refreshes discovery before matching, so recently
-  connected devices can be selected on their first request.
+```text
+Screenshot source menu
+├─ Desktop → first; keep capture shortcut
+├─ Devices → no shortcuts; exclude simulators
+└─ Unauthorized/offline Android → disabled with setup hint
+Open submenu
+└─ Warm iOS connections → deduped; 10 s cooldown; no screenshot or continuous keep-alive
+Capture device
+├─ Failure → leave open trace intact
+└─ Success
+   ├─ No trace open → create blank trace; add screenshot
+   └─ Trace open → insert at viewport center; preserve zoom and document
+CLI
+├─ traceapp capture devices → list connected devices
+└─ traceapp capture --device NAME
+   ├─ Refresh discovery → include recently connected devices on first request
+   └─ Match exact name or identifier, then unique prefix
+      ├─ Available unique match → capture device
+      └─ Unavailable or ambiguous → reject with device list
+Capture tools
+└─ ADB/Xcode → never bundled
+```
 
 ## FAQ
 - **My iPhone is missing.** It must be paired and available; same Wi‑Fi alone is not enough.

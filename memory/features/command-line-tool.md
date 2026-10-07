@@ -1,6 +1,6 @@
 # Command-line tool
 
-**Tag:** `#app`
+`#app`
 
 ## Problem
 Terminal users need to start a trace, capture a window, import images, and
@@ -18,30 +18,36 @@ import images into the current board, copy, or export.
 - [Copy trace](copy-trace.md) and [Traceboard documents](traceboard-documents.md)
 
 ## Rules
-- `traceapp` communicates only with the matching installed Trace app instance;
-  Debug and Release builds use separate IPC endpoints.
-- A new trace or capture may suppress Dictation for that request with
-  `--no-recording`; default Dictation behavior otherwise follows app settings.
-- CLI image batches insert into an open board, while a lone `.traceboard`
-  opens as a document.
-- CLI capture excludes the invoking terminal from frontmost-window selection
-  and inserts into an open board without replacing it.
-- Capture and document-open commands report success only after the requested
-  work finishes; permission, capture, load, and save failures are nonzero
-  results while existing UI errors remain visible.
-- Device names are resolved against refreshed discovery results for every
-  capture request, so newly connected devices work without restarting Trace.
-- Each action stays tied to the trace that was open when it began. A changed
-  or closed trace fails rather than receiving an unrelated insertion or export.
-- Only one CLI action that changes or exports a trace runs at a time; another
-  concurrent action returns the documented busy status.
-- `copy` copies the whole board and follows the app's close-after-copy setting.
-- `export` writes files without closing the board. Dictation formats wait for
-  the transcript; image-only operations do not.
-- Setup installation never replaces an existing non-symlink file at the
-  `traceapp` destination.
-- File, usage, unavailable-app, action, and busy failures return documented
-  exit codes and do not claim success.
+```text
+Run traceapp
+├─ App connection → matching installed instance only; separate Debug/Release IPC endpoints
+└─ Action that changes or exports a trace
+   ├─ Another such action running → documented busy status
+   └─ Target trace changed or closed after action began → fail; never affect another trace
+New trace or capture
+├─ --no-recording → suppress Dictation for this request
+└─ Otherwise → follow app Dictation settings
+Open paths
+├─ Image batch → insert into open board
+└─ Lone .traceboard → open as document
+Capture
+├─ Desktop → exclude invoking terminal; insert into open board without replacing it
+└─ Device → refresh discovery before resolving name; no restart for newly connected devices
+Copy
+└─ Whole board → follow close-after-copy setting
+Export
+├─ Write files → keep board open
+└─ Format
+   ├─ Includes Dictation → wait for transcript
+   └─ Image only → do not wait for transcript
+Capture or document open
+├─ Requested work complete → report success
+└─ Permission, capture, load, or save failure → nonzero result; keep UI error visible
+Other failures
+└─ File, usage, unavailable-app, action, or busy → documented exit code; never claim success
+Install from Setup
+└─ Existing non-symlink file at destination → preserve it; never replace
+```
 
 ## FAQ
 - **How do I install it?** Use Setup → Command-line tool or make a symlink

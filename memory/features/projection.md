@@ -1,6 +1,6 @@
 # Projection
 
-**Tag:** `#app`
+`#app`
 
 ## Problem
 When presenting on a projector or TV, the audience should see the trace, not
@@ -16,12 +16,22 @@ until a trace is activated, then the trace without the editor).
 - Shows the current [Board window](board-window.md) content
 
 ## Rules
-- Options appear only when more than one display exists; the working display is never a target.
-- Only one display is in Mirror/Project; every other display stays System.
-- Project shows black until a document is activated; the editor is hidden there.
-- Content is aspect-fit and centered on the output display.
-- HDMI and AirPlay displays behave identically.
-- The display is kept awake only while it shows a document.
+```text
+Display options
+├─ One display → no projection options
+└─ Extra displays → offer targets; never include working display
+Choose Mirror or Project
+└─ One target only → every other display stays System
+Output mode
+├─ Mirror → show open trace
+└─ Project
+   ├─ No document activated → black
+   └─ Document activated → show trace; hide editor
+Output presentation
+├─ Content → aspect-fit and centered
+├─ HDMI / AirPlay → identical behavior
+└─ Keep display awake → only while showing a document
+```
 
 ## FAQ
 - **Why is the projector black?** Project mode waits for a trace to be activated.
