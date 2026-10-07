@@ -1,6 +1,6 @@
 # Blank trace
 
-**Tag:** `#capture`
+`#capture`
 
 ## Problem
 Sometimes there is nothing to capture: a sketch, a diagram, or a place to
@@ -17,10 +17,16 @@ the canvas when ready ([ADR 0005](../adr/0005-native-first-blank-page-loading.md
 - Background from [Page background](page-background.md)
 
 ## Rules
-- No blank flash: the saved background paints before the canvas is ready.
-- Canvas fades in over 280 ms; Reduce Motion reveals directly.
-- Remembers the last blank viewport size.
-- Renderer failure shows **Canvas unavailable**, never a fallback canvas.
+```text
+New blank trace
+├─ Open → use last blank viewport size
+└─ Before canvas is ready → paint saved background; no blank flash
+Canvas loading
+├─ Ready
+│  ├─ Reduce Motion off → fade in over 280 ms
+│  └─ Reduce Motion on → reveal directly
+└─ Failure → show "Canvas unavailable"; never a fallback canvas
+```
 
 ## FAQ
 - **Why is my blank page colored?** It reuses the last page background.

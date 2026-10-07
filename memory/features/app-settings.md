@@ -1,6 +1,6 @@
 # App settings
 
-**Tag:** `#app`
+`#app`
 
 ## Problem
 People use Trace in different rhythms: pen-driven bursts, keyboard copy-paste,
@@ -23,11 +23,18 @@ The menu bar **Settings** submenu groups behavior by moment:
 - Drives [Neo pen](neo-pen.md) cap/disconnect reactions
 
 ## Rules
-- Settings persist across launches.
-- The Copy format list is the same list as the toolbar's copy-options menu.
-- The Edit menu reads **Copy trace and close** or **Copy trace** to match the
-  close-after-copy setting.
-- Pen-dependent sections are hidden while no pen is connected.
+```text
+Change settings
+└─ Relaunch Trace → chosen values persist
+Copy settings
+├─ Format choices → same list as toolbar copy options
+└─ Close window after copy
+   ├─ Enabled → Edit menu reads "Copy trace and close"
+   └─ Disabled → Edit menu reads "Copy trace"
+Pen-dependent sections
+├─ Pen connected → visible
+└─ No pen connected → hidden
+```
 
 ## FAQ
 - **Why does `⌘C` close my board?** "Close window after copy" is on under Copy.

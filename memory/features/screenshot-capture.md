@@ -1,6 +1,6 @@
 # Screenshot capture
 
-**Tag:** `#capture`
+`#capture`
 
 ## Problem
 Explaining something on screen starts with a clean, exact picture of the app
@@ -22,17 +22,24 @@ the screenshot is inserted there instead of replacing it.
 - [Command-line tool](command-line-tool.md) capture
 
 ## Rules
-- Preserve the source window's 1:1 point size whenever screen bounds permit.
-- One transition only (Monochrome Flash); no effect selector
-  ([ADR 0004](../adr/0004-single-monochrome-capture-transition.md)).
-- Reduce Motion reveals the board and toolbar directly.
-- Requires Screen Recording permission ([Setup](setup.md)).
-- The captured image is fully opaque, even after Highlighter use.
-- CLI capture skips the invoking terminal when choosing the frontmost window.
-- CLI capture inserts into an open board at its viewport center and leaves the
-  document and zoom intact.
-- A CLI capture returns success only after a screenshot trace or image insert
-  is complete; permission and capture failures return failure.
+Permissions are managed in [Setup](setup.md). The single transition follows
+[ADR 0004](../adr/0004-single-monochrome-capture-transition.md).
+
+```text
+Capture frontmost window
+├─ Prerequisite → Screen Recording permission
+├─ Size → preserve 1:1 point size whenever screen bounds permit
+└─ Captured image → fully opaque, even after Highlighter use
+Reveal board and toolbar
+├─ Reduce Motion off → Monochrome Flash only; no effect selector
+└─ Reduce Motion on → reveal directly
+CLI capture
+├─ Choose source → skip invoking terminal
+├─ Board open → insert at viewport center; preserve document and zoom
+└─ Result
+   ├─ Screenshot trace or image insert complete → success
+   └─ Permission or capture failure → failure; never claim success
+```
 
 ## FAQ
 - **Which window is captured?** The frontmost app's window.

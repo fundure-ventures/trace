@@ -1,6 +1,6 @@
 # Menu bar agent
 
-**Tag:** `#app`
+`#app`
 
 ## Problem
 Annotating a screenshot should not require launching, arranging, or quitting a
@@ -22,11 +22,17 @@ the agent running.
 - Can start at login ([App settings](app-settings.md))
 
 ## Rules
-- No dock icon, title bar, or conventional app shell.
-- The agent stays alive after every transient window closes.
-- Resting glyph `pencil.tip`; active (capturing/annotating) glyph
-  `pencil.tip.crop.circle.fill`.
-- Pen-only menu sections are hidden while the pen is disconnected.
+```text
+Trace agent
+├─ Presentation → no Dock icon, title bar, or conventional app shell
+└─ Close every transient window → agent stays running
+Status-bar glyph
+├─ Resting → pencil.tip
+└─ Capturing/annotating → pencil.tip.crop.circle.fill
+Pen-only menu sections
+├─ Pen connected → visible
+└─ Pen disconnected → hidden
+```
 
 ## FAQ
 - **Where is the Trace window?** There is none until you create or open a trace.

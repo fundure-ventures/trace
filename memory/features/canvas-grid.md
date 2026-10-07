@@ -1,6 +1,6 @@
 # Canvas grid
 
-**Tag:** `#board`
+`#board`
 
 ## Problem
 Aligning marks or sketching layouts is easier with a reference grid, but a grid
@@ -16,9 +16,14 @@ spacing field (↑/↓). The grid adapts black/white to the content beneath
 - Contrast follows [Page background](page-background.md) and screenshot content
 
 ## Rules
-- Spacing 4–64 pt (default 8); 1 pt dots/lines at 20% opacity.
-- Never appears in copied/exported pixels.
-- Uniform in board-view points regardless of window shape.
+```text
+Reference grid
+├─ Spacing → 4–64 pt; default 8 pt
+├─ Dots/lines → 1 pt at 20% opacity
+└─ Any window shape → uniform spacing in board-view points
+Copy or export
+└─ Output pixels → never include grid
+```
 
 ## FAQ
 - **Will the grid show up when I copy?** No.

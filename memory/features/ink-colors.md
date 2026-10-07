@@ -1,6 +1,6 @@
 # Ink colors
 
-**Tag:** `#board`
+`#board`
 
 ## Problem
 Fixed red/blue/yellow/green inks can vanish on some backgrounds or clash with
@@ -17,9 +17,15 @@ they stay legible and in character on any page
 - Used by [Drawing tools](drawing-tools.md)
 
 ## Rules
-- Toolbar swatches always show canonical colors, never themed ones.
-- Documents store color names; reopening on another background re-derives inks.
-- Inks keep their hue family; theming changes lightness/tint, never the named color.
+```text
+Choose ink
+└─ Toolbar swatch → canonical color; never themed
+Document ink
+├─ Save → store color name
+└─ Reopen → derive appearance from document background
+Background theming
+└─ Adjust lightness/tint → preserve hue family and named color
+```
 
 ## FAQ
 - **Why does red look different on a dark page?** Inks adapt for contrast.

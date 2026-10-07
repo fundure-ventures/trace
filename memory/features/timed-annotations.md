@@ -1,6 +1,6 @@
 # Timed annotations
 
-**Tag:** `#voice`
+`#voice`
 
 ## Problem
 A transcript and a marked-up image are hard to connect: "this" and "here"
@@ -17,10 +17,17 @@ number is inserted into the transcript at the matching spoken words
 - Visible in [Copy trace](copy-trace.md) output
 
 ## Rules
-- Neo strokes and canvas shapes share one clock and one numbering sequence per document.
-- Canvas marker and transcript reference always use the same number.
-- Late labels are offset and clamped to stay on the page.
-- Annotation scale: Small 75%, Medium 100%, Large 150%.
+```text
+Timed marks in a document
+├─ Neo strokes / canvas shapes → one shared clock and numbering sequence
+└─ Canvas marker / transcript reference → always same number
+Late labels
+└─ Offset and clamp → stay on page
+Annotation scale
+├─ Small → 75%
+├─ Medium → 100%
+└─ Large → 150%
+```
 
 ## FAQ
 - **Why do numbers appear on my drawing?** You drew while dictating.

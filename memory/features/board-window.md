@@ -1,6 +1,6 @@
 # Board window
 
-**Tag:** `#board`
+`#board`
 
 ## Problem
 The annotated screenshot should feel like the captured window itself, not a
@@ -20,12 +20,21 @@ owns resizing ([ADR 0002](../adr/0002-native-board-window-resizing.md)).
 - Shown on external displays by [Projection](projection.md)
 
 ## Rules
-- No title bar, traffic lights, reserved toolbar rows, or permanent bezels.
-- Toolbar consumes no screenshot pixels; sizing reserves its band.
-- Resizing changes only the window/viewport, never page, shapes, or zoom.
-- Empty toolbar chrome drags the window; empty drawing area never does.
-- Five outer toolbar dividers; drawing tools use a native separated segmented control.
-- Toolbar selection uses the system accent and greys out when inactive.
+```text
+Board presentation
+├─ Window → no title bar, traffic lights, reserved toolbar rows, or permanent bezels
+└─ Floating toolbar → reserve its band; consume no screenshot pixels
+Resize board
+└─ Change window/viewport only → preserve page, shapes, and zoom
+Drag empty space
+├─ Toolbar chrome → move window
+└─ Drawing area → never move window
+Toolbar controls
+├─ Structure → five outer dividers; native separated drawing-tool segments
+└─ Selection
+   ├─ Board active → system accent
+   └─ Board inactive → grey
+```
 
 ## FAQ
 - **How do I move the board?** Drag empty toolbar space.

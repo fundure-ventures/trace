@@ -1,6 +1,6 @@
 # Tool sizes
 
-**Tag:** `#board`
+`#board`
 
 ## Problem
 A fine pen line and a broad highlight need very different widths; resetting
@@ -15,10 +15,16 @@ One toolbar slider adjusts the active tool: Pen 1–12 pt, Highlighter
 - Applies to [Drawing tools](drawing-tools.md)
 
 ## Rules
-- Whole-point values only.
-- Each tool remembers its own size across switches and app restarts.
-- Text size is independent of stroke widths; slider label switches to "Font size".
-- Rectangle geometry is unchanged at both ends of the Pen range.
+```text
+Adjust active tool size
+├─ Values → whole points only
+├─ Pen → 1–12 pt
+├─ Highlighter → 16–124 pt
+├─ Text → 12–124 pt; label "Font size"; independent of stroke widths
+└─ Rectangle → reuse Pen width; preserve geometry at both ends of range
+Switch tool or restart Trace
+└─ Restore each tool's own remembered size
+```
 
 ## FAQ
 - **Why did my highlighter size not change with the pen?** Sizes are per tool.

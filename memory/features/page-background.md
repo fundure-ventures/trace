@@ -1,6 +1,6 @@
 # Page background
 
-**Tag:** `#board`
+`#board`
 
 ## Problem
 Blank traces sometimes need a dark or tinted page to match the content being
@@ -16,8 +16,13 @@ pages reuse the last choice (default white).
 - Default for [Blank trace](blank-trace.md)
 
 ## Rules
-- Stored per document; remembered for the next blank page.
-- Painted natively before the canvas loads.
+```text
+Choose page background
+├─ Current document → store chosen color
+└─ Next blank page → reuse last choice
+Load canvas
+└─ Before ready → paint background natively
+```
 
 ## FAQ
 - **Can I change a screenshot's background?** It affects the page around it.

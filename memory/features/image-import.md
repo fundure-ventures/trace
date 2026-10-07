@@ -1,6 +1,6 @@
 # Image import
 
-**Tag:** `#capture`
+`#capture`
 
 ## Problem
 Existing images (designs, exported screenshots) need the same annotate-and-
@@ -19,13 +19,23 @@ it creates a blank trace.
 - [Command-line tool](command-line-tool.md) imports image paths
 
 ## Rules
-- One Finder batch → one blank trace, one undoable insert, images arranged
-  without overlap and selected.
-- Drag and drop uses the same batched layout.
-- A single `.traceboard` opens as a document instead ([Traceboard documents](traceboard-documents.md)).
-- Any non-image or undecodable file rejects the whole Finder batch.
-- Inserted images are fully opaque regardless of Highlighter state.
-- CLI image imports add their batch to the open board instead of replacing it.
+Document opens follow [Traceboard documents](traceboard-documents.md).
+
+```text
+Open from Finder
+├─ Single .traceboard → open document instead of importing image
+└─ Image batch
+   ├─ Any non-image or undecodable file → reject whole batch
+   └─ Valid batch → one blank trace; one undoable insert
+      └─ Images → arranged without overlap and selected
+Drag and drop batch
+└─ Use same batched layout
+CLI image batch
+├─ Board open → add batch; never replace board
+└─ No board open → create blank trace
+Inserted images
+└─ Fully opaque regardless of Highlighter state
+```
 
 ## FAQ
 - **Why did all images land on one canvas?** Batches are intentionally grouped.
