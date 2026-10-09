@@ -23,6 +23,9 @@ Dictation button
 └─ Key available → recording requires Microphone permission
 Recording flow
 └─ Start → Stop/Resume → Finishing → Transcript; one visible state at a time
+Finishing for Copy
+├─ API error or reported timeout → report failure, not a successful transcript
+└─ Retry → retain recorded chunks and previously transcribed words
 New blank or screenshot trace
 └─ Start dictation automatically enabled
    ├─ Configured and authorized → begin recording
@@ -42,3 +45,6 @@ New blank or screenshot trace
 - Automatic Dictation starts for newly created blank or screenshot traces
   only when a key and Microphone permission are available.
 - Reopening a saved trace preserves its recorded audio and transcript.
+- When the transcription API reports an error or timeout while finishing for
+  Copy, Dictation leaves the finishing state and reports the failure. Retrying
+  retains the recording and previously transcribed words.

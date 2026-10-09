@@ -932,6 +932,131 @@ Task {
         }
     }
 
+    for failure in ["HTTP 401", "HTTP 503", "timeout"] {
+        await test("Copy finalization reports \(failure) and retries retained Dictation") {
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = [StubURLProtocol.self]
+            let session = URLSession(configuration: configuration)
+            defer {
+                session.invalidateAndCancel()
+                StubURLProtocol.handler = nil
+            }
+            var requestCount = 0
+            StubURLProtocol.handler = { request in
+                requestCount += 1
+                if requestCount == 2, failure == "timeout" {
+                    throw URLError(.timedOut)
+                }
+                let status = requestCount == 2
+                    ? (failure == "HTTP 401" ? 401 : 503)
+                    : 200
+                guard let url = request.url,
+                      let response = HTTPURLResponse(
+                        url: url,
+                        statusCode: status,
+                        httpVersion: nil,
+                        headerFields: nil
+                      )
+                else {
+                    throw TestFailure(description: "invalid stub request")
+                }
+                let body = status == 200
+                    ? """
+                      {"text":"\(requestCount == 1 ? "first" : "tail")"}
+                      """
+                    : """
+                      {"error":{"message":"injected API failure"}}
+                      """
+                return (response, Data(body.utf8))
+            }
+            let client = OpenRouterTranscriptionClient(
+                configuration: OpenRouterTranscriptionConfiguration(
+                    apiKey: "test-secret"
+                ),
+                session: session
+            )
+            let audioURL = try temporaryAudioFile()
+            defer {
+                try? FileManager.default.removeItem(at: audioURL)
+            }
+            let recorder = FakeRecorder()
+            let merger = FakeMerger()
+            let controller = TraceVoiceCaptureController(
+                recorder: recorder,
+                transcriber: client,
+                merger: merger
+            )
+            defer { controller.cancel() }
+            try controller.start()
+            recorder.emit(TraceAudioChunk(
+                index: 0,
+                fileURL: audioURL,
+                startTimeSeconds: 0,
+                durationSeconds: 1
+            ))
+            try await waitUntil {
+                controller.transcriptSnapshot?.text == "first"
+            }
+            recorder.finalChunk = TraceAudioChunk(
+                index: 1,
+                fileURL: audioURL,
+                startTimeSeconds: 1,
+                durationSeconds: 1
+            )
+            var finishResult: Result<TraceVoiceCaptureResult?, Error>?
+            var completionCount = 0
+            controller.finish {
+                completionCount += 1
+                finishResult = $0
+            }
+            try await waitUntil { finishResult != nil }
+            guard case let .failure(error) = finishResult,
+                  case let .failed(message) = controller.state
+            else {
+                throw TestFailure(
+                    description: "failed Dictation remained finishing or returned success"
+                )
+            }
+            if failure == "timeout" {
+                let networkError = error as NSError
+                try expect(
+                    networkError.domain == NSURLErrorDomain
+                        && networkError.code == URLError.timedOut.rawValue,
+                    "Copy hid the API timeout"
+                )
+            } else {
+                try expect(
+                    error as? TraceTranscriptionError == .requestFailed(
+                        statusCode: failure == "HTTP 401" ? 401 : 503,
+                        message: "injected API failure"
+                    ),
+                    "Copy hid the API failure"
+                )
+            }
+            try expect(
+                completionCount == 1
+                    && !message.isEmpty
+                    && !controller.state.isFinishing
+                    && controller.transcriptSnapshot?.text == "first"
+                    && merger.mergedIndices.isEmpty,
+                "failure discarded earlier words or completed Copy successfully"
+            )
+            var retryResult: Result<TraceVoiceCaptureResult?, Error>?
+            controller.finish { retryResult = $0 }
+            try await waitUntil { retryResult != nil }
+            let capture = try retryResult?.get()
+            try expect(
+                capture?.transcript == "first\ntail"
+                    && capture?.audioFileURL == merger.outputURL
+                    && controller.state == .ready
+                    && recorder.startCount == 1
+                    && recorder.stopCount == 1
+                    && merger.mergedIndices == [0, 1],
+                "retry lost recorded audio or previously transcribed words"
+            )
+        }
+    }
+
     await test("ordered chunks assemble stable clipboard text") {
         var accumulator = OrderedTranscriptAccumulator()
         accumulator.add(chunkIndex: 2, result: result(" third "))
