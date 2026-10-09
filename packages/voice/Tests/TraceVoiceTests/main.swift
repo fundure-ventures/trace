@@ -797,6 +797,10 @@ Task {
             audioData: Data([1, 2, 3])
         )
         try expect(
+            request.timeoutInterval == 12,
+            "Dictation requests must use a 12-second timeout"
+        )
+        try expect(
             request.value(forHTTPHeaderField: "Authorization")
                 == "Bearer test-secret",
             "authorization header changed"

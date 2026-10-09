@@ -27,7 +27,7 @@ Finishing for Copy
 ├─ Stop microphone; detach finishing work from the board
 ├─ Rotate recording chunks every 6 seconds for earlier transcript availability
 ├─ Copy available content immediately; finish remaining transcription in background
-├─ Each request → existing 75-second timeout; no separate Copy deadline
+├─ Each request → 12-second timeout; no separate Copy deadline
 ├─ API error or request timeout → mark partial, cancel remaining requests, save recorded audio and available words
 └─ Completion → save original trace; update clipboard only while still owned by that Copy
 Finishing for CLI file export
@@ -59,7 +59,7 @@ New blank or screenshot trace
   starting another trace while transcription finishes independently.
 - Recording chunks rotate every 6 seconds instead of 12 seconds.
 - Background transcription may finish after 3 seconds without cancellation.
-  Each request keeps its existing 75-second timeout.
+  Each request uses a 12-second timeout.
 - API failure or a request timeout returns a partial result, saves
   recorded audio and available words, and leaves the first clipboard payload
   unchanged. Late network callbacks cannot update that result.

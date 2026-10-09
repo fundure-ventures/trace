@@ -13,7 +13,7 @@ could still prevent the initial clipboard write.
 Copy the locally rendered image and already completed transcript first.
 Release controls and honor close-after-copy after this write. Detach the
 recording controller from the live board and let remaining transcription use
-the existing 75-second per-request timeout. Rotate recording chunks every
+a 12-second per-request timeout. Rotate recording chunks every
 6 seconds so completed text can become available earlier.
 
 Save the result and recorded audio to the original trace. On an API error or
@@ -41,7 +41,8 @@ finalization because file export needs a single final result.
 - Cancel after 3 seconds: initially adopted, but the user's short recordings
   repeatedly hit this limit before their first transcript arrived, leaving
   image-only copies. Tests with fast fake responses missed that limitation.
-  The user chose the existing request timeout and six-second recording chunks.
+  The user chose per-request timeouts and six-second recording chunks, then
+  reduced the request timeout from 75 to 12 seconds.
 
 ## Consequences
 - Users can paste available content and continue drawing, close, or open

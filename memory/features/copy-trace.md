@@ -38,7 +38,7 @@ Whole-trace copy
 Dictation-containing copy
 ├─ Copy current image and already completed transcript without waiting for the network
 │  └─ First clipboard write → release controls and apply close-after-copy
-├─ Remaining transcription → finish in background using the existing 75-second per-request timeout
+├─ Remaining transcription → finish in background using a 12-second per-request timeout
 │  ├─ Complete → save to original trace; update clipboard only if Trace still owns it
 │  └─ API error or request timeout → cancel remaining requests; keep first copy; save available words and audio
 ├─ Late update → reuse original image and numbered references, not subsequent canvas edits
@@ -97,7 +97,7 @@ Whole-trace image framing
 - Copying with active Dictation does not wait for transcription before
   writing available content, releasing controls, or honoring close-after-copy.
 - Remaining transcription is not canceled after 3 seconds. Each request uses
-  its existing 75-second timeout; multiple chunks may take longer overall.
+  a 12-second timeout; multiple chunks may take longer overall.
   An API failure or request timeout preserves the first copy, available words, and
   recorded audio; status explains whether Dictation finished, updated, or
   remained partial.
