@@ -135,6 +135,10 @@ the filename. `image` writes PNG, `dictation` TXT, `pdf` PDF, and
 
 Dictation-containing formats wait for active Dictation to finish. If `--format`
 has no value, `traceapp` prints the available formats and exits 64.
+Images in copy, PNG export, and PDF crop around all visible content with 8
+canvas units of page-colored background on every side. Moving or resizing an
+image changes that framing; zoom and pan do not. Empty traces keep their
+document page dimensions without added padding.
 
 ### `IMAGE...`
 **What it does:** Opens one or more images in Trace.

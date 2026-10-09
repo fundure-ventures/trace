@@ -51,6 +51,8 @@ Open **Setup** from the menu-bar menu. See [Setup](#setup) and
 ### Copy trace
 **What it does:** Copies the whole trace image, narration, or PDF.
 **Where:** `⌘C` with nothing selected; toolbar Copy and Copy options.
+**Note:** Whole-trace images crop around visible content with 8 canvas units
+of background on every side. Empty traces keep their page dimensions.
 
 ### Device screenshots
 **What it does:** Captures Android or paired iOS device screens directly into Trace.
