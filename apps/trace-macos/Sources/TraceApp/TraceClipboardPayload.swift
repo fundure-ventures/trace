@@ -41,7 +41,7 @@ enum TraceProgressiveCopyStatus {
     var detail: String {
         switch self {
         case .copied: return "Copy finished. Newer clipboard contents are never replaced."
-        case .finishing: return "Copied. Finishing Dictation for up to 3 seconds."
+        case .finishing: return "Copied. Dictation will update when transcription finishes."
         case .updated: return "Dictation updated on the clipboard."
         case .partial: return "Copied with available Dictation. Remaining audio was saved."
         case .failed: return "The first copy is unchanged. Background Dictation could not be saved or copied."

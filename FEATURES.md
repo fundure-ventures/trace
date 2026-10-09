@@ -38,7 +38,7 @@ Each file is the source of truth for
 | [Canvas grid](memory/features/canvas-grid.md) | `#board` | Adaptive reference grid, never exported |
 | [Dictation](memory/features/dictation.md) | `#voice` | Narrate while annotating |
 | [Timed annotations](memory/features/timed-annotations.md) | `#voice` | Numbered marks matched to spoken words |
-| [Copy trace](memory/features/copy-trace.md) | `#output` | Content-framed copy with 8-unit padding and bounded background Dictation |
+| [Copy trace](memory/features/copy-trace.md) | `#output` | Content-framed copy with 8-unit padding and background Dictation |
 | [Traceboard documents](memory/features/traceboard-documents.md) | `#output` | Autosaved, reopenable `.traceboard` packages |
 | [Neo pen](memory/features/neo-pen.md) | `#pen` | Draw on Ncode paper with a Neo Smartpen |
 | [Pen calibration](memory/features/pen-calibration.md) | `#pen` | Map paper coordinates onto the page |

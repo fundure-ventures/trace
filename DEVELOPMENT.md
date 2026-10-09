@@ -269,9 +269,11 @@ after `swift build`. This hardware-free diagnostic uses an isolated pasteboard
 to check initial and late image/PDF copies, clipboard ownership, and preservation
 of the frozen image. It also checks usable toolbar controls, original-document
 audio/transcript persistence across close and new-trace actions, saved edits
-after reopening, and partial deadline results.
-`swift run trace-voice-tests` covers delayed success, API errors, and the real
-3-second transcription deadline with cancellation and preserved audio chunks.
+after reopening, and partial request-timeout results. It includes a short
+recording with no initial text whose transcript arrives after 3 seconds.
+`swift run trace-voice-tests` covers that regression, six-second recording
+chunks, delayed success, API errors, and reported request timeouts with
+preserved audio chunks.
 
 ## Diagnostics
 

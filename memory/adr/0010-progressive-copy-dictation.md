@@ -1,4 +1,4 @@
-# Copy available content before bounded background Dictation
+# Copy available content before background Dictation
 
 **Status:** Accepted
 
@@ -12,12 +12,13 @@ could still prevent the initial clipboard write.
 ## Decision
 Copy the locally rendered image and already completed transcript first.
 Release controls and honor close-after-copy after this write. Detach the
-recording controller from the live board and give its remaining transcription
-one 3-second budget measured from Copy, not a budget per chunk.
+recording controller from the live board and let remaining transcription use
+the existing 75-second per-request timeout. Rotate recording chunks every
+6 seconds so completed text can become available earlier.
 
 Save the result and recorded audio to the original trace. On an API error or
-deadline, cancel remaining transcription and explicitly return a partial
-result; audio merging and persistence may finish after the network deadline.
+request timeout, cancel remaining transcription and explicitly return a partial
+result; audio merging and persistence finish independently of the live board.
 Update the clipboard only on complete transcription and only while its
 pasteboard change count still matches the initial write. Reuse the original
 image and numbered-reference state, never subsequent canvas edits.
@@ -37,15 +38,19 @@ finalization because file export needs a single final result.
   to copy the final words without another action.
 - Always replace the clipboard on completion: can destroy something copied
   from another app or a newer Trace.
+- Cancel after 3 seconds: initially adopted, but the user's short recordings
+  repeatedly hit this limit before their first transcript arrived, leaving
+  image-only copies. Tests with fast fake responses missed that limitation.
+  The user chose the existing request timeout and six-second recording chunks.
 
 ## Consequences
 - Users can paste available content and continue drawing, close, or open
   another trace without waiting for transcription.
 - Content already pasted elsewhere is not updated; a later paste may differ.
 - Dictation-only Copy with no completed text cannot provide an immediate
-  payload. It releases the board and waits for the same bounded result.
+  payload. It releases the board and waits for the background result.
 - Timeout/error preserves the first clipboard payload and recorded audio,
   but the saved transcript can remain partial.
 - Detached work requires explicit document and clipboard ownership guards.
-  The transcription budget does not bound local rendering, audio merging,
-  or disk persistence.
+  Per-request timeouts do not impose a total limit across sequential chunks.
+  They do not bound local rendering, audio merging, or disk persistence.

@@ -2710,7 +2710,6 @@ final class TraceAppDelegate:
             return
         }
         latestCopyID = UUID()
-        let dictationDeadline = ProcessInfo.processInfo.systemUptime + 3
         board.flushTldrawSnapshot { [weak self] in
             guard let self else {
                 completion?(false)
@@ -2726,7 +2725,6 @@ final class TraceAppDelegate:
             self.beginCopy(
                 content,
                 documentID: documentID,
-                dictationDeadline: dictationDeadline,
                 closesDocument: closesDocument,
                 completion: completion
             )
@@ -2736,7 +2734,6 @@ final class TraceAppDelegate:
     private func beginCopy(
         _ content: TraceCopyContent,
         documentID: UUID,
-        dictationDeadline: TimeInterval,
         closesDocument: Bool,
         completion: ((Bool) -> Void)?
     ) {
@@ -2752,7 +2749,6 @@ final class TraceAppDelegate:
         }
         beginProgressiveCopy(
             content, documentID: documentID,
-            dictationDeadline: dictationDeadline,
             closesDocument: closesDocument, completion: completion
         )
     }
@@ -2760,16 +2756,12 @@ final class TraceAppDelegate:
     private func beginProgressiveCopy(
         _ content: TraceCopyContent,
         documentID: UUID,
-        dictationDeadline: TimeInterval,
         closesDocument: Bool,
         completion: ((Bool) -> Void)?
     ) {
         let copyID = latestCopyID
         let transcript = model.availableTranscriptForCopy
         let pendingVoice = model.detachVoiceForCopy()
-        let timeout = max(
-            0, dictationDeadline - ProcessInfo.processInfo.systemUptime
-        )
         if content == .dictation, transcript == nil {
             endCopyProgress(for: documentID)
             guard let pendingVoice else {
@@ -2778,7 +2770,7 @@ final class TraceAppDelegate:
                 return
             }
             let changeCount = NSPasteboard.general.changeCount
-            model.finishBackgroundVoiceCopy(pendingVoice, timeout: timeout) { [weak self] result in
+            model.finishBackgroundVoiceCopy(pendingVoice) { [weak self] result in
                 guard let self else { return }
                 let value: TraceBackgroundVoiceCopyResult
                 do {
@@ -2841,7 +2833,7 @@ final class TraceAppDelegate:
             .appendingPathExtension("pdf").lastPathComponent
             ?? TraceClipboardPayload.defaultDocumentFileName
         if let pendingVoice {
-            model.finishBackgroundVoiceCopy(pendingVoice, timeout: timeout) { [weak self] result in
+            model.finishBackgroundVoiceCopy(pendingVoice) { [weak self] result in
                 guard let self else { return }
                 switch result {
                 case let .success(value):

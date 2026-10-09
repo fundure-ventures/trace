@@ -1355,10 +1355,9 @@ final class TraceAppModel {
 
     func finishBackgroundVoiceCopy(
         _ copy: TraceBackgroundVoiceCopy,
-        timeout: TimeInterval = 3,
         completion: @escaping (Result<TraceBackgroundVoiceCopyResult, Error>) -> Void
     ) {
-        copy.controller.finishForCopy(timeout: timeout) { [weak self] result in
+        copy.controller.finishForCopy { [weak self] result in
             defer { copy.controller.cancel() }
             guard let self else { return }
             do {

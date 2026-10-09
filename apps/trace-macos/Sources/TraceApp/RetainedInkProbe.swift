@@ -103,7 +103,7 @@ enum TraceRetainedInkProbe {
             throw probeError("timeout modified the immediate copy")
         }
 
-        for scenario in ["keep open", "close", "new trace", "reopened and closed", "deadline"] {
+        for scenario in ["keep open", "close", "new trace", "reopened and closed", "request timeout", "short recording"] {
             let directory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("TraceCopyProbe-\(UUID().uuidString)")
             defer { try? FileManager.default.removeItem(at: directory) }
@@ -119,7 +119,10 @@ enum TraceRetainedInkProbe {
             let recorder = ProgressiveCopyProbeRecorder()
             let voice = TraceVoiceCaptureController(
                 recorder: recorder,
-                transcriber: ProgressiveCopyProbeTranscriber(),
+                transcriber: ProgressiveCopyProbeTranscriber(
+                    firstChunkDelayed: scenario == "short recording",
+                    failure: scenario == "request timeout" ? URLError(.timedOut) : nil
+                ),
                 merger: ProgressiveCopyProbeMerger()
             )
             let suite = "TraceCopyProbe.\(UUID().uuidString)"
@@ -139,26 +142,42 @@ enum TraceRetainedInkProbe {
             }
             model.prepareDocumentForHistoryTesting(document)
             try voice.start()
-            recorder.onChunkReady?(TraceAudioChunk(
-                index: 0, fileURL: audioURL,
-                startTimeSeconds: 0, durationSeconds: 1
-            ))
-            for _ in 0..<200 where model.availableTranscriptForCopy != "first" {
-                try await Task.sleep(nanoseconds: 5_000_000)
+            if scenario != "short recording" {
+                recorder.onChunkReady?(TraceAudioChunk(
+                    index: 0, fileURL: audioURL,
+                    startTimeSeconds: 0, durationSeconds: 1
+                ))
+                for _ in 0..<200 where model.availableTranscriptForCopy != "first" {
+                    try await Task.sleep(nanoseconds: 5_000_000)
+                }
             }
             recorder.finalChunk = TraceAudioChunk(
-                index: 1, fileURL: audioURL,
+                index: scenario == "short recording" ? 0 : 1, fileURL: audioURL,
                 startTimeSeconds: 1, durationSeconds: 1
             )
             guard let pending = model.detachVoiceForCopy() else {
                 throw probeError("recording did not detach for Copy")
             }
             board.setCopyFinalizationActive(true)
+            let sessionCopy = TraceProgressiveClipboardCopy(pasteboard: pasteboard)
+            guard sessionCopy.copyInitial(
+                transcript: model.availableTranscriptForCopy, writer: writer
+            ) else {
+                throw probeError("immediate recording copy failed")
+            }
+            if scenario == "short recording" {
+                guard pasteboard.string(forType: .string) == nil else {
+                    throw probeError("short recording already had clipboard text")
+                }
+            }
             var finished: Result<TraceBackgroundVoiceCopyResult, Error>?
-            model.finishBackgroundVoiceCopy(
-                pending, timeout: scenario == "deadline" ? 0.02 : 3
-            ) { finished = $0 }
-            model.copyCompleted(closeDocument: scenario != "keep open" && scenario != "deadline")
+            model.finishBackgroundVoiceCopy(pending) {
+                finished = $0
+                if case let .success(value) = $0, value.isComplete {
+                    sessionCopy.complete(transcript: value.transcript)
+                }
+            }
+            model.copyCompleted(closeDocument: scenario != "keep open" && scenario != "request timeout")
             board.setCopyFinalizationActive(false)
             board.showCopyStatus("Finishing", detail: "Copied. Finishing Dictation.")
             guard model.snapshot.voiceState == .idle, finished == nil,
@@ -183,20 +202,23 @@ enum TraceRetainedInkProbe {
                 model.prepareDocumentForHistoryTesting(reopened)
                 model.copyCompleted(closeDocument: true)
             }
-            for _ in 0..<200 where finished == nil {
+            for _ in 0..<1000 where finished == nil {
                 try await Task.sleep(nanoseconds: 5_000_000)
             }
             let expectedCurrentID = nextDocument?.manifest.id
-                ?? (scenario == "keep open" || scenario == "deadline" ? document.manifest.id : nil)
+                ?? (scenario == "keep open" || scenario == "request timeout" ? document.manifest.id : nil)
             guard let result = try finished?.get(),
-                  result.isComplete == (scenario != "deadline"),
-                  result.transcript == (scenario == "deadline" ? "first" : "first\ntail"),
+                  result.isComplete == (scenario != "request timeout"),
+                  result.transcript == (scenario == "request timeout" || scenario == "short recording" ? "first" : "first\ntail"),
                   try Data(contentsOf: document.packageURL.appendingPathComponent("voice.wav")) == audio,
                   try store.load(from: document.packageURL).manifest.transcriptText == result.transcript,
                   nextDocument == nil || nextDocument?.manifest.transcriptText == nil,
                   model.snapshot.currentDocument?.manifest.id == expectedCurrentID
             else {
                 throw probeError("background Dictation crossed documents or failed to preserve audio: \(scenario)")
+            }
+            guard pasteboard.string(forType: .string) == result.transcript else {
+                throw probeError("finished recording transcript was not copied: \(scenario)")
             }
             if scenario == "reopened and closed" {
                 guard try store.load(from: document.packageURL).manifest.backgroundColor
@@ -5782,13 +5804,25 @@ private final class ProgressiveCopyProbeRecorder: TraceAudioChunkRecording {
 private final class ProgressiveCopyProbeTranscriber: TraceAudioTranscribing, @unchecked Sendable {
     private let lock = NSLock()
     private var attempts = 0
+    private let firstChunkDelayed: Bool
+    private let failure: Error?
+
+    init(firstChunkDelayed: Bool = false, failure: Error? = nil) {
+        self.firstChunkDelayed = firstChunkDelayed
+        self.failure = failure
+    }
 
     func transcribe(audioAt url: URL, format: String) async throws -> TraceTranscriptionResult {
         let attempt = lock.withLock {
             attempts += 1
             return attempts
         }
-        if attempt > 1 { try await Task.sleep(nanoseconds: 100_000_000) }
+        if firstChunkDelayed {
+            try await Task.sleep(nanoseconds: 3_300_000_000)
+        } else if attempt > 1 {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        if attempt > 1, let failure { throw failure }
         return TraceTranscriptionResult(
             text: attempt == 1 ? "first" : "tail",
             language: nil, duration: nil, segments: nil, words: nil, usage: nil
