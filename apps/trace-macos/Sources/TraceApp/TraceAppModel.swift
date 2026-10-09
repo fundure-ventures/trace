@@ -437,6 +437,18 @@ struct TraceDocumentPresentation {
     }
 }
 
+struct TraceBackgroundVoiceCopy {
+    let id: UUID
+    let controller: TraceVoiceCaptureController
+    let document: TraceDrawingSession
+    let clipboardDocument: TraceDrawingSession
+}
+
+struct TraceBackgroundVoiceCopyResult {
+    let transcript: String?
+    let isComplete: Bool
+}
+
 final class TraceAppModel {
     var onStateChange: ((TraceAppSnapshot) -> Void)?
     var onShowOnboarding: (() -> Void)?
@@ -500,7 +512,8 @@ final class TraceAppModel {
     private let drawingStore: TraceDrawingStore
     private let calibrationStore: LocalCalibrationStore
     private let defaults: UserDefaults
-    private let voiceController: TraceVoiceCaptureController
+    private var voiceController: TraceVoiceCaptureController
+    private var backgroundVoiceCopyIDs: [UUID: UUID] = [:]
     private let openRouterAPIKeyStore: any OpenRouterAPIKeyStoring
 
     private var stateMachine: TraceAppStateMachine
@@ -644,7 +657,11 @@ final class TraceAppModel {
         normalizer.eventHandler = { [weak self] event in
             self?.handleInput(event)
         }
-        self.voiceController.onStateChange = { [weak self] state in
+        bindVoiceController()
+    }
+
+    private func bindVoiceController() {
+        voiceController.onStateChange = { [weak self] state in
             guard let self else {
                 return
             }
@@ -1296,6 +1313,137 @@ final class TraceAppModel {
         }
     }
 
+    var availableTranscriptForCopy: String? {
+        guard let currentDocument,
+              let transcript = currentDocument.manifest.transcriptText,
+              !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return nil
+        }
+        return formattedTranscript(
+            fallback: transcript,
+            document: currentDocument
+        )
+    }
+
+    func detachVoiceForCopy() -> TraceBackgroundVoiceCopy? {
+        guard let currentDocument, voiceController.state != .idle else {
+            return nil
+        }
+        let controller = voiceController
+        controller.onStateChange = nil
+        controller.onLevelChange = nil
+        controller.onTranscriptChange = nil
+        let copy = TraceBackgroundVoiceCopy(
+            id: UUID(),
+            controller: controller,
+            document: currentDocument,
+            clipboardDocument: TraceDrawingSession(
+                manifest: currentDocument.manifest,
+                screenshot: currentDocument.screenshot,
+                packageURL: currentDocument.packageURL
+            )
+        )
+        backgroundVoiceCopyIDs[currentDocument.manifest.id] = copy.id
+        voiceController = TraceVoiceCaptureController(
+            apiKeyStore: openRouterAPIKeyStore
+        )
+        bindVoiceController()
+        onStateChange?(snapshot)
+        return copy
+    }
+
+    func finishBackgroundVoiceCopy(
+        _ copy: TraceBackgroundVoiceCopy,
+        timeout: TimeInterval = 3,
+        completion: @escaping (Result<TraceBackgroundVoiceCopyResult, Error>) -> Void
+    ) {
+        copy.controller.finishForCopy(timeout: timeout) { [weak self] result in
+            defer { copy.controller.cancel() }
+            guard let self else { return }
+            do {
+                let outcome = try result.get()
+                let capture: TraceVoiceCaptureResult?
+                let isComplete: Bool
+                switch outcome {
+                case let .complete(value):
+                    capture = value
+                    isComplete = true
+                case let .partial(value, error):
+                    capture = value
+                    isComplete = false
+                    TraceLogger.shared.record(
+                        .notice, category: .dictation,
+                        "Copied with available Dictation", error: error
+                    )
+                }
+                let documentID = copy.document.manifest.id
+                let ownsRecording =
+                    self.backgroundVoiceCopyIDs[documentID] == copy.id
+                if ownsRecording {
+                    self.backgroundVoiceCopyIDs.removeValue(forKey: documentID)
+                }
+                if let capture {
+                    self.storeTranscript(
+                        text: capture.transcript,
+                        words: capture.words,
+                        in: copy.clipboardDocument
+                    )
+                    if ownsRecording {
+                        let document: TraceDrawingSession
+                        if let current = self.currentDocument,
+                           current.manifest.id == documentID {
+                            document = current
+                        } else {
+                            document = try self.drawingStore.load(
+                                from: copy.document.packageURL
+                            )
+                        }
+                        self.storeTranscript(
+                            text: capture.transcript,
+                            words: capture.words,
+                            in: document
+                        )
+                        if let audioURL = capture.audioFileURL {
+                            try self.drawingStore.attachVoice(
+                                audioFileURL: audioURL,
+                                transcript: self.formattedTranscript(
+                                    fallback: capture.transcript,
+                                    document: document
+                                ),
+                                to: document
+                            )
+                        } else {
+                            try self.drawingStore.save(document)
+                        }
+                        if self.currentDocument?.manifest.id == documentID {
+                            self.onStateChange?(self.snapshot)
+                        }
+                    }
+                }
+                let text = copy.clipboardDocument.manifest.transcriptText
+                completion(.success(TraceBackgroundVoiceCopyResult(
+                    transcript: text.map {
+                        self.formattedTranscript(
+                            fallback: $0,
+                            document: copy.clipboardDocument
+                        )
+                    },
+                    isComplete: isComplete
+                )))
+            } catch {
+                TraceLogger.shared.record(
+                    .error, category: .dictation,
+                    "Background Dictation copy failed", error: error
+                )
+                self.lastError = "Trace could not save copied Dictation: "
+                    + error.localizedDescription
+                self.onStateChange?(self.snapshot)
+                completion(.failure(error))
+            }
+        }
+    }
+
     func toggleVoiceRecording() {
         TraceLogger.shared.record(.debug, category: .dictation, "Dictation toggle requested")
         do {
@@ -1939,6 +2087,9 @@ final class TraceAppModel {
         }
         do {
             try resetVoiceAnnotationForNewRecording()
+            if let currentDocument {
+                backgroundVoiceCopyIDs.removeValue(forKey: currentDocument.manifest.id)
+            }
         } catch {
             voiceController.cancel()
             throw error

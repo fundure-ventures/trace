@@ -266,6 +266,37 @@ private final class SignalingTimedTranscriber:
     }
 }
 
+private final class DelayedCopyTranscriber: TraceAudioTranscribing, @unchecked Sendable {
+    let delay: UInt64
+    let failure: Error?
+    private let lock = NSLock()
+    private var attempts = 0
+    private var canceled = false
+
+    init(delay: UInt64, failure: Error? = nil) {
+        self.delay = delay
+        self.failure = failure
+    }
+
+    var wasCanceled: Bool { lock.withLock { canceled } }
+
+    func transcribe(audioAt url: URL, format: String) async throws -> TraceTranscriptionResult {
+        let attempt = lock.withLock {
+            attempts += 1
+            return attempts
+        }
+        if attempt == 1 { return result("first") }
+        do {
+            try await Task.sleep(nanoseconds: delay)
+        } catch {
+            lock.withLock { canceled = true }
+            throw error
+        }
+        if let failure { throw failure }
+        return result("tail")
+    }
+}
+
 private var failureCount = 0
 
 private func test(
@@ -369,9 +400,11 @@ private func writeSilentAudio(
 }
 
 private func waitUntil(
+    timeout: TimeInterval = 1,
     _ condition: @escaping () -> Bool
 ) async throws {
-    for _ in 0..<200 {
+    let deadline = ProcessInfo.processInfo.systemUptime + timeout
+    while ProcessInfo.processInfo.systemUptime < deadline {
         if condition() {
             return
         }
@@ -1053,6 +1086,71 @@ Task {
                     && recorder.stopCount == 1
                     && merger.mergedIndices == [0, 1],
                 "retry lost recorded audio or previously transcribed words"
+            )
+        }
+    }
+
+    for scenario in ["slow success", "3-second deadline", "API failure"] {
+        await test("progressive Copy preserves audio after \(scenario)") {
+            let recorder = FakeRecorder()
+            let merger = FakeMerger()
+            let transcriber = DelayedCopyTranscriber(
+                delay: scenario == "3-second deadline" ? 10_000_000_000 : 50_000_000,
+                failure: scenario == "API failure"
+                    ? TraceTranscriptionError.requestFailed(statusCode: 503, message: "unavailable")
+                    : nil
+            )
+            let controller = TraceVoiceCaptureController(
+                recorder: recorder, transcriber: transcriber, merger: merger
+            )
+            defer { controller.cancel() }
+            try controller.start()
+            recorder.emit(chunk(0))
+            try await waitUntil { controller.transcriptSnapshot?.text == "first" }
+            recorder.finalChunk = chunk(1)
+            let startedAt = ProcessInfo.processInfo.systemUptime
+            var outcome: Result<TraceVoiceCopyOutcome, Error>?
+            var completionCount = 0
+            controller.finishForCopy {
+                completionCount += 1
+                outcome = $0
+            }
+            try expect(
+                outcome == nil && recorder.stopCount == 1,
+                "Copy waited synchronously or kept the microphone recording"
+            )
+            try await waitUntil(timeout: 4) { outcome != nil }
+            guard let outcome else {
+                throw TestFailure(description: "Copy never completed")
+            }
+            switch try outcome.get() {
+            case let .complete(capture):
+                try expect(
+                    scenario == "slow success" && capture?.transcript == "first\ntail",
+                    "unfinished Dictation was reported as complete"
+                )
+            case let .partial(capture, error):
+                try expect(
+                    scenario != "slow success"
+                        && capture.transcript == "first"
+                        && capture.audioFileURL == merger.outputURL,
+                    "deadline or API error lost available words or recorded audio"
+                )
+                if scenario == "3-second deadline" {
+                    let elapsed = ProcessInfo.processInfo.systemUptime - startedAt
+                    try expect(
+                        (2.8..<4).contains(elapsed)
+                            && (error as NSError).code == URLError.timedOut.rawValue,
+                        "Copy did not enforce its total 3-second deadline"
+                    )
+                    try await waitUntil { transcriber.wasCanceled }
+                }
+            }
+            try expect(
+                completionCount == 1
+                    && controller.state == .ready
+                    && merger.mergedIndices == [0, 1],
+                "Copy completed more than once or omitted pending audio"
             )
         }
     }

@@ -75,6 +75,11 @@ public struct TraceVoiceTranscriptSnapshot: Equatable, Sendable {
     }
 }
 
+public enum TraceVoiceCopyOutcome {
+    case complete(TraceVoiceCaptureResult?)
+    case partial(TraceVoiceCaptureResult, Error)
+}
+
 public final class TraceVoiceCaptureController: @unchecked Sendable {
     public var onStateChange: ((TraceVoiceCaptureState) -> Void)?
     public var onLevelChange: ((Float) -> Void)?
@@ -160,6 +165,7 @@ public final class TraceVoiceCaptureController: @unchecked Sendable {
     private var finishCompletion:
         ((Result<TraceVoiceCaptureResult?, Error>) -> Void)?
     private var lastFailure: Error?
+    private var copyDeadline: DispatchWorkItem?
 
     public convenience init(
         environment: [String: String] = ProcessInfo.processInfo.environment,
@@ -368,7 +374,70 @@ public final class TraceVoiceCaptureController: @unchecked Sendable {
         cancel()
     }
 
+    public func finishForCopy(
+        timeout: TimeInterval = 3,
+        completion: @escaping (Result<TraceVoiceCopyOutcome, Error>) -> Void
+    ) {
+        let deadline = DispatchWorkItem { [weak self] in
+            guard let self, self.finalizing else { return }
+            self.finishAvailableForCopy(
+                reason: URLError(.timedOut),
+                completion: completion
+            )
+        }
+        copyDeadline = deadline
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + max(0, timeout),
+            execute: deadline
+        )
+        finish { [weak self] result in
+            guard let self else { return }
+            self.copyDeadline?.cancel()
+            self.copyDeadline = nil
+            switch result {
+            case let .success(capture):
+                completion(.success(.complete(capture)))
+            case let .failure(error):
+                self.finishAvailableForCopy(
+                    reason: error,
+                    completion: completion
+                )
+            }
+        }
+    }
+
+    private func finishAvailableForCopy(
+        reason: Error,
+        completion: @escaping (Result<TraceVoiceCopyOutcome, Error>) -> Void
+    ) {
+        copyDeadline?.cancel()
+        copyDeadline = nil
+        generation &+= 1
+        activeTask?.cancel()
+        activeTask = nil
+        pendingChunks.removeAll()
+        deferredTranscriptionCompletion = nil
+        lastFailure = nil
+        finalizing = true
+        finishCompletion = { result in
+            switch result {
+            case let .success(capture):
+                guard let capture else {
+                    completion(.failure(reason))
+                    return
+                }
+                completion(.success(.partial(capture, reason)))
+            case let .failure(error):
+                completion(.failure(error))
+            }
+        }
+        updateActiveState()
+        finishIfReady()
+    }
+
     public func cancel() {
+        copyDeadline?.cancel()
+        copyDeadline = nil
         generation &+= 1
         activeTask?.cancel()
         activeTask = nil
@@ -547,6 +616,8 @@ public final class TraceVoiceCaptureController: @unchecked Sendable {
         else {
             return
         }
+        copyDeadline?.cancel()
+        copyDeadline = nil
         guard !allChunks.isEmpty else {
             completeMerge(
                 audioFileURL: nil,

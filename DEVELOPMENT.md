@@ -264,6 +264,15 @@ size, plus the native separated drawing-tool segments and their selection.
 It also checks native Copy routing for selected text, a text caret, and objects
 selected before holding Command, without writing to the system clipboard.
 
+For progressive Copy, run `TRACE_PROGRESSIVE_COPY_PROBE=1 .build/debug/trace`
+after `swift build`. This hardware-free diagnostic uses an isolated pasteboard
+to check initial and late image/PDF copies, clipboard ownership, and preservation
+of the frozen image. It also checks usable toolbar controls, original-document
+audio/transcript persistence across close and new-trace actions, saved edits
+after reopening, and partial deadline results.
+`swift run trace-voice-tests` covers delayed success, API errors, and the real
+3-second transcription deadline with cancellation and preserved audio chunks.
+
 ## Diagnostics
 
 ### Connected-device screenshots

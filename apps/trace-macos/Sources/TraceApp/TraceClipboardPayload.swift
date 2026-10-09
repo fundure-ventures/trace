@@ -1,5 +1,6 @@
 import AppKit
 import ImageIO
+import TraceLogging
 import UniformTypeIdentifiers
 
 enum TraceCopyContent: String, Equatable, CaseIterable {
@@ -21,6 +22,88 @@ enum TraceCopyContent: String, Equatable, CaseIterable {
         case .document:
             return "Copy as .pdf"
         }
+    }
+}
+
+enum TraceProgressiveCopyStatus {
+    case copied, finishing, updated, partial, failed
+
+    var label: String {
+        switch self {
+        case .copied: return "Copied"
+        case .finishing: return "Finishing"
+        case .updated: return "Updated"
+        case .partial: return "Partial"
+        case .failed: return "Error"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .copied: return "Copy finished. Newer clipboard contents are never replaced."
+        case .finishing: return "Copied. Finishing Dictation for up to 3 seconds."
+        case .updated: return "Dictation updated on the clipboard."
+        case .partial: return "Copied with available Dictation. Remaining audio was saved."
+        case .failed: return "The first copy is unchanged. Background Dictation could not be saved or copied."
+        }
+    }
+}
+
+final class TraceProgressiveClipboardCopy {
+    private(set) var status: TraceProgressiveCopyStatus = .finishing
+    var hasInitialCopy: Bool { writer != nil }
+    private let pasteboard: NSPasteboard
+    private var changeCount: Int?
+    private var completedTranscript: String?
+    private var hasCompletedTranscript = false
+    private var writer: ((String?) -> Bool)?
+
+    init(pasteboard: NSPasteboard = .general) {
+        self.pasteboard = pasteboard
+    }
+
+    func copyInitial(
+        transcript: String?,
+        writer: @escaping (String?) -> Bool
+    ) -> Bool {
+        guard writer(transcript) else { return false }
+        self.writer = writer
+        changeCount = pasteboard.changeCount
+        if hasCompletedTranscript {
+            _ = updateIfOwned(completedTranscript)
+        }
+        return true
+    }
+
+    @discardableResult
+    func complete(transcript: String?) -> Bool {
+        status = .copied
+        completedTranscript = transcript
+        hasCompletedTranscript = true
+        return updateIfOwned(transcript)
+    }
+
+    func finishWithoutUpdate(status: TraceProgressiveCopyStatus = .partial) {
+        self.status = status
+    }
+
+    private func updateIfOwned(_ transcript: String?) -> Bool {
+        guard let writer, let changeCount,
+              pasteboard.changeCount == changeCount
+        else {
+            return false
+        }
+        guard writer(transcript) else {
+            status = .failed
+            TraceLogger.shared.record(
+                .error, category: .clipboard,
+                "Background clipboard update failed"
+            )
+            return false
+        }
+        self.changeCount = pasteboard.changeCount
+        status = .updated
+        return true
     }
 }
 

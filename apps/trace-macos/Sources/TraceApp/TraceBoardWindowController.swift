@@ -419,6 +419,10 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         annotationToolbar.setVoicePresentationSuppressed(active)
     }
 
+    func showCopyStatus(_ label: String, detail: String) {
+        annotationToolbar.showCopyStatus(label, detail: detail)
+    }
+
     func updateVoiceLevel(_ level: Float) {
         annotationToolbar.setVoiceLevel(level)
     }
@@ -3877,6 +3881,17 @@ private final class FloatingAnnotationToolbar:
             setCopyControlsEnabled(false)
             voiceActionHover.refreshHoverAppearance()
         }
+    }
+
+    func showCopyStatus(_ label: String, detail: String) {
+        guard currentVoiceState == .idle, !voicePresentationSuppressed else {
+            return
+        }
+        voiceLabel.stringValue = label
+        voiceLabel.toolTip = detail
+        voiceLabel.isHidden = false
+        voiceGroup.setAccessibilityValue(detail)
+        onPreferredSizeChange?()
     }
 
     private func applyVoicePresentation(

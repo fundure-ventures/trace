@@ -24,7 +24,12 @@ Dictation button
 Recording flow
 └─ Start → Stop/Resume → Finishing → Transcript; one visible state at a time
 Finishing for Copy
-├─ API error or reported timeout → report failure, not a successful transcript
+├─ Stop microphone; detach finishing work from the board
+├─ Copy available content immediately; finish remaining transcription within 3 seconds
+├─ API error or deadline → mark partial, cancel remaining requests, save recorded audio and available words
+└─ Completion → save original trace; update clipboard only while still owned by that Copy
+Finishing for CLI file export
+├─ Wait for active Dictation; report API errors rather than successful export
 └─ Retry → retain recorded chunks and previously transcribed words
 New blank or screenshot trace
 └─ Start dictation automatically enabled
@@ -36,6 +41,9 @@ New blank or screenshot trace
 - **Which provider transcribes?** OpenRouter, with your own key.
 - **Can I pause?** Yes; Resume continues the same recording.
 - **Where is the transcript?** Copied with the image and saved in the `.traceboard`.
+- **Does slow transcription block Copy?** No. Available content is copied
+  first and the board is released. Remaining transcription gets up to
+  3 seconds; audio merging and saving may finish afterward in the background.
 
 ## Acceptance criteria
 - Without a configured key, clicking "Set up Dictation" opens Setup rather
@@ -45,6 +53,10 @@ New blank or screenshot trace
 - Automatic Dictation starts for newly created blank or screenshot traces
   only when a key and Microphone permission are available.
 - Reopening a saved trace preserves its recorded audio and transcript.
-- When the transcription API reports an error or timeout while finishing for
-  Copy, Dictation leaves the finishing state and reports the failure. Retrying
-  retains the recording and previously transcribed words.
+- Copy stops the microphone immediately and allows closing, drawing, or
+  starting another trace while transcription finishes independently.
+- API failure or the 3-second Copy deadline returns a partial result, saves
+  recorded audio and available words, and leaves the first clipboard payload
+  unchanged. Late network callbacks cannot update that result.
+- CLI file export remains a waiting operation; API errors or reported timeouts
+  leave its finishing state, report failure, and retain chunks/words for retry.

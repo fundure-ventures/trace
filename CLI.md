@@ -133,7 +133,16 @@ the filename. `image` writes PNG, `dictation` TXT, `pdf` PDF, and
 | `dictation` | Transcript text. | TXT. | `traceapp export out --format dictation` |
 | `pdf` | PDF with the image and transcript. | PDF. | `traceapp export out --format pdf` |
 
-Dictation-containing formats wait for active Dictation to finish. If `--format`
+For `copy`, Dictation-containing formats copy available content immediately,
+then allow up to 3 seconds for remaining transcription. A successful late
+result updates only that Copy's clipboard contents, using the original image;
+it never replaces a newer copy or changes already-pasted content. The command
+returns after the first clipboard write, not the background update.
+Dictation-only Copy with no available text waits for that bounded result
+without blocking the board. A timeout or API failure leaves the clipboard
+unchanged and saves available audio.
+For `export`, Dictation-containing formats still wait for active Dictation
+to finish; exported files are not updated in the background. If `--format`
 has no value, `traceapp` prints the available formats and exits 64.
 Images in copy, PNG export, and PDF crop around all visible content with 8
 canvas units of page-colored background on every side. Moving or resizing an

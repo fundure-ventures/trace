@@ -11,6 +11,203 @@ import TraceVoice
 
 @MainActor
 enum TraceRetainedInkProbe {
+    static func runProgressiveCopyChecks() async throws {
+        let pasteboard = NSPasteboard(name: .init("TraceProgressiveCopy.\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        let image = NSImage(size: NSSize(width: 32, height: 24))
+        image.lockFocus()
+        NSColor.red.setFill()
+        NSRect(x: 0, y: 0, width: 32, height: 24).fill()
+        image.unlockFocus()
+        let writer: (String?) -> Bool = { text in
+            TraceClipboardPayload.write(image: image, transcript: text, to: pasteboard)
+        }
+        let copy = TraceProgressiveClipboardCopy(pasteboard: pasteboard)
+        guard copy.copyInitial(transcript: "first", writer: writer) else {
+            throw probeError("initial image copy failed")
+        }
+        guard
+              pasteboard.string(forType: .string) == "first",
+              let initialPNG = pasteboard.data(forType: .png),
+              let initialPixel = NSBitmapImageRep(data: initialPNG)?.colorAt(x: 10, y: 10)
+        else {
+            throw probeError("initial clipboard payload is missing")
+        }
+        guard copy.complete(transcript: "first tail") else {
+            throw probeError("owned clipboard update failed")
+        }
+        guard pasteboard.string(forType: .string) == "first tail",
+              let png = pasteboard.data(forType: .png),
+              TraceClipboardPayload.transcriptMetadata(from: png) == "first tail"
+        else {
+            throw probeError("updated clipboard text or image metadata is incorrect")
+        }
+        guard
+              let pixel = NSBitmapImageRep(data: png)?.colorAt(x: 10, y: 10),
+              pixel == initialPixel
+        else {
+            throw probeError("updated clipboard changed the frozen image")
+        }
+        let guardedCopy = TraceProgressiveClipboardCopy(pasteboard: pasteboard)
+        guard guardedCopy.copyInitial(transcript: "first", writer: writer),
+              TraceClipboardPayload.writeTranscript("copied elsewhere", to: pasteboard),
+              !guardedCopy.complete(transcript: "late tail"),
+              pasteboard.string(forType: .string) == "copied elsewhere"
+        else {
+            throw probeError("background Dictation overwrote a newer clipboard owner")
+        }
+        let olderCopy = TraceProgressiveClipboardCopy(pasteboard: pasteboard)
+        let newerCopy = TraceProgressiveClipboardCopy(pasteboard: pasteboard)
+        guard olderCopy.copyInitial(transcript: "older trace", writer: writer),
+              newerCopy.copyInitial(transcript: "newer trace", writer: writer),
+              !olderCopy.complete(transcript: "older tail"),
+              pasteboard.string(forType: .string) == "newer trace"
+        else {
+            throw probeError("background Dictation overwrote a newer Trace copy")
+        }
+        let pdfCopy = TraceProgressiveClipboardCopy(pasteboard: pasteboard)
+        let pdfName = "TraceCopyProbe-\(UUID().uuidString).pdf"
+        defer {
+            try? FileManager.default.removeItem(
+                at: FileManager.default.temporaryDirectory.appendingPathComponent(pdfName)
+            )
+        }
+        guard pdfCopy.copyInitial(transcript: "first", writer: { text in
+            TraceClipboardPayload.writeDocument(
+                image: image, transcript: text, suggestedFileName: pdfName,
+                to: pasteboard
+            )
+        }),
+              pdfCopy.complete(transcript: "first tail"),
+              let pdfData = pasteboard.data(forType: .pdf),
+              PDFDocument(data: pdfData)?.string?.contains("first tail") == true
+        else {
+            throw probeError("progressive PDF copy did not update its narration")
+        }
+        let earlyCopy = TraceProgressiveClipboardCopy(pasteboard: pasteboard)
+        earlyCopy.complete(transcript: "early tail")
+        guard earlyCopy.copyInitial(transcript: "first", writer: writer),
+              pasteboard.string(forType: .string) == "early tail"
+        else {
+            throw probeError("Dictation completing before local image export was dropped")
+        }
+        let partialCopy = TraceProgressiveClipboardCopy(pasteboard: pasteboard)
+        guard partialCopy.copyInitial(transcript: "first", writer: writer) else {
+            throw probeError("partial-copy fixture failed")
+        }
+        let firstChangeCount = pasteboard.changeCount
+        partialCopy.finishWithoutUpdate()
+        guard pasteboard.changeCount == firstChangeCount,
+              pasteboard.string(forType: .string) == "first"
+        else {
+            throw probeError("timeout modified the immediate copy")
+        }
+
+        for scenario in ["keep open", "close", "new trace", "reopened and closed", "deadline"] {
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("TraceCopyProbe-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let store = TraceDrawingStore(directoryURL: directory)
+            let document = try store.createBlank(
+                size: NSSize(width: 400, height: 300),
+                backingScale: 1,
+                backgroundColor: TraceRGBAColor(red: 1, green: 1, blue: 1)
+            )
+            let audioURL = directory.appendingPathComponent("recorded.wav")
+            let audio = Data([0x52, 0x49, 0x46, 0x46])
+            try audio.write(to: audioURL)
+            let recorder = ProgressiveCopyProbeRecorder()
+            let voice = TraceVoiceCaptureController(
+                recorder: recorder,
+                transcriber: ProgressiveCopyProbeTranscriber(),
+                merger: ProgressiveCopyProbeMerger()
+            )
+            let suite = "TraceCopyProbe.\(UUID().uuidString)"
+            guard let defaults = UserDefaults(suiteName: suite) else {
+                throw probeError("could not create copy preferences")
+            }
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let model = TraceAppModel(
+                drawingStore: store, voiceController: voice,
+                defaults: defaults, transportFactory: { HardwareFreeNeoTransport() }
+            )
+            let board = TraceBoardWindowController()
+            board.configureInvisibleProbeWindows()
+            defer { board.hideBoard() }
+            model.onStateChange = { snapshot in
+                board.updateVoiceState(snapshot.voiceState)
+            }
+            model.prepareDocumentForHistoryTesting(document)
+            try voice.start()
+            recorder.onChunkReady?(TraceAudioChunk(
+                index: 0, fileURL: audioURL,
+                startTimeSeconds: 0, durationSeconds: 1
+            ))
+            for _ in 0..<200 where model.availableTranscriptForCopy != "first" {
+                try await Task.sleep(nanoseconds: 5_000_000)
+            }
+            recorder.finalChunk = TraceAudioChunk(
+                index: 1, fileURL: audioURL,
+                startTimeSeconds: 1, durationSeconds: 1
+            )
+            guard let pending = model.detachVoiceForCopy() else {
+                throw probeError("recording did not detach for Copy")
+            }
+            board.setCopyFinalizationActive(true)
+            var finished: Result<TraceBackgroundVoiceCopyResult, Error>?
+            model.finishBackgroundVoiceCopy(
+                pending, timeout: scenario == "deadline" ? 0.02 : 3
+            ) { finished = $0 }
+            model.copyCompleted(closeDocument: scenario != "keep open" && scenario != "deadline")
+            board.setCopyFinalizationActive(false)
+            board.showCopyStatus("Finishing", detail: "Copied. Finishing Dictation.")
+            guard model.snapshot.voiceState == .idle, finished == nil,
+                  board.voicePresentationForPreview.copyEnabled,
+                  board.voicePresentationForPreview.toggleEnabled
+            else {
+                throw probeError("Copy left the board waiting for Dictation")
+            }
+            var nextDocument: TraceDrawingSession?
+            if scenario == "new trace" {
+                let next = try store.createBlank(
+                    size: NSSize(width: 200, height: 100),
+                    backingScale: 1,
+                    backgroundColor: TraceRGBAColor(red: 1, green: 1, blue: 1)
+                )
+                nextDocument = next
+                model.prepareDocumentForHistoryTesting(next)
+            }
+            if scenario == "reopened and closed" {
+                let reopened = try store.load(from: document.packageURL)
+                reopened.manifest.backgroundColor = TraceRGBAColor(red: 1, green: 0, blue: 0)
+                model.prepareDocumentForHistoryTesting(reopened)
+                model.copyCompleted(closeDocument: true)
+            }
+            for _ in 0..<200 where finished == nil {
+                try await Task.sleep(nanoseconds: 5_000_000)
+            }
+            let expectedCurrentID = nextDocument?.manifest.id
+                ?? (scenario == "keep open" || scenario == "deadline" ? document.manifest.id : nil)
+            guard let result = try finished?.get(),
+                  result.isComplete == (scenario != "deadline"),
+                  result.transcript == (scenario == "deadline" ? "first" : "first\ntail"),
+                  try Data(contentsOf: document.packageURL.appendingPathComponent("voice.wav")) == audio,
+                  try store.load(from: document.packageURL).manifest.transcriptText == result.transcript,
+                  nextDocument == nil || nextDocument?.manifest.transcriptText == nil,
+                  model.snapshot.currentDocument?.manifest.id == expectedCurrentID
+            else {
+                throw probeError("background Dictation crossed documents or failed to preserve audio: \(scenario)")
+            }
+            if scenario == "reopened and closed" {
+                guard try store.load(from: document.packageURL).manifest.backgroundColor
+                    == TraceRGBAColor(red: 1, green: 0, blue: 0)
+                else {
+                    throw probeError("background Dictation overwrote edits saved after Copy")
+                }
+            }
+        }
+    }
+
     static func runOnboardingChecks() throws {
         try verifyOnboardingPresentation()
     }
@@ -5561,6 +5758,48 @@ enum TraceRetainedInkProbe {
             code: 1,
             userInfo: [NSLocalizedDescriptionKey: message]
         )
+    }
+}
+
+private final class ProgressiveCopyProbeRecorder: TraceAudioChunkRecording {
+    var onChunkReady: ((TraceAudioChunk) -> Void)?
+    var onFailure: ((Error) -> Void)?
+    var onLevelChange: ((Float) -> Void)?
+    let authorizationStatus: TraceMicrophoneAuthorization = .authorized
+    var finalChunk: TraceAudioChunk?
+    func requestAccess(completion: @escaping (Bool) -> Void) { completion(true) }
+    func start() throws {}
+    func pause() -> TraceAudioChunk? { stop() }
+    func resume() throws {}
+    func stop() -> TraceAudioChunk? {
+        defer { finalChunk = nil }
+        return finalChunk
+    }
+    func cancel() {}
+    func setPerformanceCritical(_ critical: Bool) {}
+}
+
+private final class ProgressiveCopyProbeTranscriber: TraceAudioTranscribing, @unchecked Sendable {
+    private let lock = NSLock()
+    private var attempts = 0
+
+    func transcribe(audioAt url: URL, format: String) async throws -> TraceTranscriptionResult {
+        let attempt = lock.withLock {
+            attempts += 1
+            return attempts
+        }
+        if attempt > 1 { try await Task.sleep(nanoseconds: 100_000_000) }
+        return TraceTranscriptionResult(
+            text: attempt == 1 ? "first" : "tail",
+            language: nil, duration: nil, segments: nil, words: nil, usage: nil
+        )
+    }
+}
+
+private struct ProgressiveCopyProbeMerger: TraceAudioChunkMerging {
+    func merge(_ chunks: [TraceAudioChunk]) throws -> URL {
+        guard let chunk = chunks.first else { throw TraceTranscriptionError.emptyAudio }
+        return chunk.fileURL
     }
 }
 

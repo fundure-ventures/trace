@@ -53,6 +53,10 @@ Open **Setup** from the menu-bar menu. See [Setup](#setup) and
 **Where:** `⌘C` with nothing selected; toolbar Copy and Copy options.
 **Note:** Whole-trace images crop around visible content with 8 canvas units
 of background on every side. Empty traces keep their page dimensions.
+Active Dictation does not delay the first copy or closing the board. It has
+up to 3 seconds to finish, then updates the clipboard only if nothing else
+has been copied. The image stays frozen; already-pasted content does not
+change. On timeout or API error, the first copy stays and recorded audio is saved.
 
 ### Device screenshots
 **What it does:** Captures Android or paired iOS device screens directly into Trace.
