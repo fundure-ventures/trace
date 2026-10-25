@@ -354,10 +354,11 @@ The file is replaced on each launch, so save it before another run.
 Global monitoring also records mouse events outside the Lab; close the Lab
 when finished. No keyboard events are recorded.
 
-1. Draw a mouse stroke on the Mac first to establish a working baseline.
+1. Use **Mark step…** in the Lab window to label each action in the log.
+   Draw a mouse stroke on the Mac first to establish a working baseline.
 2. Connect Sidecar as an extended display and move the Lab window onto the iPad.
-3. Before each action, select its label from the **Probe** menu. Hover the
-   Pencil, draw light and firm strokes, then attach and detach it three times,
+3. Before each action, select its label from **Mark step…**. Hover the Pencil,
+   draw light and firm strokes, then attach and detach it three times,
    waiting five seconds between actions. Try finger touch separately.
 4. Repeat hover and drawing with **Trace**, **PaperKit** (where available),
    and **tldraw** using the renderer dropdown. Changes are logged automatically.

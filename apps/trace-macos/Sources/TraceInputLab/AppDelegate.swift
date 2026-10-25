@@ -84,7 +84,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 model: model,
                 showsAnchors: ProcessInfo.processInfo.environment[
                     "TRACE_LAB_SHOW_ANCHORS"
-                ] == "1"
+                ] == "1",
+                sidecarProbeEnabled: usesSidecarProbe
             )
             viewController.preferredContentSize =
                 LabPaperLayout.preferredWindowContentSize
@@ -117,7 +118,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 window.title = "Trace Input Lab - Sidecar Probe"
                 window.acceptsMouseMovedEvents = true
                 sidecarProbe.attachRecognizer(to: window)
-                installSidecarProbeMenu()
                 sidecarProbe.log("renderer", configuration.rendererMode.title)
             }
 #endif
@@ -180,33 +180,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
 #if DEBUG
-    private func installSidecarProbeMenu() {
-        let mainMenu = NSApp.mainMenu ?? NSMenu()
-        if NSApp.mainMenu == nil {
-            let appItem = NSMenuItem()
-            let appMenu = NSMenu()
-            appMenu.addItem(withTitle: "Quit Input Lab",
-                action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-            appItem.submenu = appMenu
-            mainMenu.addItem(appItem)
-            NSApp.mainMenu = mainMenu
-        }
-        let probeItem = NSMenuItem(title: "Probe", action: nil, keyEquivalent: "")
-        let probeMenu = NSMenu(title: "Probe")
-        for title in [
-            "Baseline mouse", "Pencil hover", "Pencil strokes",
-            "Pencil attached", "Pencil detached", "Finger touch",
-            "Disconnect Sidecar", "Reconnect Sidecar", "Finished",
-        ] {
-            let item = NSMenuItem(title: title,
-                action: #selector(SidecarInputProbe.markStep(_:)), keyEquivalent: "")
-            item.target = SidecarInputProbe.shared
-            probeMenu.addItem(item)
-        }
-        probeItem.submenu = probeMenu
-        mainMenu.addItem(probeItem)
-    }
-
     private func writeSnapshot(
         of window: NSWindow,
         to url: URL

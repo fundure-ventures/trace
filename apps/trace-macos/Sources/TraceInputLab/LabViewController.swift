@@ -171,6 +171,10 @@ final class LabViewController: NSViewController {
         action: nil
     )
     private let eraseButton = NSButton(title: "Erase", target: nil, action: nil)
+    private let probeStepControl = NSPopUpButton(
+        frame: .zero,
+        pullsDown: false
+    )
     private let calibrateButton = NSButton(
         title: "Recalibrate",
         target: nil,
@@ -178,6 +182,7 @@ final class LabViewController: NSViewController {
     )
     private var updateTimer: Timer?
     private var hasStarted = false
+    private let sidecarProbeEnabled: Bool
     private var strategyMenu = StrategyMenu.reconstruction
     private var lastRendererPresentation: LabRendererPresentation?
     private var rendererSurfaces: [LabRendererMode: LabRendererSurface] {
@@ -188,8 +193,13 @@ final class LabViewController: NSViewController {
         ]
     }
 
-    init(model: LabModel, showsAnchors: Bool = false) {
+    init(
+        model: LabModel,
+        showsAnchors: Bool = false,
+        sidecarProbeEnabled: Bool = false
+    ) {
         self.model = model
+        self.sidecarProbeEnabled = sidecarProbeEnabled
 #if canImport(PaperKit)
         if #available(macOS 26.0, *) {
             paperKitSurface = PaperKitRendererSurface()
@@ -247,6 +257,25 @@ final class LabViewController: NSViewController {
         eraseButton.toolTip = "Erase the drawing while keeping measurements"
         eraseButton.setAccessibilityLabel("Erase drawing")
 
+        probeStepControl.addItems(withTitles: [
+            "Mark step…",
+            "Baseline mouse",
+            "Pencil hover",
+            "Pencil strokes",
+            "Pencil attached",
+            "Pencil detached",
+            "Finger touch",
+            "Disconnect Sidecar",
+            "Reconnect Sidecar",
+            "Finished",
+        ])
+        probeStepControl.target = self
+        probeStepControl.action = #selector(markProbeStep)
+        probeStepControl.controlSize = .small
+        probeStepControl.toolTip = "Mark the current Sidecar probe step in the log"
+        probeStepControl.setAccessibilityLabel("Mark Sidecar probe step")
+        probeStepControl.isHidden = !sidecarProbeEnabled
+
         calibrateButton.target = self
         calibrateButton.action = #selector(recalibrate)
         calibrateButton.controlSize = .small
@@ -282,6 +311,7 @@ final class LabViewController: NSViewController {
             modeControl,
             strategyControl,
             anchorsControl,
+            probeStepControl,
             calibrateButton,
             eraseButton,
         ] {
@@ -291,19 +321,21 @@ final class LabViewController: NSViewController {
             )
         }
 
-        let stack = NSStackView(views: [
+        let statusViews: [NSView] = [
             connectionLabel,
             separator(),
             pageLabel,
             separator(),
             metricsLabel,
             rendererControl,
+        ] + (sidecarProbeEnabled ? [probeStepControl] : []) + [
             modeControl,
             strategyControl,
             anchorsControl,
             calibrateButton,
             eraseButton,
-        ])
+        ]
+        let stack = NSStackView(views: statusViews)
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .horizontal
         stack.alignment = .centerY
@@ -518,6 +550,18 @@ final class LabViewController: NSViewController {
         SidecarInputProbe.shared.log("renderer", mode.title)
 #endif
     }
+
+#if DEBUG
+    @objc private func markProbeStep() {
+        guard let title = probeStepControl.selectedItem?.title,
+              title != "Mark step…"
+        else {
+            return
+        }
+        SidecarInputProbe.shared.log("marker", title)
+        probeStepControl.selectItem(at: 0)
+    }
+#endif
 
     @objc private func changeStrategy() {
         let snapshot = model.snapshot
