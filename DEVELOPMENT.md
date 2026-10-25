@@ -106,8 +106,21 @@ through returning the Pencil and moving the board back to the Mac.
 
 ### Experimental Apple Pencil automation
 
-After one USB trust pairing and enabling the iPad's wireless lockdown
-connections, configure its identifier and Bonjour hostname:
+In Trace Debug, open **Setup → iPad and Apple Pencil (experimental)**.
+Opening Setup searches the local network using macOS Bonjour discovery
+and identifies reachable iPads over lockdown. Select an iPad if several
+are available, then choose **Set up**. If none is advertising yet, Setup
+offers the USB step instead.
+
+The row presents one instruction and primary action at a time: USB
+connection, Finder/iPad trust approval if needed, explicit **Enable
+wireless**, unplugging USB, verifying wireless trust, Screen Recording
+permission if needed, and attaching/picking up/returning the Pencil.
+Only after the live Pencil check does it save a new iPad configuration.
+Setup gestures do not trigger captures. Closing Setup stops its checks and
+restores any previously configured listener without reopening the panel.
+
+The lower-level launcher option remains available for diagnostics:
 
 ```sh
 ./tools/trace --configure-pencil IPAD_UDID IPAD_HOSTNAME.local.
@@ -120,8 +133,9 @@ installs dependencies automatically, and needs Local Network and Screen
 Recording permission. No iPad app, Developer Mode, Accessibility permission,
 or `EnableWifiDebugging` setting is needed.
 
-The configuration is saved only after the wireless log service accepts the
-Mac's existing trust record and the iPad's identity matches. Settings then
+The launcher configuration is saved after the wireless log service accepts
+the Mac's existing trust record and the iPad's identity matches; the guided
+Setup flow additionally requires the live Pencil check. Settings then
 shows **Apple Pencil pickup opens Trace on iPad**, enabled by default.
 Disabling it stops monitoring and is remembered across launches. Configured,
 enabled debug builds resume listening on normal launch; release builds

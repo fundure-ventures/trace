@@ -747,6 +747,7 @@ final class TraceAppDelegate:
 
     func applicationWillTerminate(_ notification: Notification) {
 #if DEBUG
+        board.stopPencilSetup()
         pencilMonitor.stop()
 #endif
         if let openFileForwardingObserver {
@@ -1505,6 +1506,21 @@ final class TraceAppDelegate:
     }
 
     private func configureBoard() {
+#if DEBUG
+        board.onPencilSetupComplete = { [weak self] _ in
+            self?.pencilAutomationItem?.isHidden = false
+            self?.pencilAutomationItem?.state = PencilIPadConfiguration.enabled ? .on : .off
+            self?.pencilStatusItem?.isHidden = !PencilIPadConfiguration.enabled
+        }
+        board.onPencilSetupVerificationChange = { [weak self] verifying in
+            guard let self else { return }
+            if verifying {
+                self.pencilMonitor.stop()
+            } else if let config = PencilIPadConfiguration.load(), PencilIPadConfiguration.enabled {
+                self.startPencilMonitor(udid: config.udid, host: config.host)
+            }
+        }
+#endif
         board.onClose = { [weak self] in
             self?.model.closeBoard()
         }

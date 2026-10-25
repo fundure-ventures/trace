@@ -118,6 +118,11 @@ change. On timeout or API error, the first copy stays and recorded audio is save
 ### Setup
 **What it does:** Shows optional permissions, pen, Dictation, shortcut, and CLI setup.
 **Where:** Menu bar → Setup.
+**Debug experiment:** **iPad and Apple Pencil** finds iPads on Wi-Fi and
+guides USB trust, wireless access, unplugged verification, and a Pencil
+pickup/return check, one step at a time. Completed setup reveals the
+default-on Pencil automation setting. No device identifiers or terminal
+commands are needed in this flow.
 
 ### Timed annotations
 **What it does:** Matches numbered marks to words in the narration.

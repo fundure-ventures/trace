@@ -30,23 +30,37 @@ struct PencilIPadConfiguration {
     }
 }
 
+struct PencilNearbyIPad: Decodable {
+    let name: String
+    let host: String
+}
+
 final class PencilTelemetryMonitor {
-    private struct Event: Decodable {
+    struct Event: Decodable {
         let event: String
         let name: String?
         let charging: Bool?
         let baseline: Bool?
         let message: String?
+        let devices: [PencilNearbyIPad]?
+        let udid: String?
+        let host: String?
+        let unavailable: Int?
     }
 
     var onReady: ((String) -> Void)?
     var onState: ((Bool, Bool) -> Void)?
     var onError: ((String) -> Void)?
+    var onSetupEvent: ((Event) -> Void)?
     private var process: Process?
     private var output: Pipe?
     private var buffer = Data()
 
     func start(udid: String, host: String) throws {
+        try start(arguments: [udid, host])
+    }
+
+    func start(arguments: [String]) throws {
         stop()
         let candidates = [
             "/opt/homebrew/bin/uv",
@@ -69,8 +83,8 @@ final class PencilTelemetryMonitor {
         process.executableURL = URL(fileURLWithPath: uv)
         process.arguments = [
             "tool", "run", "--offline", "--from", "pymobiledevice3==11.44.0",
-            "python", "-u", helper.path, udid, host,
-        ]
+            "python", "-u", helper.path,
+        ] + arguments
         process.standardOutput = pipe
         process.standardError = FileHandle.standardError
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
@@ -81,10 +95,12 @@ final class PencilTelemetryMonitor {
                 self.consumeEvents()
             }
         }
-        process.terminationHandler = { [weak self] _ in
+        process.terminationHandler = { [weak self] process in
             DispatchQueue.main.async {
-                guard let self, self.process === process else { return }
-                self.onError?("Pencil monitoring stopped. Toggle the setting or rerun iPad setup to retry.")
+                guard let self, self.process === process, process.terminationStatus != 0 else { return }
+                self.onError?(self.onSetupEvent == nil
+                    ? "Pencil monitoring stopped. Toggle the setting or rerun iPad setup to retry."
+                    : "iPad setup helper stopped. Check that uv and cached pymobiledevice3 11.44.0 are available (see Development).")
             }
         }
         self.process = process
@@ -112,6 +128,8 @@ final class PencilTelemetryMonitor {
             do {
                 let event = try JSONDecoder().decode(Event.self, from: line)
                 switch event.event {
+                case "devices", "trustNeeded", "trusted", "prepared":
+                    onSetupEvent?(event)
                 case "ready":
                     guard let name = event.name else {
                         throw SidecarCaptureProbeError.failed("Pencil helper omitted the iPad name.")
