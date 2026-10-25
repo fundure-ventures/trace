@@ -31,7 +31,7 @@ Each file is the source of truth for
 | [Device screenshots](memory/features/device-screenshots.md) | `#capture` | Capture Android and iOS devices directly |
 | [Image import](memory/features/image-import.md) | `#capture` | Open, drop, or paste images onto a canvas |
 | [Board window](memory/features/board-window.md) | `#board` | Borderless window with one floating toolbar |
-| [Drawing tools](memory/features/drawing-tools.md) | `#board` | Select, Pen, Highlighter, Rectangle, Text |
+| [Drawing tools](memory/features/drawing-tools.md) | `#board` | Select, Pen, Highlighter, Rectangle, Text; Sidecar Pencil and finger navigation |
 | [Tool sizes](memory/features/tool-sizes.md) | `#board` | Per-tool stroke width and font size |
 | [Ink colors](memory/features/ink-colors.md) | `#board` | Four inks derived from the page background |
 | [Page background](memory/features/page-background.md) | `#board` | Per-document page color |

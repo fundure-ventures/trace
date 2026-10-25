@@ -54,6 +54,8 @@ final class TldrawProductCanvasView:
     }
 
     private let webView: WKWebView
+    private var canvasInput: CanvasInputController?
+    private var pendingInput: [[String: Any]] = []
     private let errorLabel = NSTextField(wrappingLabelWithString: "")
     private let messageHandler: ProductWeakScriptMessageHandler
     private let schemeHandler: ProductRendererSchemeHandler
@@ -158,6 +160,15 @@ final class TldrawProductCanvasView:
         webView.setValue(false, forKey: "drawsBackground")
         webView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(webView)
+        let canvasInput = CanvasInputController(view: webView)
+        canvasInput.onInput = { [weak self] samples in
+            guard let self, isReady, unavailableReason == nil,
+                  pendingDocument == nil
+            else { return }
+            pendingInput.append(contentsOf: samples)
+            scheduleOperation()
+        }
+        self.canvasInput = canvasInput
         errorLabel.translatesAutoresizingMaskIntoConstraints = false
         errorLabel.alignment = .center
         errorLabel.font = .systemFont(ofSize: 13, weight: .medium)
@@ -633,6 +644,7 @@ final class TldrawProductCanvasView:
         viewport = document.manifest.viewport
             ?? TracePageViewport.full
         pageSize = visiblePageSize(for: document)
+        canvasInput?.tool = toolState.canvasTool
         pendingDocument = documentPayload(document)
         pendingTool = toolPayload(toolState)
         pendingBackground = nil
@@ -640,10 +652,12 @@ final class TldrawProductCanvasView:
         pendingImageBatches.removeAll(keepingCapacity: true)
         queuedUpdates.removeAll(keepingCapacity: true)
         pendingHistoryCommands.removeAll(keepingCapacity: true)
+        pendingInput.removeAll(keepingCapacity: true)
         scheduleOperation()
     }
 
     func setToolState(_ toolState: TraceToolState) {
+        canvasInput?.tool = toolState.canvasTool
         pendingTool = toolPayload(toolState)
         scheduleOperation()
     }
@@ -1043,6 +1057,7 @@ final class TldrawProductCanvasView:
             || !pendingImageBatches.isEmpty
             || !queuedUpdates.isEmpty
             || !pendingHistoryCommands.isEmpty
+            || !pendingInput.isEmpty
             || evaluationInFlight
             || operationScheduled
     }
@@ -1060,6 +1075,7 @@ final class TldrawProductCanvasView:
                 || !pendingImageBatches.isEmpty
                 || !queuedUpdates.isEmpty
                 || !pendingHistoryCommands.isEmpty
+                || !pendingInput.isEmpty
         else {
             return
         }
@@ -1110,6 +1126,12 @@ final class TldrawProductCanvasView:
             pendingTool = nil
             script = "window.traceProductRenderer.setTool(tool)"
             arguments = ["tool": tool]
+            completesDocument = false
+            completesDocumentFrame = false
+        } else if !pendingInput.isEmpty {
+            script = "window.traceProductRenderer.handleNativeInput(samples)"
+            arguments = ["samples": pendingInput]
+            pendingInput.removeAll(keepingCapacity: true)
             completesDocument = false
             completesDocumentFrame = false
         } else if let background = pendingBackground {

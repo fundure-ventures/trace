@@ -135,7 +135,27 @@ export interface ProductImage {
   height: number
 }
 
+export type NativeCanvasInput =
+  | {
+      kind: 'pencil'
+      phase: 'began' | 'moved' | 'ended' | 'cancelled'
+      x: number
+      y: number
+      pressure: number
+      tiltX: number
+      tiltY: number
+      rotation: number
+      tangentialPressure: number
+      shiftKey: boolean
+      altKey: boolean
+      ctrlKey: boolean
+      metaKey: boolean
+    }
+  | { kind: 'pan'; dx: number; dy: number }
+  | { kind: 'pinch'; x: number; y: number; scale: number }
+
 export interface TraceProductRendererBridge {
+  handleNativeInput(samples: NativeCanvasInput[]): void
   setDocument(document: ProductDocument): void
   frameDocument(viewportWidth: number, viewportHeight: number): void
   syncStrokes(
@@ -668,7 +688,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     if (currentTool.tool === 'text') {
       queueMicrotask(reconcileTextTool)
     }
-    if (event.type !== 'pointer' || event.isPen) return
+    if (event.type !== 'pointer') return
     if (event.name === 'pointer_down' && temporaryDrawActive) {
       temporaryDrawSelection = []
     }
@@ -930,8 +950,67 @@ export function installTraceProductRenderer(editor: Editor): () => void {
     postDocumentChange()
   }
 
+  let penModeBeforeNativeStroke: boolean | null = null
   const bridge: TraceProductRendererBridge = {
+    handleNativeInput(samples) {
+      for (const sample of samples) {
+        const viewport = editor.getViewportScreenBounds()
+        if (sample.kind === 'pencil') {
+          editor.focus()
+          if (sample.phase === 'began') {
+            penModeBeforeNativeStroke = editor.getInstanceState().isPenMode
+          }
+          if (sample.phase === 'cancelled') {
+            editor.cancel()
+          }
+          editor.dispatch({
+            type: 'pointer',
+            name: sample.phase === 'began'
+              ? 'pointer_down'
+              : sample.phase === 'moved' ? 'pointer_move' : 'pointer_up',
+            point: new Vec(
+              viewport.x + sample.x * viewport.width,
+              viewport.y + sample.y * viewport.height,
+              sample.pressure,
+            ),
+            pointerId: 8_889,
+            button: 0,
+            isPen: true,
+            target: 'canvas',
+            shiftKey: sample.shiftKey,
+            altKey: sample.altKey,
+            ctrlKey: sample.ctrlKey,
+            metaKey: sample.metaKey,
+            accelKey: sample.metaKey,
+          })
+          if (sample.phase === 'ended' || sample.phase === 'cancelled') {
+            // tldraw enters pen-only mode on down; don't strand the Mac mouse there.
+            editor.updateInstanceState({ isPenMode: penModeBeforeNativeStroke ?? false })
+            penModeBeforeNativeStroke = null
+            handlePointerUp()
+          }
+        } else {
+          const camera = editor.getCamera()
+          if (sample.kind === 'pan') {
+            editor.setCamera({
+              x: camera.x + sample.dx * viewport.width / camera.z,
+              y: camera.y + sample.dy * viewport.height / camera.z,
+              z: camera.z,
+            }, { immediate: true })
+          } else {
+            const zoom = clamp(camera.z * sample.scale, MIN_KEYBOARD_ZOOM, MAX_KEYBOARD_ZOOM)
+            editor.setCamera({
+              x: camera.x + sample.x * viewport.width * (1 / zoom - 1 / camera.z),
+              y: camera.y + sample.y * viewport.height * (1 / zoom - 1 / camera.z),
+              z: zoom,
+            }, { immediate: true })
+          }
+        }
+      }
+    },
+
     setDocument(document) {
+      penModeBeforeNativeStroke = null
       if (changeTimer !== null) {
         window.clearTimeout(changeTimer)
         changeTimer = null
@@ -1018,6 +1097,7 @@ export function installTraceProductRenderer(editor: Editor): () => void {
         )
         editor.selectNone()
         applyTool(editor, currentTool)
+        editor.updateInstanceState({ isPenMode: false })
         editor.clearHistory()
         for (const shape of editor
           .getCurrentPageShapes()

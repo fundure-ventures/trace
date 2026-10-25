@@ -104,6 +104,30 @@ Closing the board stops Sidecar only if Trace started that connection.
 An already-connected iPad display is left connected. This ownership lasts
 through returning the Pencil and moving the board back to the Mac.
 
+### Sidecar canvas input
+
+The product canvas attaches AppKit gesture recognizers directly to its
+WebKit view. A tablet recognizer consumes Pencil mouse sequences before
+WebKit can flatten their pressure; direct-touch pan and tap recognizers
+separate fingers from drawing on macOS 27 / iPadOS 27. A magnification
+recognizer forwards pinch zoom. `NSIsTouchNative` disables macOS 27's
+extra mouse emulation; ordinary mouse and trackpad scrolling remain native
+WebKit input. Pencil interaction with Select, Text, and temporary Command
+selection stays in WebKit to preserve selection handles and text-caret
+hit testing.
+
+Samples join the existing ordered renderer queue. tldraw receives pen
+pointer events with normalized pressure, and finger gestures change only
+its camera. Tilt, rotation, and tangential pressure are forwarded as tablet
+metadata, not synthesized brush effects: tldraw 4.5's pointer contract only
+consumes position, pressure, and the pen flag.
+
+For a live Sidecar check, try finger tap/drag/pinch with Pen selected, then a
+light-to-heavy Pencil stroke. Confirm there are no finger marks or duplicate
+strokes, the Pencil mark supports undo and saving, and mouse drawing still
+works after returning the board to the Mac. Direct finger drag is not
+available on older Sidecar versions; two-finger scrolling remains supported.
+
 ### Apple Pencil automation
 
 In Trace, open **Setup → iPad and Apple Pencil**.

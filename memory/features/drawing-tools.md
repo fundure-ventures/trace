@@ -9,6 +9,9 @@ Pointing at UI needs a few fast, predictable marks — not a full drawing app.
 Five tools in the toolbar: **Select** (`V`, or hold `⌘`), **Pen** (`D`),
 **Highlighter** (`H`), **Rectangle** (`R`), **Text** (`T`). Double-clicking
 empty space with Select also creates text. Undo/Redo live in Edit.
+On a Sidecar iPad, Pencil draws with pressure while fingers navigate the
+canvas: drag to pan and pinch to zoom. Direct one-finger navigation requires
+macOS 27 and iPadOS 27.
 
 ## Touchpoints
 - [Board window](board-window.md) toolbar
@@ -31,12 +34,21 @@ Draw with Highlighter
 Active text editing
 ├─ Change tool settings → preserve editing
 └─ Press Space → type a space
+Sidecar canvas input
+├─ Pencil → use selected tool and pressure; one stroke per gesture
+├─ Finger drag (macOS 27 / iPadOS 27) → pan, never draw
+├─ Finger tap → leave canvas content unchanged
+├─ Pinch → zoom around the gesture, never draw
+└─ Return to Mac mouse → drawing and selection still work
 ```
 
 ## FAQ
 - **How do I select without switching tools?** Hold `⌘`.
 - **Why isn't my rectangle selected after drawing?** Rectangle is sticky for quick repeats.
 - **How do I add text?** `T` then click, or double-click empty space with Select.
+- **Does tilting the Pencil change the brush?** Not currently. Pressure changes
+  freehand ink; tldraw does not use tilt, rotation, or tangential pressure to
+  shape these brushes.
 
 ## Acceptance criteria
 - Users can choose Select, Pen, Highlighter, Rectangle, and Text from the
@@ -47,3 +59,13 @@ Active text editing
 - Highlighter marks use the chosen ink at 50% opacity.
 - Users can create text with the Text tool or a Select double-click, type
   spaces, and change tool settings without interrupting text editing.
+- On a touch-capable Sidecar connection, dragging one finger moves the canvas
+  without adding marks or moving shapes, even with Pen selected. Tapping a
+  finger does not leave a dot.
+- Pinching keeps the content under the gesture anchored while changing zoom,
+  without drawing or creating undo entries for shapes.
+- A Pencil stroke creates one editable mark, with pressure variation where
+  supported by the brush. It participates in undo, saving, and timed
+  annotations like other canvas marks.
+- After finishing or cancelling a Pencil gesture, users can draw and select
+  with the Mac mouse without having to toggle a pen-only mode.
