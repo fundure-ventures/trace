@@ -387,7 +387,7 @@ public final class OpenRouterTranscriptionClient:
         }
         var request = URLRequest(url: configuration.endpoint)
         request.httpMethod = "POST"
-        request.timeoutInterval = 75
+        request.timeoutInterval = 12
         request.setValue(
             "Bearer \(configuration.apiKey)",
             forHTTPHeaderField: "Authorization"

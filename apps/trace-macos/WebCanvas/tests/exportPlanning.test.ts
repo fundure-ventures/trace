@@ -12,22 +12,55 @@ const base: LogicalBounds = {
   height: 650,
 }
 
-test('exports the exact base for absent, inside, and touching content', () => {
-  for (const contributors of [
-    [],
+test('exports the exact page only when there is no content', () => {
+  const plan = planTraceImageExport(base, [], 2)
+  assert.deepEqual(plan.logicalBounds, base)
+  assert.equal(plan.didOverflowBase, false)
+  assert.equal(plan.pixelWidth, 1800)
+  assert.equal(plan.pixelHeight, 1300)
+})
+
+test('crops an inside sketch with 8 units of breathing room on every side', () => {
+  const plan = planTraceImageExport(
+    base,
     [{ x: 10, y: 20, width: 100, height: 200 }],
-    [{ x: 0, y: 0, width: 900, height: 650 }],
-    [{ x: 900, y: 650, width: 0, height: 0 }],
+    2,
+  )
+  assert.deepEqual(plan.logicalBounds, {
+    x: 2, y: 12, width: 116, height: 216,
+  })
+  assert.equal(plan.pixelWidth, 232)
+  assert.equal(plan.pixelHeight, 432)
+})
+
+test('pads a full-page screenshot without cropping its internal whitespace', () => {
+  const plan = planTraceImageExport(base, [base], 1)
+  assert.deepEqual(plan.logicalBounds, {
+    x: -8, y: -8, width: 916, height: 666,
+  })
+})
+
+test('moving a screenshot moves the frame without retaining the original page', () => {
+  for (const position of [
+    { x: 100, y: 50 },
+    { x: -100, y: -50 },
+    { x: 2000, y: 3000 },
   ]) {
-    const plan = planTraceImageExport(base, contributors, 2)
-    assert.deepEqual(plan.logicalBounds, base)
-    assert.equal(plan.didOverflowBase, false)
-    assert.equal(plan.pixelWidth, 1800)
-    assert.equal(plan.pixelHeight, 1300)
+    const plan = planTraceImageExport(
+      base,
+      [{ ...base, ...position }],
+      1,
+    )
+    assert.deepEqual(plan.logicalBounds, {
+      x: position.x - 8,
+      y: position.y - 8,
+      width: 916,
+      height: 666,
+    })
   }
 })
 
-test('adds symmetric 24-unit padding for one-side overflow', () => {
+test('includes only current content bounds for one-side overflow', () => {
   const plan = planTraceImageExport(
     base,
     [{ x: 850, y: 100, width: 100, height: 50 }],
@@ -35,15 +68,15 @@ test('adds symmetric 24-unit padding for one-side overflow', () => {
   )
 
   assert.deepEqual(plan.logicalBounds, {
-    x: -24,
-    y: -24,
-    width: 998,
-    height: 698,
+    x: 842,
+    y: 92,
+    width: 116,
+    height: 66,
   })
   assert.equal(plan.didOverflowBase, true)
 })
 
-test('unions negative, fractional, and multi-side overflow before padding', () => {
+test('preserves distances between separated negative and fractional marks', () => {
   const plan = planTraceImageExport(
     base,
     [
@@ -55,29 +88,47 @@ test('unions negative, fractional, and multi-side overflow before padding', () =
   )
 
   assert.deepEqual(plan.logicalBounds, {
-    x: -34.25,
-    y: -28.5,
-    width: 978.5,
-    height: 722.75,
+    x: -18.25,
+    y: -12.5,
+    width: 946.5,
+    height: 690.75,
   })
-  assert.equal(plan.pixelWidth, 979)
-  assert.equal(plan.pixelHeight, 723)
+  assert.equal(plan.pixelWidth, 947)
+  assert.equal(plan.pixelHeight, 691)
 })
 
-test('uses a tiny epsilon only when deciding whether content overflows', () => {
-  const touching = planTraceImageExport(
+test('resized screenshots use their current size rather than the page size', () => {
+  const plan = planTraceImageExport(
     base,
-    [{ x: -5e-7, y: 0, width: 900.000001, height: 650 }],
+    [{ x: 300, y: 200, width: 450, height: 325 }],
     1,
   )
-  assert.deepEqual(touching.logicalBounds, base)
+  assert.deepEqual(plan.logicalBounds, {
+    x: 292, y: 192, width: 466, height: 341,
+  })
+})
 
-  const overflowing = planTraceImageExport(
+test('zero-size marks still receive breathing room', () => {
+  const plan = planTraceImageExport(
     base,
-    [{ x: -2e-6, y: 0, width: 900, height: 650 }],
+    [{ x: 900, y: 650, width: 0, height: 0 }],
     1,
   )
-  assert.equal(overflowing.didOverflowBase, true)
+  assert.deepEqual(plan.logicalBounds, {
+    x: 892, y: 642, width: 16, height: 16,
+  })
+})
+
+test('content framing is independent of the document page dimensions', () => {
+  const content = [{ x: 100, y: 200, width: 300, height: 400 }]
+  assert.deepEqual(
+    planTraceImageExport(base, content, 2).logicalBounds,
+    planTraceImageExport(
+      { x: -500, y: -500, width: 2000, height: 2000 },
+      content,
+      2,
+    ).logicalBounds,
+  )
 })
 
 test('keeps 1x and 2x output unchanged while under budget', () => {
@@ -116,6 +167,19 @@ test('reduces ratio for the 12MP area limit', () => {
   assert.equal(plan.pixelWidth, plan.pixelHeight)
   assert.ok(plan.effectivePixelRatio < 1)
   assert.equal(plan.didReduceResolution, true)
+})
+
+test('reduces resolution without cropping large content or its padding', () => {
+  const plan = planTraceImageExport(
+    base,
+    [{ x: 10000, y: -500, width: 10000, height: 10000 }],
+    2,
+  )
+  assert.deepEqual(plan.logicalBounds, {
+    x: 9992, y: -508, width: 10016, height: 10016,
+  })
+  assert.ok(plan.pixelWidth * plan.pixelHeight <= 12_000_000)
+  assert.ok(plan.effectivePixelRatio < 2)
 })
 
 test('handles extreme finite aspect ratios without dropping the thin axis', () => {

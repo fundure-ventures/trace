@@ -133,8 +133,11 @@ the filename. `image` writes PNG, `dictation` TXT, `pdf` PDF, and
 | `dictation` | Transcript text. | TXT. | `traceapp export out --format dictation` |
 | `pdf` | PDF with the image and transcript. | PDF. | `traceapp export out --format pdf` |
 
-Dictation-containing formats wait for active Dictation to finish. If `--format`
-has no value, `traceapp` prints the available formats and exits 64.
+**Note:** Copy uses available Dictation first, then updates the clipboard when
+transcription finishes unless something newer was copied. Dictation-only Copy
+with no text waits for that result; export waits for Dictation to finish.
+Images frame visible content with 8 canvas units of padding; empty traces keep
+their page dimensions. See [Copy trace](memory/features/copy-trace.md) for details.
 
 ### `IMAGE...`
 **What it does:** Opens one or more images in Trace.

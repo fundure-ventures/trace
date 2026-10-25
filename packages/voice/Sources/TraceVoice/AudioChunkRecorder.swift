@@ -63,7 +63,7 @@ public protocol TraceAudioChunkRecording: AnyObject {
 }
 
 public final class TraceAudioChunkRecorder: TraceAudioChunkRecording {
-    public static let defaultChunkDurationSeconds: TimeInterval = 12
+    public static let defaultChunkDurationSeconds: TimeInterval = 6
 
     public var onChunkReady: ((TraceAudioChunk) -> Void)?
     public var onFailure: ((Error) -> Void)?

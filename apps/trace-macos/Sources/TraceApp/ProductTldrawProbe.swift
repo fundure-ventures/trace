@@ -651,13 +651,12 @@ enum ProductTldrawProbe {
         guard let image = await surface.exportImageForTesting(
                   pixelRatio: 1
               ),
-              bitmapDimensions(image) == NSSize(
-                  width: 1_024,
-                  height: 720
-              )
+              let contentDimensions = bitmapDimensions(image),
+              contentDimensions.width < 1_024,
+              contentDimensions.height < 720
         else {
             throw probeError(
-                "product tldraw export did not preserve base dimensions"
+                "product tldraw export retained unused blank page space"
             )
         }
         let backgroundPixel = bitmapColor(
@@ -678,10 +677,9 @@ enum ProductTldrawProbe {
         guard await surface.setExportFixtureForTesting("masked"),
               let maskedImage =
                   await surface.exportImageForTesting(pixelRatio: 1),
-              bitmapDimensions(maskedImage) == NSSize(
-                  width: 1_024,
-                  height: 720
-              )
+              let maskedDimensions = bitmapDimensions(maskedImage),
+              maskedDimensions.width <= 916,
+              maskedDimensions.height < 720
         else {
             throw probeError(
                 "masked child geometry incorrectly expanded export"
@@ -691,11 +689,17 @@ enum ProductTldrawProbe {
               let rotatedImage =
                   await surface.exportImageForTesting(pixelRatio: 1),
               let rotatedDimensions = bitmapDimensions(rotatedImage),
-              rotatedDimensions.width == 1_072,
-              rotatedDimensions.height > 820,
+              rotatedDimensions.height > contentDimensions.height,
               let rotatedState = await surface.stateForTesting(),
               let rotatedPlan =
                   rotatedState["lastExportPlan"] as? [String: Any],
+              let rotatedBounds =
+                  rotatedPlan["logicalBounds"] as? [String: Any],
+              (rotatedBounds["x"] as? NSNumber)?.doubleValue == 2,
+              abs(
+                  ((rotatedBounds["y"] as? NSNumber)?.doubleValue ?? 0)
+                      - (2 - 100 / sqrt(2.0))
+              ) < 0.001,
               rotatedPlan["didOverflowBase"] as? Bool == true
         else {
             throw probeError(
@@ -712,22 +716,21 @@ enum ProductTldrawProbe {
               let overflowImage = await surface.exportImageForTesting(
                   pixelRatio: 1
               ),
-              bitmapDimensions(overflowImage) == NSSize(
-                  width: 1_388,
-                  height: 768
-              ),
+              let overflowDimensions = bitmapDimensions(overflowImage),
+              overflowDimensions.width < 1_364,
+              overflowDimensions.height < 736,
               let overflowState = await surface.stateForTesting(),
               let overflowPlan =
                   overflowState["lastExportPlan"] as? [String: Any],
               overflowPlan["didOverflowBase"] as? Bool == true,
               let overflowBounds =
                   overflowPlan["logicalBounds"] as? [String: Any],
-              (overflowBounds["x"] as? NSNumber)?.doubleValue == -24,
-              (overflowBounds["y"] as? NSNumber)?.doubleValue == -24,
-              (overflowBounds["width"] as? NSNumber)?.doubleValue
-                  == 1_388,
-              (overflowBounds["height"] as? NSNumber)?.doubleValue
-                  == 768,
+              let overflowX =
+                  (overflowBounds["x"] as? NSNumber)?.doubleValue,
+              let overflowWidth =
+                  (overflowBounds["width"] as? NSNumber)?.doubleValue,
+              overflowX > 0,
+              abs(overflowX + overflowWidth - 1_348) < 0.001,
               let overflowBackground = bitmapColor(
                   overflowImage,
                   x: 2,
@@ -739,7 +742,7 @@ enum ProductTldrawProbe {
         else {
             throw probeError(
                 "product tldraw export did not include overflow "
-                    + "with symmetric background padding"
+                    + "without retaining unused page space"
             )
         }
         guard await surface.setZoomForTesting(2),
@@ -1599,20 +1602,27 @@ enum ProductTldrawProbe {
         guard let movedScreenshotExport =
                 await surface.exportImageForTesting(pixelRatio: 1),
               bitmapDimensions(movedScreenshotExport) == NSSize(
-                  width: 1_080,
-                  height: 792
+                  width: 1_040,
+                  height: 736
               ),
-              let oldOnlyPixel = bitmapColor(
+              let movedExportState = await surface.stateForTesting(),
+              let movedExportPlan =
+                  movedExportState["lastExportPlan"] as? [String: Any],
+              let movedExportBounds =
+                  movedExportPlan["logicalBounds"] as? [String: Any],
+              (movedExportBounds["x"] as? NSNumber)?.doubleValue == 16,
+              (movedExportBounds["y"] as? NSNumber)?.doubleValue == 28,
+              let transparentPixel = bitmapColor(
                   movedScreenshotExport,
-                  x: 538,
+                  x: 256,
                   y: 378
               ),
-              oldOnlyPixel.redComponent > 0.85,
-              oldOnlyPixel.greenComponent < 0.40,
-              oldOnlyPixel.blueComponent < 0.35,
+              transparentPixel.redComponent > 0.85,
+              transparentPixel.greenComponent < 0.40,
+              transparentPixel.blueComponent < 0.35,
               let movedPixel = bitmapColor(
                   movedScreenshotExport,
-                  x: 568,
+                  x: 768,
                   y: 378
               ),
               movedPixel.greenComponent > 0.35,
@@ -1796,14 +1806,14 @@ enum ProductTldrawProbe {
         guard let croppedScreenshotExport =
                 await surface.exportImageForTesting(pixelRatio: 2),
               bitmapDimensions(croppedScreenshotExport) == NSSize(
-                  width: 800,
-                  height: 500
+                  width: 832,
+                  height: 532
               ),
-              abs(croppedScreenshotExport.size.width - 400) < 0.5,
-              abs(croppedScreenshotExport.size.height - 250) < 0.5
+              abs(croppedScreenshotExport.size.width - 416) < 0.5,
+              abs(croppedScreenshotExport.size.height - 266) < 0.5
         else {
             throw probeError(
-                "cropped screenshot export lost its fixed base bounds"
+                "cropped screenshot export lost its 8-unit breathing room"
             )
         }
         let resizingBlank = TraceDrawingSession(

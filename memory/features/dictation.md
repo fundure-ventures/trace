@@ -23,6 +23,16 @@ Dictation button
 └─ Key available → recording requires Microphone permission
 Recording flow
 └─ Start → Stop/Resume → Finishing → Transcript; one visible state at a time
+Finishing for Copy
+├─ Stop microphone; detach finishing work from the board
+├─ Rotate recording chunks every 6 seconds for earlier transcript availability
+├─ Copy available content immediately; finish remaining transcription in background
+├─ Each request → 12-second timeout; no separate Copy deadline
+├─ API error or request timeout → mark partial, cancel remaining requests, save recorded audio and available words
+└─ Completion → save original trace; update clipboard only while still owned by that Copy
+Finishing for CLI file export
+├─ Wait for active Dictation; report API errors rather than successful export
+└─ Retry → retain recorded chunks and previously transcribed words
 New blank or screenshot trace
 └─ Start dictation automatically enabled
    ├─ Configured and authorized → begin recording
@@ -33,6 +43,9 @@ New blank or screenshot trace
 - **Which provider transcribes?** OpenRouter, with your own key.
 - **Can I pause?** Yes; Resume continues the same recording.
 - **Where is the transcript?** Copied with the image and saved in the `.traceboard`.
+- **Does slow transcription block Copy?** No. Available content is copied
+  first and the board is released. Remaining transcription, audio merging,
+  and saving finish in the background using the existing request timeout.
 
 ## Acceptance criteria
 - Without a configured key, clicking "Set up Dictation" opens Setup rather
@@ -42,3 +55,13 @@ New blank or screenshot trace
 - Automatic Dictation starts for newly created blank or screenshot traces
   only when a key and Microphone permission are available.
 - Reopening a saved trace preserves its recorded audio and transcript.
+- Copy stops the microphone immediately and allows closing, drawing, or
+  starting another trace while transcription finishes independently.
+- Recording chunks rotate every 6 seconds instead of 12 seconds.
+- Background transcription may finish after 3 seconds without cancellation.
+  Each request uses a 12-second timeout.
+- API failure or a request timeout returns a partial result, saves
+  recorded audio and available words, and leaves the first clipboard payload
+  unchanged. Late network callbacks cannot update that result.
+- CLI file export remains a waiting operation; API errors or reported timeouts
+  leave its finishing state, report failure, and retain chunks/words for retry.

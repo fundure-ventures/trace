@@ -75,6 +75,11 @@ public struct TraceVoiceTranscriptSnapshot: Equatable, Sendable {
     }
 }
 
+public enum TraceVoiceCopyOutcome {
+    case complete(TraceVoiceCaptureResult?)
+    case partial(TraceVoiceCaptureResult, Error)
+}
+
 public final class TraceVoiceCaptureController: @unchecked Sendable {
     public var onStateChange: ((TraceVoiceCaptureState) -> Void)?
     public var onLevelChange: ((Float) -> Void)?
@@ -366,6 +371,50 @@ public final class TraceVoiceCaptureController: @unchecked Sendable {
 
     public func completeCopy() {
         cancel()
+    }
+
+    public func finishForCopy(
+        completion: @escaping (Result<TraceVoiceCopyOutcome, Error>) -> Void
+    ) {
+        finish { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case let .success(capture):
+                completion(.success(.complete(capture)))
+            case let .failure(error):
+                self.finishAvailableForCopy(
+                    reason: error,
+                    completion: completion
+                )
+            }
+        }
+    }
+
+    private func finishAvailableForCopy(
+        reason: Error,
+        completion: @escaping (Result<TraceVoiceCopyOutcome, Error>) -> Void
+    ) {
+        generation &+= 1
+        activeTask?.cancel()
+        activeTask = nil
+        pendingChunks.removeAll()
+        deferredTranscriptionCompletion = nil
+        lastFailure = nil
+        finalizing = true
+        finishCompletion = { result in
+            switch result {
+            case let .success(capture):
+                guard let capture else {
+                    completion(.failure(reason))
+                    return
+                }
+                completion(.success(.partial(capture, reason)))
+            case let .failure(error):
+                completion(.failure(error))
+            }
+        }
+        updateActiveState()
+        finishIfReady()
     }
 
     public func cancel() {

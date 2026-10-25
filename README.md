@@ -33,6 +33,7 @@ configuration, and build commands. From a configured checkout, run:
 
 ## More detail
 
+- [Release notes](https://github.com/fundure-ventures/trace/releases) — what's changed in each version
 - [Development guide](DEVELOPMENT.md) — setup, commands, architecture,
   and diagnostics
 - [Troubleshooting](TROUBLESHOOTING.md) — known issues and fixes

@@ -15,7 +15,7 @@ export interface TraceImageExportPlan {
   didReduceResolution: boolean
 }
 
-export const TRACE_EXPORT_PADDING = 24
+export const TRACE_EXPORT_PADDING = 8
 export const TRACE_EXPORT_MAX_PIXEL_SIDE = 8192
 export const TRACE_EXPORT_MAX_PIXEL_AREA = 12_000_000
 
@@ -41,18 +41,11 @@ export function planTraceImageExport(
       ? unionBounds(contentBounds, bounds)
       : { ...bounds }
   }
-  let didOverflowBase = false
-  let logicalBounds = { ...baseBounds }
-  if (
-    contentBounds !== null
+  const didOverflowBase = contentBounds !== null
     && !boundsFitWithin(contentBounds, baseBounds)
-  ) {
-    didOverflowBase = true
-    logicalBounds = expandBounds(
-      unionBounds(baseBounds, contentBounds),
-      TRACE_EXPORT_PADDING,
-    )
-  }
+  const logicalBounds = contentBounds
+    ? expandBounds(contentBounds, TRACE_EXPORT_PADDING)
+    : { ...baseBounds }
   const raster = planRasterSize(
     logicalBounds.width,
     logicalBounds.height,

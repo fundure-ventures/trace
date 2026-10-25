@@ -266,6 +266,39 @@ private final class SignalingTimedTranscriber:
     }
 }
 
+private final class DelayedCopyTranscriber: TraceAudioTranscribing, @unchecked Sendable {
+    let delay: UInt64
+    let failure: Error?
+    let immediateFirstChunk: Bool
+    private let lock = NSLock()
+    private var attempts = 0
+    private var canceled = false
+
+    init(delay: UInt64, failure: Error? = nil, immediateFirstChunk: Bool = true) {
+        self.delay = delay
+        self.failure = failure
+        self.immediateFirstChunk = immediateFirstChunk
+    }
+
+    var wasCanceled: Bool { lock.withLock { canceled } }
+
+    func transcribe(audioAt url: URL, format: String) async throws -> TraceTranscriptionResult {
+        let attempt = lock.withLock {
+            attempts += 1
+            return attempts
+        }
+        if attempt == 1, immediateFirstChunk { return result("first") }
+        do {
+            try await Task.sleep(nanoseconds: delay)
+        } catch {
+            lock.withLock { canceled = true }
+            throw error
+        }
+        if let failure { throw failure }
+        return result(attempt == 1 ? "first" : "tail")
+    }
+}
+
 private var failureCount = 0
 
 private func test(
@@ -369,9 +402,11 @@ private func writeSilentAudio(
 }
 
 private func waitUntil(
+    timeout: TimeInterval = 1,
     _ condition: @escaping () -> Bool
 ) async throws {
-    for _ in 0..<200 {
+    let deadline = ProcessInfo.processInfo.systemUptime + timeout
+    while ProcessInfo.processInfo.systemUptime < deadline {
         if condition() {
             return
         }
@@ -441,9 +476,9 @@ Task {
         )
     }
 
-    await test("rolling Dictation chunks every twelve seconds") {
+    await test("rolling Dictation chunks every six seconds") {
         try expect(
-            TraceAudioChunkRecorder.defaultChunkDurationSeconds == 12,
+            TraceAudioChunkRecorder.defaultChunkDurationSeconds == 6,
             "rolling Dictation chunk duration changed"
         )
     }
@@ -762,6 +797,10 @@ Task {
             audioData: Data([1, 2, 3])
         )
         try expect(
+            request.timeoutInterval == 12,
+            "Dictation requests must use a 12-second timeout"
+        )
+        try expect(
             request.value(forHTTPHeaderField: "Authorization")
                 == "Bearer test-secret",
             "authorization header changed"
@@ -928,6 +967,220 @@ Task {
                     message: "invalid key"
                 ),
                 "OpenRouter error status or message was hidden"
+            )
+        }
+    }
+
+    for failure in ["HTTP 401", "HTTP 503", "timeout"] {
+        await test("Copy finalization reports \(failure) and retries retained Dictation") {
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = [StubURLProtocol.self]
+            let session = URLSession(configuration: configuration)
+            defer {
+                session.invalidateAndCancel()
+                StubURLProtocol.handler = nil
+            }
+            var requestCount = 0
+            StubURLProtocol.handler = { request in
+                requestCount += 1
+                if requestCount == 2, failure == "timeout" {
+                    throw URLError(.timedOut)
+                }
+                let status = requestCount == 2
+                    ? (failure == "HTTP 401" ? 401 : 503)
+                    : 200
+                guard let url = request.url,
+                      let response = HTTPURLResponse(
+                        url: url,
+                        statusCode: status,
+                        httpVersion: nil,
+                        headerFields: nil
+                      )
+                else {
+                    throw TestFailure(description: "invalid stub request")
+                }
+                let body = status == 200
+                    ? """
+                      {"text":"\(requestCount == 1 ? "first" : "tail")"}
+                      """
+                    : """
+                      {"error":{"message":"injected API failure"}}
+                      """
+                return (response, Data(body.utf8))
+            }
+            let client = OpenRouterTranscriptionClient(
+                configuration: OpenRouterTranscriptionConfiguration(
+                    apiKey: "test-secret"
+                ),
+                session: session
+            )
+            let audioURL = try temporaryAudioFile()
+            defer {
+                try? FileManager.default.removeItem(at: audioURL)
+            }
+            let recorder = FakeRecorder()
+            let merger = FakeMerger()
+            let controller = TraceVoiceCaptureController(
+                recorder: recorder,
+                transcriber: client,
+                merger: merger
+            )
+            defer { controller.cancel() }
+            try controller.start()
+            recorder.emit(TraceAudioChunk(
+                index: 0,
+                fileURL: audioURL,
+                startTimeSeconds: 0,
+                durationSeconds: 1
+            ))
+            try await waitUntil {
+                controller.transcriptSnapshot?.text == "first"
+            }
+            recorder.finalChunk = TraceAudioChunk(
+                index: 1,
+                fileURL: audioURL,
+                startTimeSeconds: 1,
+                durationSeconds: 1
+            )
+            var finishResult: Result<TraceVoiceCaptureResult?, Error>?
+            var completionCount = 0
+            controller.finish {
+                completionCount += 1
+                finishResult = $0
+            }
+            try await waitUntil { finishResult != nil }
+            guard case let .failure(error) = finishResult,
+                  case let .failed(message) = controller.state
+            else {
+                throw TestFailure(
+                    description: "failed Dictation remained finishing or returned success"
+                )
+            }
+            if failure == "timeout" {
+                let networkError = error as NSError
+                try expect(
+                    networkError.domain == NSURLErrorDomain
+                        && networkError.code == URLError.timedOut.rawValue,
+                    "Copy hid the API timeout"
+                )
+            } else {
+                try expect(
+                    error as? TraceTranscriptionError == .requestFailed(
+                        statusCode: failure == "HTTP 401" ? 401 : 503,
+                        message: "injected API failure"
+                    ),
+                    "Copy hid the API failure"
+                )
+            }
+            try expect(
+                completionCount == 1
+                    && !message.isEmpty
+                    && !controller.state.isFinishing
+                    && controller.transcriptSnapshot?.text == "first"
+                    && merger.mergedIndices.isEmpty,
+                "failure discarded earlier words or completed Copy successfully"
+            )
+            var retryResult: Result<TraceVoiceCaptureResult?, Error>?
+            controller.finish { retryResult = $0 }
+            try await waitUntil { retryResult != nil }
+            let capture = try retryResult?.get()
+            try expect(
+                capture?.transcript == "first\ntail"
+                    && capture?.audioFileURL == merger.outputURL
+                    && controller.state == .ready
+                    && recorder.startCount == 1
+                    && recorder.stopCount == 1
+                    && merger.mergedIndices == [0, 1],
+                "retry lost recorded audio or previously transcribed words"
+            )
+        }
+    }
+
+    await test("short recording copies its first transcript after more than three seconds") {
+        let recorder = FakeRecorder()
+        let merger = FakeMerger()
+        let transcriber = DelayedCopyTranscriber(
+            delay: 3_300_000_000, immediateFirstChunk: false
+        )
+        let controller = TraceVoiceCaptureController(
+            recorder: recorder, transcriber: transcriber, merger: merger
+        )
+        defer { controller.cancel() }
+        try controller.start()
+        recorder.finalChunk = chunk(0)
+        try expect(controller.transcriptSnapshot == nil, "fixture already had a transcript")
+        var outcome: Result<TraceVoiceCopyOutcome, Error>?
+        controller.finishForCopy { outcome = $0 }
+        try expect(outcome == nil && recorder.stopCount == 1, "Copy blocked or kept recording")
+        try await waitUntil(timeout: 5) { outcome != nil }
+        guard case let .complete(capture) = try outcome?.get() else {
+            throw TestFailure(description: "short recording was cut off before its first transcript")
+        }
+        try expect(
+            capture?.transcript == "first"
+                && capture?.audioFileURL == merger.outputURL
+                && !transcriber.wasCanceled,
+            "short recording lost its delayed transcript or audio"
+        )
+    }
+
+    for scenario in ["slow success", "request timeout", "API failure"] {
+        await test("progressive Copy preserves audio after \(scenario)") {
+            let recorder = FakeRecorder()
+            let merger = FakeMerger()
+            let transcriber = DelayedCopyTranscriber(
+                delay: 50_000_000,
+                failure: scenario == "API failure"
+                    ? TraceTranscriptionError.requestFailed(statusCode: 503, message: "unavailable")
+                    : (scenario == "request timeout" ? URLError(.timedOut) : nil)
+            )
+            let controller = TraceVoiceCaptureController(
+                recorder: recorder, transcriber: transcriber, merger: merger
+            )
+            defer { controller.cancel() }
+            try controller.start()
+            recorder.emit(chunk(0))
+            try await waitUntil { controller.transcriptSnapshot?.text == "first" }
+            recorder.finalChunk = chunk(1)
+            var outcome: Result<TraceVoiceCopyOutcome, Error>?
+            var completionCount = 0
+            controller.finishForCopy {
+                completionCount += 1
+                outcome = $0
+            }
+            try expect(
+                outcome == nil && recorder.stopCount == 1,
+                "Copy waited synchronously or kept the microphone recording"
+            )
+            try await waitUntil(timeout: 4) { outcome != nil }
+            guard let outcome else {
+                throw TestFailure(description: "Copy never completed")
+            }
+            switch try outcome.get() {
+            case let .complete(capture):
+                try expect(
+                    scenario == "slow success" && capture?.transcript == "first\ntail",
+                    "unfinished Dictation was reported as complete"
+                )
+            case let .partial(capture, error):
+                try expect(
+                    scenario != "slow success"
+                        && capture.transcript == "first"
+                        && capture.audioFileURL == merger.outputURL,
+                    "deadline or API error lost available words or recorded audio"
+                )
+                if scenario == "request timeout" {
+                    try expect(
+                        (error as NSError).code == URLError.timedOut.rawValue,
+                        "Copy did not preserve the request timeout error"
+                    )
+                }
+            }
+            try expect(
+                completionCount == 1
+                    && controller.state == .ready
+                    && merger.mergedIndices == [0, 1],
+                "Copy completed more than once or omitted pending audio"
             )
         }
     }
