@@ -399,6 +399,11 @@ final class TraceAppDelegate:
     private var persistDebugLogItems: [NSMenuItem] = []
 #if DEBUG
     private var sidecarCaptureInProgress = false
+    private let pencilMonitor = PencilTelemetryMonitor()
+    private var pencilAutomationItem: NSMenuItem?
+    private var pencilStatusItem: NSMenuItem?
+    private var pencilCharging: Bool?
+    private var sidecarSessionDocumentID: UUID?
 #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -608,6 +613,9 @@ final class TraceAppDelegate:
             startCLIServer()
         }
 #if DEBUG
+        if !isUIPreview {
+            startConfiguredPencilMonitor()
+        }
         if CommandLine.arguments.contains("--sidecar-capture") {
             DispatchQueue.main.async { [weak self] in
                 self?.captureToSidecar()
@@ -732,6 +740,9 @@ final class TraceAppDelegate:
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+#if DEBUG
+        pencilMonitor.stop()
+#endif
         if let openFileForwardingObserver {
             DistributedNotificationCenter.default().removeObserver(
                 openFileForwardingObserver
@@ -1844,6 +1855,21 @@ final class TraceAppDelegate:
             action: #selector(toggleLaunchInMenuBarAtLogin(_:))
         )
         appSettingsMenu.addItem(launchInMenuBarAtLogin)
+#if DEBUG
+        let pencilAutomation = penToggleItem(
+            title: "Apple Pencil pickup opens Trace on iPad",
+            action: #selector(togglePencilAutomation(_:))
+        )
+        pencilAutomation.isHidden = PencilIPadConfiguration.load() == nil
+        pencilAutomation.state = PencilIPadConfiguration.enabled ? .on : .off
+        appSettingsMenu.addItem(pencilAutomation)
+        pencilAutomationItem = pencilAutomation
+        let pencilStatus = NSMenuItem(title: "Pencil: connecting", action: nil, keyEquivalent: "")
+        pencilStatus.isEnabled = false
+        pencilStatus.isHidden = pencilAutomation.isHidden || !PencilIPadConfiguration.enabled
+        appSettingsMenu.addItem(pencilStatus)
+        pencilStatusItem = pencilStatus
+#endif
         appSettings.submenu = appSettingsMenu
         menu.addItem(appSettings)
         captureOnCapOffItem = captureOnCapOff
@@ -2313,7 +2339,82 @@ final class TraceAppDelegate:
     }
 
 #if DEBUG
-    private func captureToSidecar() {
+    private func startConfiguredPencilMonitor() {
+        let args = CommandLine.arguments
+        if let index = args.firstIndex(of: "--configure-pencil") {
+            guard args.count > index + 2 else {
+                showSettingsError("Pencil setup requires an iPad identifier and hostname.")
+                return
+            }
+            startPencilMonitor(udid: args[index + 1], host: args[index + 2])
+        } else if let config = PencilIPadConfiguration.load(), PencilIPadConfiguration.enabled {
+            startPencilMonitor(udid: config.udid, host: config.host)
+        }
+    }
+
+    private func startPencilMonitor(udid: String, host: String) {
+        pencilCharging = nil
+        pencilMonitor.onReady = { [weak self] name in
+            PencilIPadConfiguration(udid: udid, host: host, name: name).save()
+            self?.pencilAutomationItem?.isHidden = false
+            self?.pencilAutomationItem?.state = PencilIPadConfiguration.enabled ? .on : .off
+            self?.pencilStatusItem?.isHidden = !PencilIPadConfiguration.enabled
+            self?.pencilStatusItem?.title = "Pencil: listening on \(name)"
+            TraceLogger.shared.record(.notice, category: .capture, "Wireless Pencil monitor ready")
+            if !PencilIPadConfiguration.enabled { self?.pencilMonitor.stop() }
+        }
+        pencilMonitor.onState = { [weak self] charging, baseline in
+            guard let self, PencilIPadConfiguration.enabled else { return }
+            self.pencilCharging = charging
+            self.pencilStatusItem?.title = charging
+                ? "Pencil: on iPad" : "Pencil: picked up"
+            guard !baseline else { return }
+            if charging {
+                self.returnPencilBoardToMac()
+            } else {
+                self.captureToSidecar(triggeredByPencil: true)
+            }
+        }
+        pencilMonitor.onError = { [weak self] message in
+            self?.pencilCharging = nil
+            self?.pencilStatusItem?.isHidden = false
+            self?.pencilStatusItem?.title = message
+            TraceLogger.shared.record(
+                .error, category: .capture, "Wireless Pencil monitor unavailable"
+            )
+        }
+        do { try pencilMonitor.start(udid: udid, host: host) }
+        catch {
+            pencilStatusItem?.title = error.localizedDescription
+            TraceLogger.shared.record(
+                .error, category: .capture, "Pencil monitor could not start", error: error
+            )
+            showSettingsError(error.localizedDescription)
+        }
+    }
+
+    @objc private func togglePencilAutomation(_ sender: NSMenuItem) {
+        PencilIPadConfiguration.enabled.toggle()
+        sender.state = PencilIPadConfiguration.enabled ? .on : .off
+        pencilStatusItem?.isHidden = !PencilIPadConfiguration.enabled
+        if PencilIPadConfiguration.enabled, let config = PencilIPadConfiguration.load() {
+            startPencilMonitor(udid: config.udid, host: config.host)
+        } else {
+            pencilMonitor.stop()
+            returnPencilBoardToMac()
+        }
+    }
+
+    private func returnPencilBoardToMac() {
+        guard let id = sidecarSessionDocumentID,
+              model.snapshot.currentDocument?.manifest.id == id
+        else { return }
+        board.returnFromSidecar()
+        sidecarSessionDocumentID = nil
+        TraceLogger.shared.record(.notice, category: .capture, "Pencil board returned to Mac")
+    }
+
+    private func captureToSidecar(triggeredByPencil: Bool = false) {
         guard !sidecarCaptureInProgress else { return }
         sidecarCaptureInProgress = true
         withFlushedTldrawSnapshot { [weak self] in
@@ -2325,7 +2426,9 @@ final class TraceAppDelegate:
                         try result.get()
                         let documentID = self.model.snapshot.currentDocument?.manifest.id
                         let probe = SidecarCaptureProbe()
-                        let screen = try await probe.connectDisplay()
+                        let screen = try await probe.connectDisplay(
+                            named: triggeredByPencil ? PencilIPadConfiguration.load()?.name : nil
+                        )
                         guard documentID != nil,
                               self.model.snapshot.currentDocument?.manifest.id == documentID
                         else {
@@ -2333,7 +2436,12 @@ final class TraceAppDelegate:
                                 "The open trace changed while Sidecar was connecting."
                             )
                         }
+                        if triggeredByPencil,
+                           !PencilIPadConfiguration.enabled || self.pencilCharging != false {
+                            return
+                        }
                         try self.board.fillSidecarScreen(screen)
+                        self.sidecarSessionDocumentID = documentID
                         TraceLogger.shared.record(
                             .notice, category: .capture,
                             "Sidecar capture ready"

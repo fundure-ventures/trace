@@ -30,7 +30,7 @@ enum SidecarCaptureProbeError: LocalizedError {
 final class SidecarCaptureProbe {
     private var connectionResult: Result<Void, Error>?
 
-    func connectDisplay() async throws -> NSScreen {
+    func connectDisplay(named targetName: String? = nil) async throws -> NSScreen {
         guard dlopen(
             "/System/Library/PrivateFrameworks/SidecarCore.framework/SidecarCore",
             RTLD_NOW
@@ -53,6 +53,13 @@ final class SidecarCaptureProbe {
         var devices = manager.connectedDevices()
         for device in manager.devices() where !devices.contains(device) {
             devices.append(device)
+        }
+        if let targetName {
+            devices = devices.filter {
+                $0.responds(to: NSSelectorFromString("name"))
+                    && ($0.perform(NSSelectorFromString("name"))?.takeUnretainedValue()
+                        as? String) == targetName
+            }
         }
         guard devices.count == 1, let device = devices.first else {
             throw SidecarCaptureProbeError.failed(

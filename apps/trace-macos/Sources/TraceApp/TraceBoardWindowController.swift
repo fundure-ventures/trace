@@ -96,11 +96,24 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     private var blankCanvasRevealPending = false
     private var currentToolState = TraceToolState()
 #if DEBUG
+    private var sidecarReturnFrame: NSRect?
+
+    func returnFromSidecar() {
+        guard let frame = sidecarReturnFrame, showingDocument, let window else { return }
+        sidecarReturnFrame = nil
+        (window as? TraceBoardWindow)?.fillsSidecarDisplayForProbe = false
+        window.setFrame(frame, display: true)
+        window.makeKeyAndOrderFront(nil)
+        showAnnotationToolbar(animated: false)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     func fillSidecarScreen(_ screen: NSScreen) throws {
         guard showingDocument, let window else {
             throw SidecarCaptureProbeError.failed("The captured trace is no longer open.")
         }
         transitionController.cancel()
+        sidecarReturnFrame = window.frame
         isPositioningToolbar = true
         (window as? TraceBoardWindow)?.fillsSidecarDisplayForProbe = true
         window.setFrame(screen.frame, display: true)
@@ -358,6 +371,7 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         toolState: TraceToolState
     ) {
 #if DEBUG
+        sidecarReturnFrame = nil
         (window as? TraceBoardWindow)?.fillsSidecarDisplayForProbe = false
 #endif
         showingDocument = true

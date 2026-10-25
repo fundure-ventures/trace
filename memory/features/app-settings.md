@@ -15,6 +15,8 @@ The menu bar **Settings** submenu groups behavior by moment:
 - **Dictation:** Start dictation automatically; Annotation scale
   (Small 75%, Medium 100%, Large 150%).
 - **Launch in menu bar at login.**
+- Experimental debug builds with a configured iPad also offer **Apple Pencil
+  pickup opens Trace on iPad**, enabled by default.
 
 ## Touchpoints
 - [Menu bar agent](menu-bar-agent.md) → Settings
@@ -34,6 +36,11 @@ Copy settings
 Pen-dependent sections
 ├─ Pen connected → visible
 └─ No pen connected → hidden
+Experimental Apple Pencil setting (debug builds only)
+├─ No validated iPad configuration → hidden
+├─ Wireless iPad configuration validated → visible; initially on
+├─ User switches off → stop listening; remember choice across launches
+└─ iPad temporarily unavailable → retain setting; show connection status
 ```
 
 ## FAQ
@@ -51,3 +58,8 @@ Pen-dependent sections
   describe whether copying will close the trace.
 - With no pen connected, pen-dependent settings are hidden; connecting a pen
   makes them available.
+- In experimental debug builds, validating an iPad configuration reveals an
+  enabled Apple Pencil automation setting. Turning it off stops automatic
+  capture, and it remains off after restarting Trace.
+- When a configured iPad becomes unreachable, its setting remains available
+  and its connection problem is visible rather than silently appearing ready.

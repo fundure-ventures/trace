@@ -99,9 +99,44 @@ The connection uses unsupported private `SidecarCore` APIs, not UI scripting.
 It requests no sidebar or Touch Bar for a new connection and switches a mirrored
 iPad display to extended mode for the current session. Existing connected
 sessions retain their sidebar settings. The toolbar overlays the full-display
-board. Normal app launch and release builds do not enable this experiment.
-Pencil charging events are not wired to it yet, and returning the board to the
-Mac is still manual. This is an editable board, not Mirror/Project output.
+board. This is an editable board, not Mirror/Project output.
+
+### Experimental Apple Pencil automation
+
+After one USB trust pairing and enabling the iPad's wireless lockdown
+connections, configure its identifier and Bonjour hostname:
+
+```sh
+./tools/trace --configure-pencil IPAD_UDID IPAD_HOSTNAME.local.
+```
+
+This debug experiment requires `uv` and a locally cached
+`pymobiledevice3==11.44.0` environment (`uvx --from pymobiledevice3==11.44.0
+python --version` prepares it). Trace launches the helper offline, never
+installs dependencies automatically, and needs Local Network and Screen
+Recording permission. No iPad app, Developer Mode, Accessibility permission,
+or `EnableWifiDebugging` setting is needed.
+
+The configuration is saved only after the wireless log service accepts the
+Mac's existing trust record and the iPad's identity matches. Settings then
+shows **Apple Pencil pickup opens Trace on iPad**, enabled by default.
+Disabling it stops monitoring and is remembered across launches. Configured,
+enabled debug builds resume listening on normal launch; release builds
+contain neither the helper nor the setting.
+
+A change to charging `NO` or an explicit detach starts a new screenshot
+trace on the configured iPad. Charging `YES` or an explicit attach brings
+that same board back to its Mac position without copying, closing, or
+disconnecting Sidecar. Initial battery state is a baseline, not a pickup;
+duplicate state messages do not create extra captures. A return during
+connection prevents the board from being moved to the iPad afterward.
+
+Only normalized state, device name, and errors cross the helper pipe; raw
+iPad logs are not saved. Temporary connection failures appear in Settings
+and retry every ten seconds, with a fresh baseline on reconnect. The helper
+uses standard wireless lockdown port 62078 rather than relying on usbmuxd's
+network device discovery. This remains unsupported, OS-dependent telemetry:
+charging is a pickup proxy, not a public magnetic-attachment API.
 
 ## Build
 

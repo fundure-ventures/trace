@@ -31,6 +31,10 @@ Open **Setup** from the menu-bar menu. See [Setup](#setup) and
 ### App settings
 **What it does:** Configures pen, Copy, Dictation, and launch behavior.
 **Where:** Trace menu bar menu.
+**Debug experiment:** After wireless iPad configuration, **Apple Pencil pickup
+opens Trace on iPad** appears enabled by default. Pickup captures and opens on
+Sidecar; returning the Pencil brings the board back to the Mac. See
+[experimental setup](DEVELOPMENT.md#experimental-apple-pencil-automation).
 
 ### Blank trace
 **What it does:** Opens an empty page for drawing or collecting images.
