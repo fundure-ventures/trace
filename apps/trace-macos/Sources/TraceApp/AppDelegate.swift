@@ -2413,7 +2413,6 @@ final class TraceAppDelegate:
         }
         let index = menu.index(of: anchor)
         for (offset, item) in pencilDeviceItems.enumerated() {
-            item.indentationLevel = 1
             menu.insertItem(item, at: index + 1 + offset)
         }
     }
