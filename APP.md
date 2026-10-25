@@ -31,10 +31,10 @@ Open **Setup** from the menu-bar menu. See [Setup](#setup) and
 ### App settings
 **What it does:** Configures pen, Copy, Dictation, and launch behavior.
 **Where:** Trace menu bar menu.
-**Debug experiment:** After wireless iPad configuration, **Apple Pencil pickup
+After wireless iPad configuration, **Apple Pencil pickup
 opens Trace on iPad** appears enabled by default. Pickup captures and opens on
 Sidecar; returning the Pencil brings the board back to the Mac. See
-[experimental setup](DEVELOPMENT.md#experimental-apple-pencil-automation).
+[iPad setup](DEVELOPMENT.md#apple-pencil-automation).
 Closing the board disconnects Sidecar only when Trace started the connection.
 
 ### Blank trace
@@ -118,7 +118,7 @@ change. On timeout or API error, the first copy stays and recorded audio is save
 ### Setup
 **What it does:** Shows optional permissions, pen, Dictation, shortcut, and CLI setup.
 **Where:** Menu bar → Setup.
-**Debug experiment:** **iPad and Apple Pencil** finds iPads on Wi-Fi and
+**iPad and Apple Pencil** finds iPads on Wi-Fi and
 guides USB trust, wireless access, unplugged verification, and a Pencil
 pickup/return check, one step at a time. Completed setup reveals the
 default-on Pencil automation setting. No device identifiers or terminal

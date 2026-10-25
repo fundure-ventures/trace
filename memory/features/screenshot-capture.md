@@ -14,7 +14,7 @@ Monochrome Flash transition from the window's position into a new
 `traceapp capture` captures the window the user came from; with a board open,
 the screenshot is inserted there instead of replacing it.
 
-In experimental debug builds, a configured iPad can use Pencil pickup to
+A configured iPad can use Pencil pickup to
 capture the Mac window, connect Sidecar, and fill its screen with the editable
 board. Returning the Pencil brings that same board back to the Mac.
 
@@ -45,10 +45,10 @@ CLI capture
    └─ Permission or capture failure → failure; never claim success
 ```
 
-Experimental debug builds also support a Pencil capture workflow:
+The Pencil capture workflow follows these rules:
 
 ```text
-Experimental Pencil capture
+Pencil capture
 ├─ Prerequisites → validated wireless iPad setup and enabled setting
 ├─ Pickup → capture first; then connect Sidecar and show editable board on iPad
 ├─ Initial state or repeated identical messages → no extra captures
@@ -79,12 +79,12 @@ Experimental Pencil capture
   document.
 - A CLI capture does not report success while screen capture is still pending;
   permission or capture failures are reported as failures.
-- In the experimental debug workflow, picking up the Pencil captures the Mac
+- Picking up the Pencil captures the Mac
   app before connecting Sidecar, then opens the editable board across the iPad
   screen. Returning the Pencil moves the same board back without copying,
   closing, or losing its annotations.
 - Starting or reconnecting the Pencil monitor does not itself create a
   screenshot, and repeated messages for the same state create no extra board.
-- Closing an experimental Sidecar trace disconnects the iPad display if Trace
+- Closing a Sidecar trace disconnects the iPad display if Trace
   started that connection, including after the board returns to the Mac.
   An iPad display connected before the capture remains connected.

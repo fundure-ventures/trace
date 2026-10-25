@@ -32,6 +32,8 @@
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>Trace records your voice while you annotate so it can add a transcript to the copied image.</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Trace reads Pencil pickup and charging state from your configured iPad to open and return your drawing board.</string>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

@@ -21,7 +21,7 @@ Each file is the source of truth for
 | Feature | Tag | Summary |
 | --- | --- | --- |
 | [Menu bar agent](memory/features/menu-bar-agent.md) | `#app` | Trace lives in the menu bar, with no dock icon or app shell |
-| [Setup](memory/features/setup.md) | `#app` | Permissions, pen, Dictation key, shortcuts, and experimental guided iPad setup |
+| [Setup](memory/features/setup.md) | `#app` | Permissions, pen, Dictation key, shortcuts, and guided iPad setup |
 | [Command-line tool](memory/features/command-line-tool.md) | `#app` | Install and use Trace from Terminal |
 | [Global shortcuts](memory/features/global-shortcuts.md) | `#app` | System-wide New Blank Trace and Capture Frontmost App |
 | [App settings](memory/features/app-settings.md) | `#app` | Pen, copy, Dictation, and login behavior |

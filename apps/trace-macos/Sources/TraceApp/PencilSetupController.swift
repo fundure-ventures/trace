@@ -1,4 +1,3 @@
-#if DEBUG
 import AppKit
 import TraceLogging
 
@@ -150,7 +149,7 @@ final class PencilSetupController {
         } catch {
             busy = false
             instruction = error.localizedDescription
-                + " This debug experiment requires the local diagnostic tools described in Development."
+                + " iPad setup requires the local diagnostic tools described in Development."
             action = retryAction ?? "Try again"
             TraceLogger.shared.record(.error, category: .capture, "iPad setup helper failed", error: error)
             onChange?()
@@ -229,4 +228,3 @@ final class PencilSetupController {
         onChange?()
     }
 }
-#endif

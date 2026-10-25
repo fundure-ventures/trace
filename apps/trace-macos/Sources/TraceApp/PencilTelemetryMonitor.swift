@@ -1,4 +1,3 @@
-#if DEBUG
 import AppKit
 
 struct PencilIPadConfiguration {
@@ -75,7 +74,7 @@ final class PencilTelemetryMonitor {
             forResource: "pencil-telemetry", withExtension: "py"
         ) else {
             throw SidecarCaptureProbeError.failed(
-                "Pencil automation needs uv and the bundled debug telemetry helper."
+                "Pencil automation needs uv and the bundled telemetry helper."
             )
         }
         let process = Process()
@@ -153,4 +152,3 @@ final class PencilTelemetryMonitor {
 
     deinit { stop() }
 }
-#endif

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Experimental local Pencil state relay. Never forwards or saves raw iPad logs."""
+"""Local Pencil state relay. Never forwards or saves raw iPad logs."""
 
 import argparse
 import asyncio

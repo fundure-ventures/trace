@@ -397,7 +397,6 @@ final class TraceAppDelegate:
     private var startupErrorWorkItem: DispatchWorkItem?
     private var forwardedOpenFiles = false
     private var persistDebugLogItems: [NSMenuItem] = []
-#if DEBUG
     private var sidecarCaptureInProgress = false
     private let pencilMonitor = PencilTelemetryMonitor()
     private var pencilAutomationItem: NSMenuItem?
@@ -405,7 +404,6 @@ final class TraceAppDelegate:
     private var pencilCharging: Bool?
     private var sidecarSessionDocumentID: UUID?
     private var sidecarCaptureProbe: SidecarCaptureProbe?
-#endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
 #if DEBUG
@@ -569,11 +567,9 @@ final class TraceAppDelegate:
         model.onHideBoard = { [weak self] in
             self?.board.hideBoard()
             self?.projection.hideProjection()
-#if DEBUG
             if self?.sidecarCaptureInProgress == false {
                 self?.stopOwnedSidecarDisplay()
             }
-#endif
             NSApp.setActivationPolicy(.accessory)
         }
         model.onCopyRequested = { [weak self] in
@@ -618,7 +614,6 @@ final class TraceAppDelegate:
         if !isUIPreview {
             startCLIServer()
         }
-#if DEBUG
         if !isUIPreview {
             startConfiguredPencilMonitor()
         }
@@ -627,6 +622,7 @@ final class TraceAppDelegate:
                 self?.captureToSidecar()
             }
         }
+#if DEBUG
         if ProcessInfo.processInfo.environment["TRACE_CLI_PROBE"] == "1",
            let cliServer
         {
@@ -746,10 +742,8 @@ final class TraceAppDelegate:
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-#if DEBUG
         board.stopPencilSetup()
         pencilMonitor.stop()
-#endif
         if let openFileForwardingObserver {
             DistributedNotificationCenter.default().removeObserver(
                 openFileForwardingObserver
@@ -1506,7 +1500,6 @@ final class TraceAppDelegate:
     }
 
     private func configureBoard() {
-#if DEBUG
         board.onPencilSetupComplete = { [weak self] _ in
             self?.pencilAutomationItem?.isHidden = false
             self?.pencilAutomationItem?.state = PencilIPadConfiguration.enabled ? .on : .off
@@ -1520,7 +1513,6 @@ final class TraceAppDelegate:
                 self.startPencilMonitor(udid: config.udid, host: config.host)
             }
         }
-#endif
         board.onClose = { [weak self] in
             self?.model.closeBoard()
         }
@@ -1877,7 +1869,6 @@ final class TraceAppDelegate:
             action: #selector(toggleLaunchInMenuBarAtLogin(_:))
         )
         appSettingsMenu.addItem(launchInMenuBarAtLogin)
-#if DEBUG
         let pencilAutomation = penToggleItem(
             title: "Apple Pencil pickup opens Trace on iPad",
             action: #selector(togglePencilAutomation(_:))
@@ -1891,7 +1882,6 @@ final class TraceAppDelegate:
         pencilStatus.isHidden = pencilAutomation.isHidden || !PencilIPadConfiguration.enabled
         appSettingsMenu.addItem(pencilStatus)
         pencilStatusItem = pencilStatus
-#endif
         appSettings.submenu = appSettingsMenu
         menu.addItem(appSettings)
         captureOnCapOffItem = captureOnCapOff
@@ -2360,7 +2350,6 @@ final class TraceAppDelegate:
         }
     }
 
-#if DEBUG
     private func stopOwnedSidecarDisplay() {
         guard let probe = sidecarCaptureProbe else { return }
         sidecarCaptureProbe = nil
@@ -2501,8 +2490,6 @@ final class TraceAppDelegate:
             }
         }
     }
-#endif
-
     func menuWillOpen(_ menu: NSMenu) {
         if screenshotMenuItems.contains(where: { $0.submenu === menu }) {
             deviceScreenshots.warmAvailableIOSDevices()

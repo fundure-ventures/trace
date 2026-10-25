@@ -44,10 +44,10 @@ usage: ./tools/trace [--clear] [--sidecar-capture]
 
   --clear  Reset Trace onboarding, calibration, window state, and macOS
            permissions before launching. Saved .traceboard drawings remain.
-  --sidecar-capture  Debug experiment: capture the frontmost Mac window,
+  --sidecar-capture  Capture the frontmost Mac window,
                     connect one nearby iPad, and fill its Sidecar display.
   --configure-pencil UDID HOST  Validate a trusted iPad's wireless log access
-                               and enable experimental Pencil automation.
+                               and enable Pencil automation.
 
 Builds Trace Debug and installs it to /Applications/Trace Debug.app (override
 the parent directory with TRACE_APP_INSTALL_DIR) before launching, so every
@@ -62,15 +62,11 @@ while (($#)); do
             CLEAR_STATE=true
             ;;
         --sidecar-capture)
-            if [[ "$CONFIGURATION" != "debug" ]]; then
-                echo "error: Sidecar capture is debug-only." >&2
-                exit 64
-            fi
             SIDECAR_CAPTURE=true
             ;;
         --configure-pencil)
-            if [[ "$CONFIGURATION" != "debug" || "$#" -lt 3 ]]; then
-                echo "error: --configure-pencil requires a debug build, UDID and hostname." >&2
+            if [[ "$#" -lt 3 ]]; then
+                echo "error: --configure-pencil requires UDID and hostname." >&2
                 exit 64
             fi
             PENCIL_IPAD=(--configure-pencil "$2" "$3")
@@ -207,12 +203,7 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Helpers"
 cp "$BIN_DIRECTORY/trace" "$CONTENTS/MacOS/trace"
 cp "$BIN_DIRECTORY/traceapp" "$CONTENTS/Helpers/traceapp"
 cp "$ROOT/apps/trace-macos/Trace-Info.plist" "$CONTENTS/Info.plist"
-if [[ "$CONFIGURATION" == "debug" ]]; then
-    cp "$ROOT/tools/pencil-telemetry.py" "$CONTENTS/Resources/"
-    plutil -insert NSLocalNetworkUsageDescription -string \
-        "Trace reads Pencil pickup and charging state from your configured iPad to open and return your drawing board." \
-        "$CONTENTS/Info.plist"
-fi
+cp "$ROOT/tools/pencil-telemetry.py" "$CONTENTS/Resources/"
 plutil -replace CFBundleDisplayName -string "$PRODUCT_NAME" "$CONTENTS/Info.plist"
 plutil -replace CFBundleName -string "$PRODUCT_NAME" "$CONTENTS/Info.plist"
 plutil -replace CFBundleIdentifier \

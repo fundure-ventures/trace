@@ -1,4 +1,3 @@
-#if DEBUG
 import AppKit
 import CoreGraphics
 import Darwin
@@ -166,4 +165,3 @@ final class SidecarCaptureProbe {
         throw SidecarCaptureProbeError.failed("Sidecar connected, but its extended screen did not appear.")
     }
 }
-#endif

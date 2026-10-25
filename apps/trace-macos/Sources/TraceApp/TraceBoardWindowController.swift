@@ -95,7 +95,6 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     private var applicationResignObserver: NSObjectProtocol?
     private var blankCanvasRevealPending = false
     private var currentToolState = TraceToolState()
-#if DEBUG
     var onPencilSetupComplete: ((PencilIPadConfiguration) -> Void)?
     var onPencilSetupVerificationChange: ((Bool) -> Void)?
     private var sidecarReturnFrame: NSRect?
@@ -130,6 +129,7 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+#if DEBUG
     private var suppressFloatingToolbarOrderingForTesting = false
     private var toolbarRevealAnimatedForTesting = false
     private var toolbarPresentedForTesting = false
@@ -237,7 +237,6 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         setupPanel.onRequestScreenAccess = { [weak self] in
             self?.onRequestScreenAccess?()
         }
-#if DEBUG
         setupPanel.onPencilSetupComplete = { [weak self] config in
             self?.onPencilSetupComplete?(config)
         }
@@ -248,7 +247,6 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
             guard let self else { return }
             self.configureSetupPanel(preservingTopLeft: self.setupWindow.isVisible)
         }
-#endif
         setupPanel.onRequestMicrophoneAccess = { [weak self] in
             self?.onRequestMicrophoneAccess?()
         }
@@ -370,11 +368,13 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
             TraceGlobalShortcutsSnapshot()
     ) {
         setupRequested = snapshot.setupVisible && !snapshot.calibrationActive
+        var pencilSetupActive = setupRequested
 #if DEBUG
-        setupPanel.setPencilSetupActive(
-            setupRequested && !suppressFloatingToolbarOrderingForTesting
-        )
+        pencilSetupActive = pencilSetupActive && !suppressFloatingToolbarOrderingForTesting
 #endif
+        setupPanel.setPencilSetupActive(
+            pencilSetupActive
+        )
         drawingController.updateSetup(snapshot, shortcuts: shortcuts)
         setupPanel.update(snapshot, shortcuts: shortcuts)
         configureSetupPanel(preservingTopLeft: setupWindow.isVisible)
@@ -393,10 +393,8 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         capture: CapturedWindow?,
         toolState: TraceToolState
     ) {
-#if DEBUG
         sidecarReturnFrame = nil
         (window as? TraceBoardWindow)?.fillsSidecarDisplayForProbe = false
-#endif
         showingDocument = true
 #if DEBUG
         suppressFloatingToolbarOrderingForTesting = false
@@ -1817,9 +1815,7 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func hideSetupPanel() {
-#if DEBUG
         setupPanel.setPencilSetupActive(false)
-#endif
         if let parent = setupWindow.parent {
             parent.removeChildWindow(setupWindow)
         }
@@ -2025,13 +2021,13 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
 private final class TraceBoardWindow: NSWindow {
     var onPointerDown: (() -> Void)?
 
-#if DEBUG
     var fillsSidecarDisplayForProbe = false
 
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
         fillsSidecarDisplayForProbe ? frameRect : super.constrainFrameRect(frameRect, to: screen)
     }
 
+#if DEBUG
     private let sidecarInputProbeEnabled =
         ProcessInfo.processInfo.environment[
             "TRACE_SIDECAR_INPUT_PROBE"
@@ -5282,12 +5278,11 @@ private final class SetupPanelView: NSView {
     private let errorLabel = NSTextField(wrappingLabelWithString: "")
     private let contentStack = NSStackView()
     private var cliErrorMessage: String?
-#if DEBUG
     var onPencilSetupComplete: ((PencilIPadConfiguration) -> Void)?
     var onPencilSetupVerificationChange: ((Bool) -> Void)?
     var onPencilSetupChange: (() -> Void)?
     private let pencilSetup = PencilSetupController()
-    private let pencilHeading = NSTextField(labelWithString: "iPad and Apple Pencil (experimental)")
+    private let pencilHeading = NSTextField(labelWithString: "iPad and Apple Pencil")
     private let pencilRow = SetupCapabilityRow()
     private let pencilInstruction = NSTextField(wrappingLabelWithString: "")
     private let pencilPicker = NSPopUpButton()
@@ -5319,12 +5314,9 @@ private final class SetupPanelView: NSView {
     @objc private func choosePencilIPad() {
         pencilSetup.selectDevice(at: pencilPicker.indexOfSelectedItem)
     }
-#endif
-
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
 
-#if DEBUG
         pencilHeading.font = .systemFont(ofSize: 13, weight: .semibold)
         pencilInstruction.font = .systemFont(ofSize: 11)
         pencilInstruction.textColor = .secondaryLabelColor
@@ -5341,7 +5333,6 @@ private final class SetupPanelView: NSView {
         pencilSetup.onVerificationChange = { [weak self] verifying in
             self?.onPencilSetupVerificationChange?(verifying)
         }
-#endif
         penRow.onAction = { [weak self] in self?.onRecalibrate?() }
         captureRow.onAction = {
             [weak self] in self?.onRequestScreenAccess?()
@@ -5409,7 +5400,6 @@ private final class SetupPanelView: NSView {
             cliDetailLabel,
             errorLabel,
         ].forEach(contentStack.addArrangedSubview)
-#if DEBUG
         for (offset, view) in [pencilHeading, pencilRow, pencilPicker, pencilInstruction].enumerated() {
             contentStack.insertArrangedSubview(view, at: 2 + offset)
             view.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
@@ -5418,7 +5408,6 @@ private final class SetupPanelView: NSView {
         contentStack.setCustomSpacing(6, after: pencilRow)
         contentStack.setCustomSpacing(18, after: pencilInstruction)
         updatePencilSetup()
-#endif
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         contentStack.orientation = .vertical
         contentStack.alignment = .leading

@@ -83,13 +83,13 @@ renderer. The local `.env` is copied only into the installed debug product so
 it can resolve credentials away from the repository. It is never copied into
 the unsigned or signed production product. Never commit keys.
 
-### Experimental capture to Sidecar
+### Capture to Sidecar
 
 ```sh
 ./tools/trace --sidecar-capture
 ```
 
-This debug-only experiment captures the frontmost Mac window before asking
+This captures the frontmost Mac window before asking
 Sidecar to connect, then moves the editable board to fill the iPad display.
 Keep exactly one Sidecar-capable iPad available, awake, and unlocked. Existing
 traces are saved before creating a new screenshot trace. Screen Recording
@@ -104,9 +104,9 @@ Closing the board stops Sidecar only if Trace started that connection.
 An already-connected iPad display is left connected. This ownership lasts
 through returning the Pencil and moving the board back to the Mac.
 
-### Experimental Apple Pencil automation
+### Apple Pencil automation
 
-In Trace Debug, open **Setup → iPad and Apple Pencil (experimental)**.
+In Trace, open **Setup → iPad and Apple Pencil**.
 Opening Setup searches the local network using macOS Bonjour discovery
 and identifies reachable iPads over lockdown. Select an iPad if several
 are available, then choose **Set up**. If none is advertising yet, Setup
@@ -126,7 +126,7 @@ The lower-level launcher option remains available for diagnostics:
 ./tools/trace --configure-pencil IPAD_UDID IPAD_HOSTNAME.local.
 ```
 
-This debug experiment requires `uv` and a locally cached
+This workflow requires `uv` and a locally cached
 `pymobiledevice3==11.44.0` environment (`uvx --from pymobiledevice3==11.44.0
 python --version` prepares it). Trace launches the helper offline, never
 installs dependencies automatically, and needs Local Network and Screen
@@ -138,8 +138,9 @@ the Mac's existing trust record and the iPad's identity matches; the guided
 Setup flow additionally requires the live Pencil check. Settings then
 shows **Apple Pencil pickup opens Trace on iPad**, enabled by default.
 Disabling it stops monitoring and is remembered across launches. Configured,
-enabled debug builds resume listening on normal launch; release builds
-contain neither the helper nor the setting.
+enabled builds resume listening on normal launch. Debug and release bundles
+both include the helper and setting. The Python runtime and diagnostic package
+are external prerequisites, not bundled or downloaded automatically.
 
 A change to charging `NO` or an explicit detach starts a new screenshot
 trace on the configured iPad. Charging `YES` or an explicit attach brings

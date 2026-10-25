@@ -14,7 +14,7 @@ Recording and Microphone permissions, the OpenRouter key for
 optional [command-line tool](command-line-tool.md). It
 opens on first launch (onboarding) and later from the menu bar.
 
-Experimental debug builds also include **iPad and Apple Pencil**. Setup
+Setup also includes **iPad and Apple Pencil**. It
 looks for iPads on the local network, offers the detected device, and walks
 through one instruction and action at a time. If wireless discovery is not
 available yet, the flow starts with USB instead.
@@ -47,7 +47,7 @@ Install or reinstall traceapp
 Close trace with Setup open
 └─ Close canvas, toolbar, and Setup together
    └─ Background status updates → never reopen them
-Experimental iPad setup (debug builds only)
+iPad setup
 ├─ Open Setup → look for iPads on the local network
 ├─ Multiple iPads → user chooses which one to configure
 ├─ No advertising iPad → offer USB setup; never claim a device is ready
@@ -88,7 +88,7 @@ Experimental iPad setup (debug builds only)
   not prevent other Setup tasks.
 - If another executable already occupies the install path, Install or
   Reinstall reports the conflict and preserves that file unchanged.
-- In experimental debug builds, opening Setup searches the local network
+- Opening Setup searches the local network
   and offers an identified iPad for configuration. Multiple iPads can be
   selected explicitly; without a reachable iPad, users get a USB instruction.
 - Users finish iPad setup without entering identifiers or commands. Each step
