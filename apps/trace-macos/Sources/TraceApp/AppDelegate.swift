@@ -404,6 +404,7 @@ final class TraceAppDelegate:
     private var pencilStatusItem: NSMenuItem?
     private var pencilCharging: Bool?
     private var sidecarSessionDocumentID: UUID?
+    private var sidecarCaptureProbe: SidecarCaptureProbe?
 #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -568,6 +569,11 @@ final class TraceAppDelegate:
         model.onHideBoard = { [weak self] in
             self?.board.hideBoard()
             self?.projection.hideProjection()
+#if DEBUG
+            if self?.sidecarCaptureInProgress == false {
+                self?.stopOwnedSidecarDisplay()
+            }
+#endif
             NSApp.setActivationPolicy(.accessory)
         }
         model.onCopyRequested = { [weak self] in
@@ -2339,6 +2345,22 @@ final class TraceAppDelegate:
     }
 
 #if DEBUG
+    private func stopOwnedSidecarDisplay() {
+        guard let probe = sidecarCaptureProbe else { return }
+        sidecarCaptureProbe = nil
+        sidecarSessionDocumentID = nil
+        Task { @MainActor in
+            do {
+                try await probe.disconnectOwnedDisplay()
+            } catch {
+                TraceLogger.shared.record(
+                    .error, category: .capture, "Sidecar disconnect failed", error: error
+                )
+                self.showSettingsError(error.localizedDescription)
+            }
+        }
+    }
+
     private func startConfiguredPencilMonitor() {
         let args = CommandLine.arguments
         if let index = args.firstIndex(of: "--configure-pencil") {
@@ -2421,11 +2443,16 @@ final class TraceAppDelegate:
             guard let self else { return }
             self.model.newScreenshotPage(noRecording: true) { result in
                 Task { @MainActor in
-                    defer { self.sidecarCaptureInProgress = false }
+                    var presented = false
+                    defer {
+                        self.sidecarCaptureInProgress = false
+                        if !presented { self.stopOwnedSidecarDisplay() }
+                    }
                     do {
                         try result.get()
                         let documentID = self.model.snapshot.currentDocument?.manifest.id
-                        let probe = SidecarCaptureProbe()
+                        let probe = self.sidecarCaptureProbe ?? SidecarCaptureProbe()
+                        self.sidecarCaptureProbe = probe
                         let screen = try await probe.connectDisplay(
                             named: triggeredByPencil ? PencilIPadConfiguration.load()?.name : nil
                         )
@@ -2442,6 +2469,7 @@ final class TraceAppDelegate:
                         }
                         try self.board.fillSidecarScreen(screen)
                         self.sidecarSessionDocumentID = documentID
+                        presented = true
                         TraceLogger.shared.record(
                             .notice, category: .capture,
                             "Sidecar capture ready"

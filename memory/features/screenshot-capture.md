@@ -52,6 +52,7 @@ Experimental Pencil capture
 ├─ Prerequisites → validated wireless iPad setup and enabled setting
 ├─ Pickup → capture first; then connect Sidecar and show editable board on iPad
 ├─ Initial state or repeated identical messages → no extra captures
+├─ Close board → stop Sidecar only if Trace started the connection
 └─ Return to iPad charger
    ├─ Board on iPad → bring same document back to Mac; preserve edits
    └─ Connection pending → do not move board to iPad after return
@@ -84,3 +85,6 @@ Experimental Pencil capture
   closing, or losing its annotations.
 - Starting or reconnecting the Pencil monitor does not itself create a
   screenshot, and repeated messages for the same state create no extra board.
+- Closing an experimental Sidecar trace disconnects the iPad display if Trace
+  started that connection, including after the board returns to the Mac.
+  An iPad display connected before the capture remains connected.

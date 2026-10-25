@@ -14,6 +14,8 @@ import Darwin
         config: NSObject,
         completion: @escaping (NSError?) -> Void
     )
+    @objc(disconnectFromDevice:completion:)
+    func disconnect(from device: NSObject, completion: @escaping (NSError?) -> Void)
 }
 
 enum SidecarCaptureProbeError: LocalizedError {
@@ -29,6 +31,30 @@ enum SidecarCaptureProbeError: LocalizedError {
 @MainActor
 final class SidecarCaptureProbe {
     private var connectionResult: Result<Void, Error>?
+    private var ownedConnection: (manager: SidecarCaptureManagerAPI, device: NSObject)?
+
+    func disconnectOwnedDisplay() async throws {
+        guard let connection = ownedConnection else { return }
+        guard connection.manager.connectedDevices().contains(connection.device) else {
+            ownedConnection = nil
+            return
+        }
+        var result: Result<Void, Error>?
+        connection.manager.disconnect(from: connection.device) { error in
+            DispatchQueue.main.async {
+                result = error.map { .failure($0) } ?? .success(())
+            }
+        }
+        let deadline = Date().addingTimeInterval(20)
+        while result == nil, Date() < deadline {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        guard let result else {
+            throw SidecarCaptureProbeError.failed("Stopping Trace's Sidecar connection timed out.")
+        }
+        try result.get()
+        ownedConnection = nil
+    }
 
     func connectDisplay(named targetName: String? = nil) async throws -> NSScreen {
         guard dlopen(
@@ -45,6 +71,7 @@ final class SidecarCaptureProbe {
         for selector in [
             "devices", "connectedDevices", "configForDevice:",
             "connectToDevice:withConfig:completion:",
+            "disconnectFromDevice:completion:",
         ] where !object.responds(to: NSSelectorFromString(selector)) {
             throw SidecarCaptureProbeError.failed("SidecarCore API changed: \(selector)")
         }
@@ -83,6 +110,9 @@ final class SidecarCaptureProbe {
             connectionResult = nil
             manager.connect(to: device, config: config) { [weak self] error in
                 DispatchQueue.main.async {
+                    if error == nil {
+                        self?.ownedConnection = (manager, device)
+                    }
                     self?.connectionResult = error.map { .failure($0) } ?? .success(())
                 }
             }

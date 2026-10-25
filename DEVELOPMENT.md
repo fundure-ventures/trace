@@ -100,6 +100,9 @@ It requests no sidebar or Touch Bar for a new connection and switches a mirrored
 iPad display to extended mode for the current session. Existing connected
 sessions retain their sidebar settings. The toolbar overlays the full-display
 board. This is an editable board, not Mirror/Project output.
+Closing the board stops Sidecar only if Trace started that connection.
+An already-connected iPad display is left connected. This ownership lasts
+through returning the Pencil and moving the board back to the Mac.
 
 ### Experimental Apple Pencil automation
 
@@ -130,6 +133,8 @@ that same board back to its Mac position without copying, closing, or
 disconnecting Sidecar. Initial battery state is a baseline, not a pickup;
 duplicate state messages do not create extra captures. A return during
 connection prevents the board from being moved to the iPad afterward.
+Closing the board also releases a Sidecar connection started by Trace;
+connections that were already active before the capture are preserved.
 
 Only normalized state, device name, and errors cross the helper pipe; raw
 iPad logs are not saved. Temporary connection failures appear in Settings
