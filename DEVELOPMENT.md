@@ -108,8 +108,12 @@ through returning the Pencil and moving the board back to the Mac.
 
 The product canvas attaches AppKit gesture recognizers directly to its
 WebKit view. A tablet recognizer consumes Pencil mouse sequences before
-WebKit can flatten their pressure; direct-touch pan and tap recognizers
-separate fingers from drawing on macOS 27 / iPadOS 27. A magnification
+WebKit can flatten their pressure; a direct-touch recognizer
+separates fingers from drawing on macOS 27 / iPadOS 27. It claims the
+single-finger sequence at touch-down rather than competing with WebKit's
+drag/scroll recognizers, and forwards movement in canvas-view points.
+Taps produce no movement; adding a second finger ends the pan so pinch
+can take over. A magnification
 recognizer forwards pinch zoom. `NSIsTouchNative` disables macOS 27's
 extra mouse emulation; ordinary mouse and trackpad scrolling remain native
 WebKit input. Pencil interaction with Select, Text, and temporary Command

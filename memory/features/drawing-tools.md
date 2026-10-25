@@ -62,6 +62,8 @@ Sidecar canvas input
 - On a touch-capable Sidecar connection, dragging one finger moves the canvas
   without adding marks or moving shapes, even with Pen selected. Tapping a
   finger does not leave a dot.
+- Adding a second finger during a pan allows pinch zoom without a sudden
+  canvas jump; ending or cancelling the gesture leaves the next drag usable.
 - Pinching keeps the content under the gesture anchored while changing zoom,
   without drawing or creating undo entries for shapes.
 - A Pencil stroke creates one editable mark, with pressure variation where

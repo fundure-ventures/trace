@@ -6,8 +6,7 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
     var tool: TraceCanvasTool = .pen
     private weak var view: NSView?
     private let pencil = CanvasPencilRecognizer(target: nil, action: nil)
-    private let pan = NSPanGestureRecognizer(target: nil, action: nil)
-    private let fingerTap = NSClickGestureRecognizer(target: nil, action: nil)
+    private let pan = CanvasFingerPanRecognizer(target: nil, action: nil)
     private let pinch = NSMagnificationGestureRecognizer(target: nil, action: nil)
 
     init(view: NSView) {
@@ -26,14 +25,7 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
             pan.action = #selector(panChanged)
             pan.delegate = self
             pan.allowedTouchTypes = .direct
-            pan.minimumNumberOfTouches = 1
-            pan.maximumNumberOfTouches = 1
             view.addGestureRecognizer(pan)
-            fingerTap.target = self
-            fingerTap.action = #selector(ignoreFingerTap)
-            fingerTap.delegate = self
-            fingerTap.allowedTouchTypes = .direct
-            view.addGestureRecognizer(fingerTap)
         }
         pinch.target = self
         pinch.action = #selector(pinchChanged)
@@ -81,8 +73,6 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
         ]
     }
 
-    @objc private func ignoreFingerTap() {}
-
     @objc private func pencilChanged() {
         guard let view else { return }
         var samples = pencil.samples
@@ -120,8 +110,7 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
 
     @objc private func panChanged() {
         guard let view, pencil.state != .began, pencil.state != .changed else { return }
-        let translation = pan.translation(in: view)
-        pan.setTranslation(.zero, in: view)
+        let translation = pan.translation
         guard pan.state == .began || pan.state == .changed || pan.state == .ended else { return }
         onInput?([[
             "kind": "pan",
@@ -139,6 +128,61 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
         payload["kind"] = "pinch"
         payload["scale"] = scale
         onInput?([payload])
+    }
+}
+
+/// Claims direct touches before WebKit's own drag/scroll recognizers.
+private final class CanvasFingerPanRecognizer: NSGestureRecognizer {
+    private(set) var translation = NSPoint.zero
+
+    override func canBePrevented(by preventingGestureRecognizer: NSGestureRecognizer) -> Bool {
+        false
+    }
+
+    override func canPrevent(_ preventedGestureRecognizer: NSGestureRecognizer) -> Bool {
+        !(preventedGestureRecognizer is NSMagnificationGestureRecognizer)
+    }
+
+    override func touchesBegan(with event: NSEvent) {
+        let touches = event.touches(matching: .touching, in: view)
+            .filter { $0.type == .direct }
+        guard touches.count == 1 else {
+            translation = .zero
+            state = state == .possible ? .failed : .cancelled
+            return
+        }
+        translation = .zero
+        state = .began
+    }
+
+    override func touchesMoved(with event: NSEvent) {
+        guard state == .began || state == .changed, let view else { return }
+        let touches = event.touches(matching: .touching, in: view)
+            .filter { $0.type == .direct }
+        guard touches.count == 1, let touch = touches.first else {
+            translation = .zero
+            state = .cancelled
+            return
+        }
+        let current = touch.location(in: view)
+        let previous = touch.previousLocation(in: view)
+        translation = NSPoint(x: current.x - previous.x, y: current.y - previous.y)
+        state = .changed
+    }
+
+    override func touchesEnded(with event: NSEvent) {
+        translation = .zero
+        state = state == .possible ? .failed : .ended
+    }
+
+    override func touchesCancelled(with event: NSEvent) {
+        translation = .zero
+        state = state == .possible ? .failed : .cancelled
+    }
+
+    override func reset() {
+        super.reset()
+        translation = .zero
     }
 }
 
