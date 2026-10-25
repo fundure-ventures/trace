@@ -96,6 +96,21 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     private var blankCanvasRevealPending = false
     private var currentToolState = TraceToolState()
 #if DEBUG
+    func fillSidecarScreen(_ screen: NSScreen) throws {
+        guard showingDocument, let window else {
+            throw SidecarCaptureProbeError.failed("The captured trace is no longer open.")
+        }
+        transitionController.cancel()
+        isPositioningToolbar = true
+        (window as? TraceBoardWindow)?.fillsSidecarDisplayForProbe = true
+        window.setFrame(screen.frame, display: true)
+        isPositioningToolbar = false
+        window.alphaValue = 1
+        window.makeKeyAndOrderFront(nil)
+        showAnnotationToolbar(animated: false, allowBoardReposition: false)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     private var suppressFloatingToolbarOrderingForTesting = false
     private var toolbarRevealAnimatedForTesting = false
     private var toolbarPresentedForTesting = false
@@ -342,6 +357,9 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         capture: CapturedWindow?,
         toolState: TraceToolState
     ) {
+#if DEBUG
+        (window as? TraceBoardWindow)?.fillsSidecarDisplayForProbe = false
+#endif
         showingDocument = true
 #if DEBUG
         suppressFloatingToolbarOrderingForTesting = false
@@ -1968,6 +1986,12 @@ private final class TraceBoardWindow: NSWindow {
     var onPointerDown: (() -> Void)?
 
 #if DEBUG
+    var fillsSidecarDisplayForProbe = false
+
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        fillsSidecarDisplayForProbe ? frameRect : super.constrainFrameRect(frameRect, to: screen)
+    }
+
     private let sidecarInputProbeEnabled =
         ProcessInfo.processInfo.environment[
             "TRACE_SIDECAR_INPUT_PROBE"

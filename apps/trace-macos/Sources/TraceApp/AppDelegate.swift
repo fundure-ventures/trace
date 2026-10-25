@@ -397,6 +397,9 @@ final class TraceAppDelegate:
     private var startupErrorWorkItem: DispatchWorkItem?
     private var forwardedOpenFiles = false
     private var persistDebugLogItems: [NSMenuItem] = []
+#if DEBUG
+    private var sidecarCaptureInProgress = false
+#endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
 #if DEBUG
@@ -605,6 +608,11 @@ final class TraceAppDelegate:
             startCLIServer()
         }
 #if DEBUG
+        if CommandLine.arguments.contains("--sidecar-capture") {
+            DispatchQueue.main.async { [weak self] in
+                self?.captureToSidecar()
+            }
+        }
         if ProcessInfo.processInfo.environment["TRACE_CLI_PROBE"] == "1",
            let cliServer
         {
@@ -2303,6 +2311,45 @@ final class TraceAppDelegate:
             self?.model.newScreenshotPage()
         }
     }
+
+#if DEBUG
+    private func captureToSidecar() {
+        guard !sidecarCaptureInProgress else { return }
+        sidecarCaptureInProgress = true
+        withFlushedTldrawSnapshot { [weak self] in
+            guard let self else { return }
+            self.model.newScreenshotPage(noRecording: true) { result in
+                Task { @MainActor in
+                    defer { self.sidecarCaptureInProgress = false }
+                    do {
+                        try result.get()
+                        let documentID = self.model.snapshot.currentDocument?.manifest.id
+                        let probe = SidecarCaptureProbe()
+                        let screen = try await probe.connectDisplay()
+                        guard documentID != nil,
+                              self.model.snapshot.currentDocument?.manifest.id == documentID
+                        else {
+                            throw SidecarCaptureProbeError.failed(
+                                "The open trace changed while Sidecar was connecting."
+                            )
+                        }
+                        try self.board.fillSidecarScreen(screen)
+                        TraceLogger.shared.record(
+                            .notice, category: .capture,
+                            "Sidecar capture ready"
+                        )
+                    } catch {
+                        TraceLogger.shared.record(
+                            .error, category: .capture,
+                            "Sidecar capture failed", error: error
+                        )
+                        self.showSettingsError(error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+#endif
 
     func menuWillOpen(_ menu: NSMenu) {
         if screenshotMenuItems.contains(where: { $0.submenu === menu }) {

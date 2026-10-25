@@ -83,6 +83,26 @@ renderer. The local `.env` is copied only into the installed debug product so
 it can resolve credentials away from the repository. It is never copied into
 the unsigned or signed production product. Never commit keys.
 
+### Experimental capture to Sidecar
+
+```sh
+./tools/trace --sidecar-capture
+```
+
+This debug-only experiment captures the frontmost Mac window before asking
+Sidecar to connect, then moves the editable board to fill the iPad display.
+Keep exactly one Sidecar-capable iPad available, awake, and unlocked. Existing
+traces are saved before creating a new screenshot trace. Screen Recording
+permission is required; automatic Dictation is suppressed for this probe.
+
+The connection uses unsupported private `SidecarCore` APIs, not UI scripting.
+It requests no sidebar or Touch Bar for a new connection and switches a mirrored
+iPad display to extended mode for the current session. Existing connected
+sessions retain their sidebar settings. The toolbar overlays the full-display
+board. Normal app launch and release builds do not enable this experiment.
+Pencil charging events are not wired to it yet, and returning the board to the
+Mac is still manual. This is an editable board, not Mirror/Project output.
+
 ## Build
 
 ```sh

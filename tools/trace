@@ -35,13 +35,16 @@ BASE_BUNDLE_IDENTIFIER=$(
 BUNDLE_IDENTIFIER="${BASE_BUNDLE_IDENTIFIER}${BUNDLE_IDENTIFIER_SUFFIX}"
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 CLEAR_STATE=false
+SIDECAR_CAPTURE=false
 
 show_help() {
     cat <<'EOF'
-usage: ./tools/trace [--clear]
+usage: ./tools/trace [--clear] [--sidecar-capture]
 
   --clear  Reset Trace onboarding, calibration, window state, and macOS
            permissions before launching. Saved .traceboard drawings remain.
+  --sidecar-capture  Debug experiment: capture the frontmost Mac window,
+                    connect one nearby iPad, and fill its Sidecar display.
 
 Builds Trace Debug and installs it to /Applications/Trace Debug.app (override
 the parent directory with TRACE_APP_INSTALL_DIR) before launching, so every
@@ -54,6 +57,13 @@ while (($#)); do
     case "$1" in
         --clear)
             CLEAR_STATE=true
+            ;;
+        --sidecar-capture)
+            if [[ "$CONFIGURATION" != "debug" ]]; then
+                echo "error: Sidecar capture is debug-only." >&2
+                exit 64
+            fi
+            SIDECAR_CAPTURE=true
             ;;
         --help|-h)
             show_help
@@ -251,7 +261,9 @@ cp -R "$BUILD_APP" "$APP"
 "$ROOT/tools/sign-app" "$APP"
 
 register_current_app
-if [[ -n "${TRACE_PERSIST_DEBUG_LOGS:-}" ]]; then
+if [[ "$SIDECAR_CAPTURE" == "true" ]]; then
+    open -g "$APP" --args --sidecar-capture
+elif [[ -n "${TRACE_PERSIST_DEBUG_LOGS:-}" ]]; then
     open "$APP" --env "TRACE_PERSIST_DEBUG_LOGS=$TRACE_PERSIST_DEBUG_LOGS"
 else
     open "$APP"
