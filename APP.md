@@ -31,9 +31,14 @@ Open **Setup** from the menu-bar menu. See [Setup](#setup) and
 ### App settings
 **What it does:** Configures pen, Copy, Dictation, and launch behavior.
 **Where:** Trace menu bar menu.
-After wireless iPad configuration, **Apple Pencil pickup
-opens Trace on iPad** appears enabled by default. Pickup captures and opens on
-Sidecar; returning the Pencil brings the board back to the Mac. See
+Under the muted **Pencil** heading, **Pick up to capture and open** and
+**Put down to copy** apply to Neo Smartpen and Apple Pencil alike.
+Checked device rows select which pens to watch, including each configured
+iPad's **Apple Pencil**. Unticking a device stops its watcher; unticking all
+devices stops all normal pen watching. Choices persist across launches.
+Pickup captures and opens on the Pencil's Sidecar iPad; returning it brings
+the board back to the Mac and, when enabled, triggers Copy. **Copy → Close
+window after copy** alone decides whether that copy closes the board. See
 [iPad setup](DEVELOPMENT.md#apple-pencil-automation).
 Closing the board disconnects Sidecar only when Trace started the connection.
 
@@ -125,7 +130,8 @@ Pressure affects freehand ink; Pencil tilt does not currently change the brush.
 **iPad and Apple Pencil** finds iPads on Wi-Fi and
 guides USB trust, wireless access, unplugged verification, and a Pencil
 pickup/return check, one step at a time. Completed setup reveals the
-default-on automation setting. A spinner accompanies the current instruction;
+named device in Settings → Pencil without replacing earlier devices.
+A spinner accompanies the current instruction;
 USB, trust, cable removal, permission, and Pencil checks advance as detected,
 without extra Continue clicks. Choosing between iPads and enabling wireless
 access still require your approval. No device identifiers or terminal commands

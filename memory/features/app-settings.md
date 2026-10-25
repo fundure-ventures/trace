@@ -8,15 +8,15 @@ or narrated walkthroughs. One fixed behavior fits none of them.
 
 ## Solution
 The menu bar **Settings** submenu groups behavior by moment:
-- **When pen is connected:** Capture screenshot (on cap off).
-- **When pen is disconnected:** copy the open trace and close it.
+- **Pencil:** Pick up to capture and open; Put down to copy. Both apply to
+  Neo Smartpen cap/connection changes and configured Apple Pencil devices.
+  Checked device rows choose which pens Trace watches.
 - **Copy:** Close window after copy; **Format** (image and dictation, image,
   dictation, `.pdf`).
 - **Dictation:** Start dictation automatically; Annotation scale
   (Small 75%, Medium 100%, Large 150%).
 - **Launch in menu bar at login.**
-- With a configured iPad, Settings also offers **Apple Pencil
-  pickup opens Trace on iPad**, enabled by default.
+- Each configured iPad appears by name followed by **Apple Pencil**.
 
 ## Touchpoints
 - [Menu bar agent](menu-bar-agent.md) → Settings
@@ -33,20 +33,26 @@ Copy settings
 └─ Close window after copy
    ├─ Enabled → Edit menu reads "Copy trace and close"
    └─ Disabled → Edit menu reads "Copy trace"
-Pen-dependent sections
-├─ Pen connected → visible
-└─ No pen connected → hidden
-Apple Pencil setting
-├─ No validated iPad configuration → hidden
-├─ Wireless iPad configuration validated → visible; initially on
-├─ User switches off → stop listening; remember choice across launches
-└─ iPad temporarily unavailable → retain setting; show connection status
+Pencil section
+├─ Presentation → muted "Pencil" heading, shared actions, checked device rows
+├─ Disconnected device → keep controls available
+├─ Pick up to capture and open → same preference for Neo and Apple Pencil
+├─ Put down to copy → copy whole trace using Copy format
+│  └─ Close window after copy → sole setting deciding whether copy closes board
+├─ Neo Smartpen → uncheck to stop Bluetooth discovery and disconnect
+├─ Configured iPad Apple Pencil → uncheck to stop its listener
+├─ Multiple configured iPads → independent device checks; remember all devices
+├─ All devices unchecked → no background pen watching
+└─ iPad temporarily unavailable → retain device; explain status in its tooltip
 ```
 
 ## FAQ
 - **Why does `⌘C` close my board?** "Close window after copy" is on under Copy.
-- **Can the pen cap start a capture?** Yes: When pen is connected → Capture screenshot.
+- **Can the pen cap start a capture?** Yes: Pencil → Pick up to capture and open.
 - **How do I copy only the transcript?** Copy → Format → Copy dictation.
+- **Can putting down a pen copy but keep the trace open?** Enable Put down
+  to copy and disable Copy → Close window after copy.
+- **How do I stop watching one iPad?** Untick its Apple Pencil device row.
 
 ## Acceptance criteria
 - Users can reach Settings directly from Trace's status-bar menu.
@@ -56,10 +62,16 @@ Apple Pencil setting
   toolbar's copy-options menu.
 - Changing "Close window after copy" immediately updates the Edit menu to
   describe whether copying will close the trace.
-- With no pen connected, pen-dependent settings are hidden; connecting a pen
-  makes them available.
-- Validating an iPad configuration reveals an
-  enabled Apple Pencil automation setting. Turning it off stops automatic
-  capture, and it remains off after restarting Trace.
-- When a configured iPad becomes unreachable, its setting remains available
-  and its connection problem is visible rather than silently appearing ready.
+- Pencil controls remain available when no device is connected, allowing users
+  to re-enable a disabled device.
+- Configuring an iPad adds its named Apple Pencil device row without removing
+  previously configured iPads. Each row retains its checked state after relaunch.
+- Disabling one device stops its watcher without disabling other devices.
+  Disabling every device stops all normal Bluetooth discovery and iPad listeners.
+  Disabling is not a put-down event: it does not copy or close the trace.
+- With Put down to copy enabled, returning an Apple Pencil to its magnetic
+  charger or disconnecting/capping the Neo pen copies the open trace. With
+  Close window after copy disabled, that copied trace stays open; with it
+  enabled, the trace closes after copying succeeds.
+- When a configured iPad becomes unreachable, its device row remains available
+  with a tooltip explaining the connection problem.

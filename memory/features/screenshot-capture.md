@@ -16,7 +16,9 @@ the screenshot is inserted there instead of replacing it.
 
 A configured iPad can use Pencil pickup to
 capture the Mac window, connect Sidecar, and fill its screen with the editable
-board. Returning the Pencil brings that same board back to the Mac.
+board. Returning the Pencil brings that same board back to the Mac and
+triggers Copy when **Put down to copy** is enabled. Copy's close setting
+decides whether the board then stays open.
 
 ## Touchpoints
 - [Menu bar agent](menu-bar-agent.md) and File → New Screenshot trace
@@ -49,12 +51,13 @@ The Pencil capture workflow follows these rules:
 
 ```text
 Pencil capture
-├─ Prerequisites → validated wireless iPad setup and enabled setting
-├─ Pickup → capture first; then connect Sidecar and show editable board on iPad
+├─ Prerequisites → validated wireless iPad setup and checked device
+├─ Pickup capture enabled → capture first; then connect Sidecar to that iPad
 ├─ Initial state or repeated identical messages → no extra captures
 ├─ Close board → stop Sidecar only if Trace started the connection
 └─ Return to iPad charger
    ├─ Board on iPad → bring same document back to Mac; preserve edits
+   ├─ Put down to copy enabled → Copy; obey Close window after copy
    └─ Connection pending → do not move board to iPad after return
 ```
 
@@ -81,8 +84,11 @@ Pencil capture
   permission or capture failures are reported as failures.
 - Picking up the Pencil captures the Mac
   app before connecting Sidecar, then opens the editable board across the iPad
-  screen. Returning the Pencil moves the same board back without copying,
-  closing, or losing its annotations.
+  screen when pickup capture is enabled. Returning the Pencil moves the same
+  board back without losing its annotations, then follows the shared
+  Put down to copy and Close window after copy settings.
+- With several watched iPads, pickup opens the board on the iPad belonging to
+  that Pencil. Another device's return does not copy or move its active board.
 - Starting or reconnecting the Pencil monitor does not itself create a
   screenshot, and repeated messages for the same state create no extra board.
 - Closing a Sidecar trace disconnects the iPad display if Trace

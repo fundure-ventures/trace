@@ -164,24 +164,31 @@ or `EnableWifiDebugging` setting is needed.
 
 The launcher configuration is saved after the wireless log service accepts
 the Mac's existing trust record and the iPad's identity matches; the guided
-Setup flow additionally requires the live Pencil check. Settings then
-shows **Apple Pencil pickup opens Trace on iPad**, enabled by default.
-Disabling it stops monitoring and is remembered across launches. Configured,
-enabled builds resume listening on normal launch. Debug and release bundles
+Setup flow additionally requires the live Pencil check. Settings groups
+**Pick up to capture and open**, **Put down to copy**, and checked device rows
+under **Pencil**. These action preferences are shared with Neo Smartpen.
+Each configured iPad is retained separately, with its own watching preference.
+Unchecking an iPad stops its helper process; unchecking Neo stops Bluetooth
+discovery and disconnects without copying. Rechecking resumes discovery with
+a fresh baseline. Legacy single-iPad configuration and its opt-out migrate
+without resetting the user's choices. Configured,
+enabled devices resume listening on normal launch. Debug and release bundles
 both include the helper and setting. The Python runtime and diagnostic package
 are external prerequisites, not bundled or downloaded automatically.
 
 A change to charging `NO` or an explicit detach starts a new screenshot
-trace on the configured iPad. Charging `YES` or an explicit attach brings
-that same board back to its Mac position without copying, closing, or
-disconnecting Sidecar. Initial battery state is a baseline, not a pickup;
+trace on that iPad when pickup capture is enabled. Charging `YES` or an
+explicit attach returns that same board to its Mac position and requests
+the ordinary whole-trace Copy action when put-down copy is enabled.
+The shared **Close window after copy** preference alone decides whether
+that copy closes the board. Initial battery state is a baseline, not a pickup;
 duplicate state messages do not create extra captures. A return during
 connection prevents the board from being moved to the iPad afterward.
 Closing the board also releases a Sidecar connection started by Trace;
 connections that were already active before the capture are preserved.
 
 Only normalized state, device name, and errors cross the helper pipe; raw
-iPad logs are not saved. Temporary connection failures appear in Settings
+iPad logs are not saved. Temporary connection failures appear in device tooltips
 and retry every ten seconds, with a fresh baseline on reconnect. The helper
 uses standard wireless lockdown port 62078 rather than relying on usbmuxd's
 network device discovery. This remains unsupported, OS-dependent telemetry:

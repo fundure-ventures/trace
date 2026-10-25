@@ -62,7 +62,7 @@ iPad setup
 │  ├─ Verify → wait for USB removal, then check trusted Wi-Fi log connection
 │  ├─ Screen Recording missing → offer permission action
 │  └─ Pencil check → attach, pick up, return; no automatic captures during check
-├─ Completed → remember iPad and expose default-on automation setting
+├─ Completed → add iPad to Pencil devices; preserve prior devices and choices
 ├─ Failure → show current problem and a retry action; never mark complete
 └─ Close Setup → stop setup checks; do not reopen the window
 ```
@@ -108,6 +108,10 @@ iPad setup
   connected by USB. It confirms actual wireless trust and Pencil pickup/return
   before saving a new configuration.
 - Pencil gestures used for setup do not create screenshot boards. After
-  completion, the remembered automation preference controls normal pickup.
+  completion, the device's checkmark and shared Pencil preferences control
+  normal pickup and return.
+- Setting up another iPad keeps previously configured iPads and their
+  independent watching preferences. Setup's Check again can configure
+  another detected iPad; completing it does not re-enable an unticked device.
 - Closing Setup stops its discovery or verification work without reopening
   it or discarding an already saved iPad configuration.

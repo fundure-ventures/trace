@@ -3479,11 +3479,11 @@ enum TraceRetainedInkProbe {
             )
         }
         guard TraceAppSettingsMenuPresentation.connectedSection
-            == "When pen is connected",
+                == "Pencil",
             TraceAppSettingsMenuPresentation.captureScreenshot
-                == "Capture screenshot",
-            TraceAppSettingsMenuPresentation.disconnectedSection
-                == "When pen is disconnected",
+                == "Pick up to capture and open",
+            TraceAppSettingsMenuPresentation.putDown
+                == "Put down to copy",
             TraceAppSettingsMenuPresentation.copyTraceAndClose
                 == "Close window after copy",
             TraceAppSettingsMenuPresentation.onCopySection
@@ -3506,25 +3506,6 @@ enum TraceRetainedInkProbe {
                 == "Large (150%)"
         else {
             throw probeError("app settings menu labels changed")
-        }
-        let penAppSettingItems = (0..<6).map { _ in NSMenuItem() }
-        TraceAppSettingsMenuPresentation.applyPenVisibility(
-            isConnected: false,
-            to: penAppSettingItems
-        )
-        guard penAppSettingItems.allSatisfy(\.isHidden) else {
-            throw probeError(
-                "pen-related app settings remained visible while disconnected"
-            )
-        }
-        TraceAppSettingsMenuPresentation.applyPenVisibility(
-            isConnected: true,
-            to: penAppSettingItems
-        )
-        guard penAppSettingItems.allSatisfy({ !$0.isHidden }) else {
-            throw probeError(
-                "pen-related app settings did not return after connection"
-            )
         }
         guard TraceAppMenuPresentation.newBlankTrace
             == "New Blank trace",

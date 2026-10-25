@@ -14,7 +14,7 @@ Each file is the source of truth for
 | `#board` | The trace window, its toolbar, and the canvas |
 | `#voice` | Dictation and its link to marks |
 | `#output` | Copying, saving, and reopening traces |
-| `#pen` | Neo Smartpen hardware input |
+| `#pen` | Neo Smartpen and Apple Pencil hardware workflows |
 
 ## Inventory
 
@@ -24,9 +24,9 @@ Each file is the source of truth for
 | [Setup](memory/features/setup.md) | `#app` | Permissions, pen, Dictation key, shortcuts, and auto-advancing guided iPad setup |
 | [Command-line tool](memory/features/command-line-tool.md) | `#app` | Install and use Trace from Terminal |
 | [Global shortcuts](memory/features/global-shortcuts.md) | `#app` | System-wide New Blank Trace and Capture Frontmost App |
-| [App settings](memory/features/app-settings.md) | `#app` | Pen, copy, Dictation, and login behavior |
+| [App settings](memory/features/app-settings.md) | `#app` | Shared Pencil pickup/put-down actions, per-device watching, Copy, Dictation, and login |
 | [Projection](memory/features/projection.md) | `#app` | Mirror or Project a trace on an external display |
-| [Screenshot capture](memory/features/screenshot-capture.md) | `#capture` | Capture the frontmost window 1:1 into a board |
+| [Screenshot capture](memory/features/screenshot-capture.md) | `#capture` | Capture the frontmost window 1:1; Pencil pickup opens on its iPad |
 | [Blank trace](memory/features/blank-trace.md) | `#capture` | Start from an empty page |
 | [Device screenshots](memory/features/device-screenshots.md) | `#capture` | Capture Android and iOS devices directly |
 | [Image import](memory/features/image-import.md) | `#capture` | Open, drop, or paste images onto a canvas |

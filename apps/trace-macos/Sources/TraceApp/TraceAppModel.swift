@@ -795,7 +795,38 @@ final class TraceAppModel {
             )
             onShowOnboarding?()
         }
-        transport.startDiscovery()
+        if neoPenWatchingEnabled { transport.startDiscovery() }
+    }
+
+    var neoPenWatchingEnabled: Bool {
+        defaults.object(forKey: "TraceNeoPenWatchingEnabled") as? Bool ?? true
+    }
+
+    func setNeoPenWatchingEnabled(_ enabled: Bool) {
+        guard enabled != neoPenWatchingEnabled else { return }
+        defaults.set(enabled, forKey: "TraceNeoPenWatchingEnabled")
+        if enabled {
+            didRequestConnection = false
+            transport.startDiscovery()
+        } else {
+            transport.stopDiscovery()
+            transport.disconnect()
+            resetConnectionState(cancelVoice: false)
+            connectionState = .disconnected
+            stateMachine.receive(.penDisconnected)
+            if let currentDocument {
+                stateMachine.receive(.drawingOpened(currentDocument.manifest.id))
+            }
+            onStateChange?(snapshot)
+        }
+    }
+
+    func pencilPutDown() {
+        guard appSettings.copyTraceAndCloseOnDisconnect, currentDocument != nil,
+              !copyRequestPending, !voiceController.state.isFinishing
+        else { return }
+        copyRequestPending = true
+        onCopyRequested?()
     }
 
     func stop() {
@@ -1697,6 +1728,7 @@ final class TraceAppModel {
     }
 
     private func handleTransport(_ event: NeoTransportEvent) {
+        guard neoPenWatchingEnabled else { return }
         if case let .notificationBatch(batch) = event {
             currentNotificationBatch = batch
         }

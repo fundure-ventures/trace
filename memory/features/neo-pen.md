@@ -23,6 +23,10 @@ Off with Cap, Auto Power Off, Pressure Sensitivity.
 Pen availability
 ├─ No pen → every product flow remains available without it
 └─ Hardware validation → M1 only; other models untested
+Pencil settings
+├─ Pick up to capture and open / Put down to copy → shared with Apple Pencil
+├─ Copy triggered by cap/disconnect → obey Copy's Close window after copy
+└─ Neo device unchecked → stop discovery and disconnect without copying
 Pen status
 ├─ Disconnected → "Pen disconnected"
 ├─ Connecting → "<name> · Connecting"
@@ -44,3 +48,5 @@ Save Neo strokes
 - Reopening a trace preserves pen strokes alongside mouse-drawn content.
 - Without a pen connected, users can still capture, annotate with the
   mouse or trackpad, dictate, and copy a trace.
+- Unticking Neo Smartpen stops Bluetooth discovery and connection attempts.
+  Ticking it again resumes discovery without changing the shared Pencil actions.

@@ -1,9 +1,38 @@
 import AppKit
+import TraceLogging
 
 struct PencilIPadConfiguration {
     let udid: String
     let host: String
     let name: String
+
+    static func loadAll() -> [Self] {
+        if let saved = UserDefaults.standard.array(forKey: "TracePencilIPads") as? [[String: String]] {
+            return saved.compactMap {
+                guard let udid = $0["udid"], let host = $0["host"], let name = $0["name"] else {
+                    TraceLogger.shared.record(.error, category: .capture, "Saved iPad configuration is incomplete")
+                    return nil
+                }
+                return Self(udid: udid, host: host, name: name)
+            }
+        }
+        return load().map { [$0] } ?? []
+    }
+
+    var isEnabled: Bool {
+        get {
+            let defaults = UserDefaults.standard
+            if let enabled = defaults.object(forKey: "TracePencilEnabled.\(udid)") as? Bool {
+                return enabled
+            }
+            return defaults.string(forKey: "TracePencilIPadUDID") == udid
+                ? (defaults.object(forKey: "TracePencilSidecarEnabled") as? Bool ?? true)
+                : true
+        }
+        nonmutating set {
+            UserDefaults.standard.set(newValue, forKey: "TracePencilEnabled.\(udid)")
+        }
+    }
 
     static func load() -> Self? {
         let defaults = UserDefaults.standard
@@ -16,16 +45,23 @@ struct PencilIPadConfiguration {
 
     func save() {
         let defaults = UserDefaults.standard
+        var configurations = Self.loadAll()
+        // Preserve the legacy opt-out before changing the last-configured iPad.
+        for config in configurations {
+            defaults.set(config.isEnabled, forKey: "TracePencilEnabled.\(config.udid)")
+        }
+        defaults.set(isEnabled, forKey: "TracePencilEnabled.\(udid)")
+        if let index = configurations.firstIndex(where: { $0.udid == udid }) {
+            configurations[index] = self
+        } else {
+            configurations.append(self)
+        }
+        defaults.set(configurations.map {
+            ["udid": $0.udid, "host": $0.host, "name": $0.name]
+        }, forKey: "TracePencilIPads")
         defaults.set(udid, forKey: "TracePencilIPadUDID")
         defaults.set(host, forKey: "TracePencilIPadHost")
         defaults.set(name, forKey: "TracePencilIPadName")
-    }
-
-    static var enabled: Bool {
-        get {
-            UserDefaults.standard.object(forKey: "TracePencilSidecarEnabled") as? Bool ?? true
-        }
-        set { UserDefaults.standard.set(newValue, forKey: "TracePencilSidecarEnabled") }
     }
 }
 

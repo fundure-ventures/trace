@@ -16,7 +16,7 @@ room on every side, rather than retaining unused page space.
 ## Touchpoints
 - Edit → Copy trace / Copy trace and close; toolbar Copy and Copy options
 - Format and close behavior from [App settings](app-settings.md)
-- Triggered on pen disconnect by [Neo pen](neo-pen.md) settings
+- Triggered on pen put-down by shared [App settings](app-settings.md)
 - Includes [Dictation](dictation.md) and [Timed annotations](timed-annotations.md)
 - Shares image framing with command-line copy and export in [Command-line tool](command-line-tool.md)
 
@@ -35,6 +35,10 @@ Whole-trace copy
 └─ Copy and save trace
    ├─ Close-after-copy enabled → close board
    └─ Close-after-copy disabled → keep board open
+Pen put-down copy
+├─ Put down to copy enabled → same whole-trace Copy action and format
+├─ Close-after-copy → obey shared Copy setting; never force close
+└─ Device unticked → stop watching; never treat disabling as put-down
 Dictation-containing copy
 ├─ Copy current image and already completed transcript without waiting for the network
 │  └─ First clipboard write → release controls and apply close-after-copy
