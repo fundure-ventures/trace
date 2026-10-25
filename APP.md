@@ -125,8 +125,11 @@ Pressure affects freehand ink; Pencil tilt does not currently change the brush.
 **iPad and Apple Pencil** finds iPads on Wi-Fi and
 guides USB trust, wireless access, unplugged verification, and a Pencil
 pickup/return check, one step at a time. Completed setup reveals the
-default-on Pencil automation setting. No device identifiers or terminal
-commands are needed in this flow.
+default-on automation setting. A spinner accompanies the current instruction;
+USB, trust, cable removal, permission, and Pencil checks advance as detected,
+without extra Continue clicks. Choosing between iPads and enabling wireless
+access still require your approval. No device identifiers or terminal commands
+are needed in this flow.
 
 ### Timed annotations
 **What it does:** Matches numbered marks to words in the narration.

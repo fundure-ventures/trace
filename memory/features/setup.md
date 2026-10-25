@@ -16,8 +16,11 @@ opens on first launch (onboarding) and later from the menu bar.
 
 Setup also includes **iPad and Apple Pencil**. It
 looks for iPads on the local network, offers the detected device, and walks
-through one instruction and action at a time. If wireless discovery is not
-available yet, the flow starts with USB instead.
+through the current instruction with a spinner while waiting. USB connection,
+trust approval, cable removal, permission approval, and Pencil gestures
+advance automatically when detected. If wireless discovery is not available
+yet, the flow waits for USB instead. Buttons remain for choosing among multiple
+iPads, enabling wireless access, opening permission settings, and retrying errors.
 
 ## Touchpoints
 - [Menu bar agent](menu-bar-agent.md) → **Setup**
@@ -51,10 +54,12 @@ iPad setup
 ├─ Open Setup → look for iPads on the local network
 ├─ Multiple iPads → user chooses which one to configure
 ├─ No advertising iPad → offer USB setup; never claim a device is ready
+├─ One identified iPad → proceed to USB instructions automatically
+├─ Waiting for user or device → spinner and current instruction; no Continue clicks
 ├─ Configure
 │  ├─ Trust → guide USB connection, Finder trust, and iPad approval as needed
 │  ├─ Wireless → enable only after user chooses the action
-│  ├─ Verify → require USB unplugged and a trusted Wi-Fi log connection
+│  ├─ Verify → wait for USB removal, then check trusted Wi-Fi log connection
 │  ├─ Screen Recording missing → offer permission action
 │  └─ Pencil check → attach, pick up, return; no automatic captures during check
 ├─ Completed → remember iPad and expose default-on automation setting
@@ -92,8 +97,13 @@ iPad setup
   and offers an identified iPad for configuration. Multiple iPads can be
   selected explicitly; without a reachable iPad, users get a USB instruction.
 - Users finish iPad setup without entering identifiers or commands. Each step
-  shows the current instruction and one primary action, with separate steps
-  for trusting the Mac and enabling wireless access.
+  shows the current instruction and a spinner while observing progress.
+  Connecting USB, approving trust, and unplugging the cable advance without
+  Check or Continue buttons. Wireless access still requires explicit approval.
+- A single discovered iPad proceeds automatically; multiple discovered iPads
+  remain an explicit choice. Actual failures stop the spinner and offer a retry.
+- After opening Screen Recording settings from Setup, granting permission
+  advances to the Pencil check automatically when macOS reports it available.
 - Setup cannot complete its wireless check while the selected iPad is still
   connected by USB. It confirms actual wireless trust and Pencil pickup/return
   before saving a new configuration.

@@ -4,7 +4,7 @@ import TraceLogging
 @MainActor
 final class PencilSetupController {
     enum Step {
-        case idle, discovering, choose, trust, finderTrust, ipadTrust, enable, unplug, wireless
+        case idle, discovering, choose, trust, finderTrust, enable, unplug, wireless
         case permission, attach, pickup, replace, done
     }
 
@@ -23,6 +23,11 @@ final class PencilSetupController {
     private var lastCharging: Bool?
     private var retryAction: String?
     private var verifying = false
+    private var permissionCheck: Task<Void, Never>?
+
+    var waiting: Bool {
+        busy || [.attach, .pickup, .replace].contains(step)
+    }
 
     init() {
         if let configuration = PencilIPadConfiguration.load() {
@@ -61,6 +66,8 @@ final class PencilSetupController {
         helper.onError = { [weak self] message in
             guard let self else { return }
             self.helper.stop()
+            self.permissionCheck?.cancel()
+            self.permissionCheck = nil
             self.endVerification()
             self.busy = false
             self.instruction = message
@@ -92,12 +99,9 @@ final class PencilSetupController {
             show(.discovering, "Looking for iPads on your Wi-Fi. Allow Local Network access if asked.", action: nil)
             run(["--discover"])
         case .choose:
-            show(.trust, "Connect this iPad by USB and unlock it.", action: "Check trust")
-        case .trust:
+            show(.trust, "Connect this iPad by USB and unlock it.", action: nil)
             run(["--trust", selected?.name ?? "", selected?.host ?? ""])
-        case .finderTrust:
-            show(.ipadTrust, "On the unlocked iPad, tap Trust and enter its passcode.", action: "Check trust")
-        case .ipadTrust:
+        case .trust, .finderTrust:
             run(["--trust", selected?.name ?? "", selected?.host ?? ""])
         case .enable:
             run(["--enable", selected?.name ?? "", selected?.host ?? ""])
@@ -106,16 +110,30 @@ final class PencilSetupController {
             lastCharging = nil
             verifying = true
             onVerificationChange?(true)
-            show(.wireless, "Checking the iPad over Wi-Fi, without USB.", action: nil)
+            show(.unplug, "Unplug the USB cable. Keep the iPad awake on the same Wi-Fi.", action: nil)
             run(["--verify", configuration.udid, configuration.host])
         case .permission:
             if CGPreflightScreenCaptureAccess() {
                 beginPencilCheck()
             } else {
                 onRequestScreenAccess?()
-                instruction = "Allow Trace in Screen Recording settings, then check again."
-                action = "Check permission"
+                instruction = "Allow Trace in Screen Recording settings. Setup will continue automatically."
+                action = nil
+                busy = true
                 onChange?()
+                permissionCheck = Task { @MainActor [weak self] in
+                    while !Task.isCancelled {
+                        do { try await Task.sleep(nanoseconds: 1_000_000_000) }
+                        catch { return }
+                        guard let self, self.step == .permission else { return }
+                        if CGPreflightScreenCaptureAccess() {
+                            self.permissionCheck = nil
+                            self.busy = false
+                            self.beginPencilCheck()
+                            return
+                        }
+                    }
+                }
             }
         case .attach, .pickup, .replace:
             break
@@ -129,6 +147,8 @@ final class PencilSetupController {
     }
 
     func stop() {
+        permissionCheck?.cancel()
+        permissionCheck = nil
         helper.stop()
         endVerification()
         if step != .done {
@@ -147,6 +167,7 @@ final class PencilSetupController {
         do {
             try helper.start(arguments: arguments)
         } catch {
+            endVerification()
             busy = false
             instruction = error.localizedDescription
                 + " iPad setup requires the local diagnostic tools described in Development."
@@ -157,25 +178,43 @@ final class PencilSetupController {
     }
 
     private func receive(_ event: PencilTelemetryMonitor.Event) {
-        busy = false
         switch event.event {
         case "devices":
             helper.stop()
+            busy = false
             devices = event.devices ?? []
             selected = devices.first
             if let selected {
                 show(.choose, "Set up \(selected.name) for Apple Pencil pickup.", action: "Set up")
+                if devices.count == 1 { advance() }
             } else {
                 let detail = (event.unavailable ?? 0) > 0
                     ? "Nearby devices could not be identified. Check Local Network access, or connect your iPad by USB."
                     : "No iPad is advertising on Wi-Fi. Connect your iPad by USB and unlock it to enable wireless access."
-                show(.trust, detail, action: "Check USB")
+                show(.trust, detail, action: nil)
+                run(["--trust", "", ""])
             }
+        case "waiting":
+            guard let message = event.message, message != instruction else { return }
+            instruction = message
+            onChange?()
+        case "checkingWireless":
+            show(.wireless, "Checking the iPad over Wi-Fi, without USB.", action: nil)
         case "trustNeeded":
-            helper.stop()
-            show(.finderTrust, "Select your iPad in Finder and click Trust.", action: "Continue")
+            if step == .finderTrust { return }
+            let needsTrustMonitor = step == .enable
+            if needsTrustMonitor { helper.stop() }
+            show(
+                .finderTrust,
+                "Select your iPad in Finder and click Trust if asked. Then tap Trust on the unlocked iPad and enter its passcode.",
+                action: nil
+            )
+            if needsTrustMonitor {
+                run(["--trust", selected?.name ?? "", selected?.host ?? ""])
+            }
         case "trusted", "prepared":
             helper.stop()
+            busy = false
             guard let udid = event.udid, let name = event.name, let host = event.host else {
                 instruction = "The iPad setup response was incomplete. Try again."
                 action = "Try again"
@@ -191,7 +230,8 @@ final class PencilSetupController {
                     action: "Enable wireless"
                 )
             } else {
-                show(.unplug, "Unplug the USB cable. Keep the iPad awake on the same Wi-Fi.", action: "Check Wi-Fi")
+                show(.unplug, "Unplug the USB cable. Keep the iPad awake on the same Wi-Fi.", action: nil)
+                advance()
             }
         default: break
         }

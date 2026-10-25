@@ -133,13 +133,18 @@ available on older Sidecar versions; two-finger scrolling remains supported.
 In Trace, open **Setup → iPad and Apple Pencil**.
 Opening Setup searches the local network using macOS Bonjour discovery
 and identifies reachable iPads over lockdown. Select an iPad if several
-are available, then choose **Set up**. If none is advertising yet, Setup
-offers the USB step instead.
+are available, then choose **Set up**. A single identified iPad proceeds
+automatically. If none is advertising yet, Setup waits for USB instead.
 
-The row presents one instruction and primary action at a time: USB
+The row presents the current instruction with a spinner while waiting: USB
 connection, Finder/iPad trust approval if needed, explicit **Enable
 wireless**, unplugging USB, verifying wireless trust, Screen Recording
-permission if needed, and attaching/picking up/returning the Pencil.
+permission if needed, and attaching/picking up/returning the Pencil. The helper
+checks USB/trust and cable removal every two seconds; Screen Recording is
+checked every second after the permission action. These advance without
+Check or Continue clicks. Multiple-device choice, wireless consent, permission
+settings, and error retries retain explicit buttons. Waiting for USB or trust
+is a normal setup state, not an error or a completed check.
 Only after the live Pencil check does it save a new iPad configuration.
 Setup gestures do not trigger captures. Closing Setup stops its checks and
 restores any previously configured listener without reopening the panel.

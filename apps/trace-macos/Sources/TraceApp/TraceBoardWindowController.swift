@@ -5300,7 +5300,8 @@ private final class SetupPanelView: NSView {
             title: pencilSetup.step == .done ? "iPad configured" : "Pencil pickup",
             detail: pencilSetup.instruction,
             ready: pencilSetup.step == .done,
-            action: pencilSetup.action
+            action: pencilSetup.action,
+            busy: pencilSetup.waiting
         )
         pencilInstruction.stringValue = pencilSetup.instruction
         pencilPicker.isHidden = pencilSetup.step != .choose || pencilSetup.devices.count < 2
@@ -5940,6 +5941,7 @@ private final class SetupCapabilityRow: NSView {
     var onAction: (() -> Void)?
 
     private let statusImage = NSImageView()
+    private let spinner = NSProgressIndicator()
     private let titleLabel = NSTextField(labelWithString: "")
     private let detailLabel = NSTextField(labelWithString: "")
     private let actionButton = NSButton()
@@ -5950,6 +5952,10 @@ private final class SetupCapabilityRow: NSView {
         super.init(frame: frameRect)
         statusImage.translatesAutoresizingMaskIntoConstraints = false
         statusImage.imageScaling = .scaleProportionallyDown
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        spinner.isDisplayedWhenStopped = false
+        spinner.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.font = .systemFont(ofSize: 12, weight: .regular)
         titleLabel.textColor = .labelColor
         actionButton.bezelStyle = .rounded
@@ -5957,7 +5963,7 @@ private final class SetupCapabilityRow: NSView {
         actionButton.target = self
         actionButton.action = #selector(performAction)
 
-        [statusImage, titleLabel, NSView(), actionButton].forEach(row.addArrangedSubview)
+        [statusImage, spinner, titleLabel, NSView(), actionButton].forEach(row.addArrangedSubview)
         row.translatesAutoresizingMaskIntoConstraints = false
         row.orientation = .horizontal
         row.alignment = .centerY
@@ -5966,6 +5972,8 @@ private final class SetupCapabilityRow: NSView {
         NSLayoutConstraint.activate([
             statusImage.widthAnchor.constraint(equalToConstant: 16),
             statusImage.heightAnchor.constraint(equalToConstant: 16),
+            spinner.widthAnchor.constraint(equalToConstant: 16),
+            spinner.heightAnchor.constraint(equalToConstant: 16),
             row.topAnchor.constraint(equalTo: topAnchor),
             row.leadingAnchor.constraint(equalTo: leadingAnchor),
             row.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -5985,7 +5993,7 @@ private final class SetupCapabilityRow: NSView {
         link.orientation = .horizontal
         link.alignment = .centerY
         link.spacing = 4
-        row.insertArrangedSubview(link, at: 2)
+        row.insertArrangedSubview(link, at: 3)
         row.setCustomSpacing(4, after: titleLabel)
     }
 
@@ -5993,11 +6001,16 @@ private final class SetupCapabilityRow: NSView {
         title: String,
         detail: String,
         ready: Bool,
-        action: String?
+        action: String?,
+        busy: Bool = false
     ) {
         titleLabel.stringValue = title
         detailLabel.stringValue = detail
         self.ready = ready
+        statusImage.isHidden = busy
+        spinner.isHidden = !busy
+        if busy { spinner.startAnimation(nil) }
+        else { spinner.stopAnimation(nil) }
         titleLabel.toolTip = detail
         statusImage.image = NSImage(
             systemSymbolName: ready

@@ -127,7 +127,7 @@ final class PencilTelemetryMonitor {
             do {
                 let event = try JSONDecoder().decode(Event.self, from: line)
                 switch event.event {
-                case "devices", "trustNeeded", "trusted", "prepared":
+                case "devices", "trustNeeded", "trusted", "prepared", "waiting", "checkingWireless":
                     onSetupEvent?(event)
                 case "ready":
                     guard let name = event.name else {

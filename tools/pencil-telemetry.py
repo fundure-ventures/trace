@@ -109,6 +109,9 @@ async def prepare(name, host, enable=False):
 
     devices = [device for device in await list_devices() if device.is_usb]
     if not devices:
+        if not enable:
+            emit("waiting", message="Connect your iPad by USB and unlock it.")
+            return False
         raise RuntimeError("Connect your iPad by USB, unlock it, and tap Trust if asked.")
     for device in devices:
         client = await asyncio.wait_for(
@@ -126,7 +129,7 @@ async def prepare(name, host, enable=False):
                 raise RuntimeError("Leave only the iPad you want to configure connected by USB.")
             if not client.paired:
                 emit("trustNeeded")
-                return
+                return False
             if enable:
                 domain = "com.apple.mobile.wireless_lockdown"
                 await client.set_value(True, domain=domain, key="EnableWifiConnections")
@@ -149,17 +152,22 @@ async def prepare(name, host, enable=False):
                 "prepared" if enable else "trusted",
                 udid=client.udid, name=device_name, host=host,
             )
-            return
+            return True
         finally:
             await client.close()
+    if not enable:
+        emit("waiting", message="Connect the selected iPad by USB and unlock it.")
+        return False
     raise RuntimeError("The selected iPad is not connected by USB. Connect it and try again.")
 
 
 async def check_wireless(udid, host):
     from pymobiledevice3.usbmux import list_devices
 
-    if any(device.is_usb and device.matches_udid(udid) for device in await list_devices()):
-        raise RuntimeError("Unplug the iPad's USB cable before checking Wi-Fi.")
+    while any(device.is_usb and device.matches_udid(udid) for device in await list_devices()):
+        emit("waiting", message="Unplug the USB cable. Keep the iPad awake on the same Wi-Fi.")
+        await asyncio.sleep(2)
+    emit("checkingWireless")
     await watch(udid, host, retry=False)
 
 
@@ -231,8 +239,11 @@ async def run_command(args):
     asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, task.cancel)
     if args.discover:
         await discover()
-    elif args.trust or args.enable:
-        await prepare(args.udid, args.host, enable=args.enable)
+    elif args.trust:
+        while not await prepare(args.udid, args.host):
+            await asyncio.sleep(2)
+    elif args.enable:
+        await prepare(args.udid, args.host, enable=True)
     elif args.verify:
         await check_wireless(args.udid, args.host)
     else:
