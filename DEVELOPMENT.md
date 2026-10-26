@@ -115,8 +115,10 @@ drag/scroll recognizers, and forwards movement in canvas-view points.
 The gesture delegate admits direct-touch event streams for the pan recognizer
 while rejecting mouse streams.
 Taps produce no movement; adding a second finger ends the pan so pinch
-can take over. A magnification
-recognizer forwards pinch zoom. `NSIsTouchNative` disables macOS 27's
+can take over. On macOS 27, pinch zoom uses the ratio of the current and
+previous two-finger distances, anchored at their midpoint, rather than the
+system's magnification value. Older Macs retain the magnification recognizer.
+`NSIsTouchNative` disables macOS 27's
 extra mouse emulation; ordinary mouse and trackpad scrolling remain native
 WebKit input. Pencil interaction with Select, Text, and temporary Command
 selection stays in WebKit to preserve selection handles and text-caret

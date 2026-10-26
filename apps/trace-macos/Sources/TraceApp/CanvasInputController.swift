@@ -7,10 +7,15 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
     private weak var view: NSView?
     private let pencil = CanvasPencilRecognizer(target: nil, action: nil)
     private let pan = CanvasFingerPanRecognizer(target: nil, action: nil)
-    private let pinch = NSMagnificationGestureRecognizer(target: nil, action: nil)
+    private let pinch: NSGestureRecognizer
     private var hidesCursorForPencil = false
 
     init(view: NSView) {
+        if #available(macOS 27.0, *) {
+            pinch = CanvasFingerPinchRecognizer(target: nil, action: nil)
+        } else {
+            pinch = NSMagnificationGestureRecognizer(target: nil, action: nil)
+        }
         self.view = view
         super.init()
         pencil.target = self
@@ -54,7 +59,10 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
         if gestureRecognizer === pan {
             return event.type == .directTouch
         }
-        return gestureRecognizer === pinch
+        if gestureRecognizer === pinch {
+            return pinch is NSMagnificationGestureRecognizer || event.type == .directTouch
+        }
+        return false
     }
 
     func gestureRecognizer(
@@ -136,10 +144,20 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
 
     @objc private func pinchChanged() {
         guard let view, pencil.state != .began, pencil.state != .changed else { return }
-        let scale = max(0.01, 1 + pinch.magnification)
-        pinch.magnification = 0
         guard pinch.state == .began || pinch.state == .changed || pinch.state == .ended else { return }
-        var payload = point(pinch.location(in: view), in: view)
+        let scale: CGFloat
+        let location: NSPoint
+        if let direct = pinch as? CanvasFingerPinchRecognizer {
+            scale = direct.scale
+            location = direct.center
+        } else if let magnification = pinch as? NSMagnificationGestureRecognizer {
+            scale = max(0.01, 1 + magnification.magnification)
+            magnification.magnification = 0
+            location = magnification.location(in: view)
+        } else {
+            return
+        }
+        var payload = point(location, in: view)
         payload["kind"] = "pinch"
         payload["scale"] = scale
         onInput?([payload])
@@ -156,6 +174,7 @@ private final class CanvasFingerPanRecognizer: NSGestureRecognizer {
 
     override func canPrevent(_ preventedGestureRecognizer: NSGestureRecognizer) -> Bool {
         !(preventedGestureRecognizer is NSMagnificationGestureRecognizer)
+            && !(preventedGestureRecognizer is CanvasFingerPinchRecognizer)
     }
 
     override func touchesBegan(with event: NSEvent) {
@@ -198,6 +217,58 @@ private final class CanvasFingerPanRecognizer: NSGestureRecognizer {
     override func reset() {
         super.reset()
         translation = .zero
+    }
+}
+
+private final class CanvasFingerPinchRecognizer: NSGestureRecognizer {
+    private(set) var scale: CGFloat = 1
+    private(set) var center = NSPoint.zero
+
+    override func touchesBegan(with event: NSEvent) {
+        guard let view else { return }
+        let touches = event.touches(matching: .touching, in: view)
+            .filter { $0.type == .direct }
+        guard touches.count == 2 else { return }
+        let points = touches.map { $0.location(in: view) }
+        center = NSPoint(x: (points[0].x + points[1].x) / 2,
+                         y: (points[0].y + points[1].y) / 2)
+        scale = 1
+        state = .began
+    }
+
+    override func touchesMoved(with event: NSEvent) {
+        guard state == .began || state == .changed, let view else { return }
+        let touches = event.touches(matching: .touching, in: view)
+            .filter { $0.type == .direct }
+        guard touches.count == 2 else {
+            state = .cancelled
+            return
+        }
+        let current = touches.map { $0.location(in: view) }
+        let previous = touches.map { $0.previousLocation(in: view) }
+        let oldDistance = hypot(previous[0].x - previous[1].x, previous[0].y - previous[1].y)
+        let newDistance = hypot(current[0].x - current[1].x, current[0].y - current[1].y)
+        guard oldDistance > 0, newDistance > 0 else { return }
+        scale = newDistance / oldDistance
+        center = NSPoint(x: (current[0].x + current[1].x) / 2,
+                         y: (current[0].y + current[1].y) / 2)
+        state = .changed
+    }
+
+    override func touchesEnded(with event: NSEvent) {
+        scale = 1
+        state = state == .possible ? .failed : .ended
+    }
+
+    override func touchesCancelled(with event: NSEvent) {
+        scale = 1
+        state = state == .possible ? .failed : .cancelled
+    }
+
+    override func reset() {
+        super.reset()
+        scale = 1
+        center = .zero
     }
 }
 

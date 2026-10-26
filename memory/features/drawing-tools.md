@@ -38,7 +38,7 @@ Sidecar canvas input
 ├─ Pencil → use selected tool and pressure; one stroke per gesture; hide pointer while drawing
 ├─ Finger drag (macOS 27 Mac) → pan, never draw
 ├─ Finger tap → leave canvas content unchanged
-├─ Pinch → zoom around the gesture, never draw
+├─ Pinch → zoom around the gesture in proportion to finger spacing, never draw
 └─ Return to Mac mouse → drawing and selection still work
 ```
 
@@ -66,6 +66,9 @@ Sidecar canvas input
   canvas jump; ending or cancelling the gesture leaves the next drag usable.
 - Pinching keeps the content under the gesture anchored while changing zoom,
   without drawing or creating undo entries for shapes.
+  On a direct-touch connection, spreading fingers 20% farther apart increases
+  zoom by 20%, within the canvas zoom limits; reversing the movement restores
+  the original zoom.
 - A Pencil stroke creates one editable mark, with pressure variation where
   supported by the brush. It participates in undo, saving, and timed
   annotations like other canvas marks. The Mac pointer is hidden while the
