@@ -342,6 +342,7 @@ final class TraceAppDelegate:
     private let projection = TraceProjectionCoordinator()
     private let globalShortcuts = TraceGlobalShortcutManager()
     private let deviceScreenshots = DeviceScreenshotService()
+    private var pencilDoubleTapMonitor: Any?
     private var screenshotMenuItems: [NSMenuItem] = []
     private var openScreenshotMenus = Set<ObjectIdentifier>()
     private var statusItem: NSStatusItem?
@@ -433,6 +434,12 @@ final class TraceAppDelegate:
             startOpenFileForwardingListener()
         }
         TraceLogger.shared.record(.notice, category: .lifecycle, "Trace started")
+        // Sidecar delivers Apple Pencil double-taps as .changeMode events.
+        pencilDoubleTapMonitor = NSEvent.addLocalMonitorForEvents(matching: .changeMode) { [weak self] event in
+            TraceLogger.shared.record(.notice, category: .input, "Pencil double-tap received")
+            self?.board.selectNextColor()
+            return nil
+        }
 #if DEBUG
         if environment["TRACE_PROGRESSIVE_COPY_PROBE"] == "1" {
             Task { @MainActor in

@@ -103,6 +103,11 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         setupPanel.setPencilSetupActive(false)
     }
 
+    func selectNextColor() {
+        guard showingDocument else { return }
+        annotationToolbar.selectNextColor()
+    }
+
     func returnFromSidecar() {
         guard let frame = sidecarReturnFrame, showingDocument, let window else { return }
         sidecarReturnFrame = nil
@@ -4716,6 +4721,14 @@ private final class FloatingAnnotationToolbar:
         toolState.color = sender.traceColor
         syncControls()
         onToolChange?(toolState)
+    }
+
+    func selectNextColor() {
+        guard !swatches.isEmpty else {
+            return
+        }
+        let current = swatches.firstIndex { $0.traceColor == toolState.color } ?? -1
+        selectColor(swatches[(current + 1) % swatches.count])
     }
 
     @objc private func changeBrush() {

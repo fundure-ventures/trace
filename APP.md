@@ -124,7 +124,7 @@ change. On timeout or API error, the first copy stays and recorded audio is save
 ### Setup
 **What it does:** Shows optional permissions, pen, Dictation, shortcut, and CLI setup.
 **Where:** Menu bar → Setup.
-On a Sidecar iPad, use Pencil to draw, pinch to zoom, and drag a finger to pan. Fingers navigate rather than make marks.
+On a Sidecar iPad, use Pencil to draw, pinch to zoom, and drag a finger to pan. Fingers navigate rather than make marks. Double-tap the Pencil to switch to the next ink color.
 Pressure affects freehand ink; Pencil tilt does not currently change the brush.
 
 **iPad and Apple Pencil** finds iPads on Wi-Fi and

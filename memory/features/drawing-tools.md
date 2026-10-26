@@ -39,6 +39,7 @@ Sidecar canvas input
 ├─ Finger drag (macOS 27 Mac) → pan, never draw
 ├─ Finger tap → leave canvas content unchanged
 ├─ Pinch → zoom around the gesture in proportion to finger spacing, never draw
+├─ Pencil double-tap → select the next toolbar color, wrapping to the first
 └─ Return to Mac mouse → drawing and selection still work
 ```
 
@@ -73,5 +74,8 @@ Sidecar canvas input
   supported by the brush. It participates in undo, saving, and timed
   annotations like other canvas marks. The Mac pointer is hidden while the
   Pencil is drawing and returns when the stroke ends or is cancelled.
+- Double-tapping the Pencil on Sidecar switches to the next toolbar color,
+  and after the last color it returns to the first. The toolbar swatch
+  updates, and the next stroke uses the new color.
 - After finishing or cancelling a Pencil gesture, users can draw and select
   with the Mac mouse without having to toggle a pen-only mode.
