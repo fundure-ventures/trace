@@ -159,12 +159,21 @@ The lower-level launcher option remains available for diagnostics:
 ./tools/trace --configure-pencil IPAD_UDID IPAD_HOSTNAME.local.
 ```
 
-This workflow requires `uv` and a locally cached
-`pymobiledevice3==11.44.0` environment (`uvx --from pymobiledevice3==11.44.0
-python --version` prepares it). Trace launches the helper offline, never
-installs dependencies automatically, and needs Local Network and Screen
-Recording permission. No iPad app, Developer Mode, Accessibility permission,
-or `EnableWifiDebugging` setting is needed.
+Trace bundles the telemetry helper, its Python runtime, and the locked
+`pymobiledevice3==11.44.0` dependencies inside a private helper app within
+Trace.app. The build machine needs
+`uv`; `./tools/build-pencil-telemetry` creates the architecture-specific helper
+used by Debug and Release builds. The installed app does not need `uv`, a
+separate Python installation, or network access to a package registry. Pencil
+setup still needs Local Network and Screen Recording permission. No iPad app,
+Developer Mode, Accessibility permission, or `EnableWifiDebugging` setting is
+needed.
+
+**Release hold:** `pymobiledevice3` is GPL-3.0-or-later. Do not sign or publish
+a public Trace release containing this helper until license compatibility and
+the required third-party source and notices have been reviewed. The helper
+contains a generated dependency-license inventory for that review; it is not
+a complete legal notice set or corresponding-source offer.
 
 The launcher configuration is saved after the wireless log service accepts
 the Mac's existing trust record and the iPad's identity matches; the guided

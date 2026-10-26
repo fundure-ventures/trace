@@ -278,6 +278,13 @@ if ! [[ "$resolver_line" -lt "$resources_line" &&
     exit 1
 fi
 grep -Fq 'xcrun --find swift' "$LAUNCHER"
+grep -Fq '"$ROOT/tools/build-pencil-telemetry"' "$LAUNCHER"
+build_pencil_line=$(grep -nF '"$ROOT/tools/build-pencil-telemetry"' "$LAUNCHER" | head -n 1 | cut -d: -f1)
+copy_pencil_line=$(grep -nF '"$ROOT/.build/pencil-telemetry/dist/PencilTelemetry.app"' "$LAUNCHER" | head -n 1 | cut -d: -f1)
+if [[ -z "$copy_pencil_line" || "$build_pencil_line" -ge "$copy_pencil_line" ]]; then
+    echo "expected the bundled Pencil runtime to be built before it is copied." >&2
+    exit 1
+fi
 grep -Fq 'resolve-macos-sdk' "$LAUNCHER"
 grep -Fq -- '--sdk "$MACOS_SDK"' "$LAUNCHER"
 grep -Fq -- '-platform_version' "$LAUNCHER"

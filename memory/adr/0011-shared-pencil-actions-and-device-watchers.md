@@ -45,9 +45,10 @@ Use separate device watching controls beneath one Pencil section:
   active automatic Sidecar capture. Pickup targets that device's iPad;
   another device's return must not copy or move the active board.
 
-The bundled helper runs through external `uv` with cached
-`pymobiledevice3==11.44.0`, offline. It uses the Mac's existing pairing
-record and lockdown port 62078 to open the iPad's diagnostic log service.
+The helper is packaged as a private executable inside Trace.app, with its
+Python runtime and locked `pymobiledevice3==11.44.0` dependencies. It uses the
+Mac's existing pairing record and lockdown port 62078 to open the iPad's
+diagnostic log service.
 Only normalized Pencil state, setup events, names, and actionable errors
 cross the process pipe; raw logs are not saved by the app. Reconnect begins
 with a baseline and duplicate states are suppressed.
@@ -88,8 +89,10 @@ Drawing still goes through tldraw, as described in
   saved traces, or their shared action choices.
 - Diagnostic message formats and private Sidecar interfaces can change with
   OS updates. This is not a Mac App Store-compatible integration.
-- Local Network and Screen Recording permissions, USB trust, same-network
-  reachability, and external diagnostic runtime prerequisites remain real
-  setup requirements. Dependencies are not silently downloaded.
+- Local Network and Screen Recording permissions, USB trust, and same-network
+  reachability remain real setup requirements.
+- The helper's GPL-3.0-or-later dependency requires license compatibility and
+  corresponding-source review before public distribution; packaging it inside
+  the app does not resolve that requirement.
 - Multi-device watching does not imply simultaneous editable Sidecar boards;
   Trace retains its single active board workflow.

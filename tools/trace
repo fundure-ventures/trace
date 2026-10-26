@@ -203,7 +203,10 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Helpers"
 cp "$BIN_DIRECTORY/trace" "$CONTENTS/MacOS/trace"
 cp "$BIN_DIRECTORY/traceapp" "$CONTENTS/Helpers/traceapp"
 cp "$ROOT/apps/trace-macos/Trace-Info.plist" "$CONTENTS/Info.plist"
-cp "$ROOT/tools/pencil-telemetry.py" "$CONTENTS/Resources/"
+"$ROOT/tools/build-pencil-telemetry" >/dev/null
+cp -R \
+    "$ROOT/.build/pencil-telemetry/dist/PencilTelemetry.app" \
+    "$CONTENTS/Helpers/"
 plutil -replace CFBundleDisplayName -string "$PRODUCT_NAME" "$CONTENTS/Info.plist"
 plutil -replace CFBundleName -string "$PRODUCT_NAME" "$CONTENTS/Info.plist"
 plutil -replace CFBundleIdentifier \

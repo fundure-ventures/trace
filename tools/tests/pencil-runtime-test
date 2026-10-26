@@ -1,0 +1,42 @@
+#!/bin/bash
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+HELPER="$ROOT/.build/pencil-telemetry/dist/PencilTelemetry.app/Contents/MacOS/trace-pencil-telemetry"
+INFO="$ROOT/.build/pencil-telemetry/dist/PencilTelemetry.app/Contents/Info.plist"
+NOTICES="$ROOT/.build/pencil-telemetry/dist/PencilTelemetry.app/Contents/Resources/ThirdPartyNotices.txt"
+TEMP_HOME=$(mktemp -d)
+cleanup() {
+    rm -rf -- "$TEMP_HOME"
+}
+trap cleanup EXIT
+
+if [[ ! -x "$HELPER" ]]; then
+    echo "error: build the bundled Pencil helper before running this test." >&2
+    exit 66
+fi
+
+HELP_OUTPUT=$(
+    env -i \
+        HOME="$TEMP_HOME" \
+        PATH=/usr/bin:/bin \
+        "$HELPER" --help
+)
+grep -Fq "usage: trace-pencil-telemetry" <<< "$HELP_OUTPUT"
+grep -Fq "pymobiledevice3 11.44.0 (GPL-3.0-or-later)" "$NOTICES"
+plutil -lint "$INFO" >/dev/null
+/usr/libexec/PlistBuddy \
+    -c 'Print :NSLocalNetworkUsageDescription' "$INFO" |
+    grep -Fq "Trace reads Pencil pickup"
+/usr/libexec/PlistBuddy \
+    -c 'Print :NSBonjourServices:0' "$INFO" |
+    grep -Fxq "_apple-mobdev2._tcp"
+
+EXPECTED_ARCH=$(uname -m)
+HELPER_ARCH=$(/usr/bin/lipo -archs "$HELPER")
+if [[ "$HELPER_ARCH" != "$EXPECTED_ARCH" ]]; then
+    echo "error: helper architecture $HELPER_ARCH does not match $EXPECTED_ARCH." >&2
+    exit 1
+fi
+
+echo "Pencil runtime packaging tests passed"

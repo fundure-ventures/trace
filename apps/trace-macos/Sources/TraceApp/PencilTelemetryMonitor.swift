@@ -97,29 +97,18 @@ final class PencilTelemetryMonitor {
 
     func start(arguments: [String]) throws {
         stop()
-        let candidates = [
-            "/opt/homebrew/bin/uv",
-            FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".local/bin/uv").path,
-            "/usr/local/bin/uv",
-        ]
-        guard let uv = candidates.first(where: {
-            FileManager.default.isExecutableFile(atPath: $0)
-        }),
-        let helper = Bundle.main.url(
-            forResource: "pencil-telemetry", withExtension: "py"
-        ) else {
+        let helper = Bundle.main.bundleURL.appendingPathComponent(
+            "Contents/Helpers/PencilTelemetry.app/Contents/MacOS/trace-pencil-telemetry"
+        )
+        guard FileManager.default.isExecutableFile(atPath: helper.path) else {
             throw SidecarCaptureProbeError.failed(
-                "Pencil automation needs uv and the bundled telemetry helper."
+                "The bundled Pencil helper is missing. Rebuild or reinstall Trace."
             )
         }
         let process = Process()
         let pipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: uv)
-        process.arguments = [
-            "tool", "run", "--offline", "--from", "pymobiledevice3==11.44.0",
-            "python", "-u", helper.path,
-        ] + arguments
+        process.executableURL = helper
+        process.arguments = arguments
         process.standardOutput = pipe
         process.standardError = FileHandle.standardError
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
@@ -135,7 +124,7 @@ final class PencilTelemetryMonitor {
                 guard let self, self.process === process, process.terminationStatus != 0 else { return }
                 self.onError?(self.onSetupEvent == nil
                     ? "Pencil monitoring stopped. Toggle the setting or rerun iPad setup to retry."
-                    : "iPad setup helper stopped. Check that uv and cached pymobiledevice3 11.44.0 are available (see Development).")
+                    : "iPad setup helper stopped. Reopen Setup and retry.")
             }
         }
         self.process = process

@@ -21,6 +21,7 @@ is shaped the way it is.
 | [0009](memory/adr/0009-cli-unix-socket-ipc.md) | Use a per-user Unix socket for the command-line interface |
 | [0010](memory/adr/0010-progressive-copy-dictation.md) | Copy available content before background Dictation |
 | [0011](memory/adr/0011-shared-pencil-actions-and-device-watchers.md) | Share Pencil actions across independent Neo and iPad watchers |
+| [0012](memory/adr/0012-bundled-pencil-telemetry-runtime.md) | Bundle the Pencil telemetry runtime inside Trace.app |
 
 ## Documentation principles
 

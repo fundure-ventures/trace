@@ -16,9 +16,25 @@ trap cleanup EXIT
 FAKE_BIN="$TEMP_ROOT/bin"
 APP="$TEMP_ROOT/Trace.app"
 INFO_PLIST="$APP/Contents/Info.plist"
+PENCIL_HELPER="$APP/Contents/Helpers/PencilTelemetry.app"
+PENCIL_EXECUTABLE="$PENCIL_HELPER/Contents/MacOS/trace-pencil-telemetry"
 ENTITLEMENTS="$TEMP_ROOT/direct.entitlements"
 COMMAND_LOG="$TEMP_ROOT/commands.log"
-mkdir -p "$FAKE_BIN" "$APP/Contents/MacOS"
+mkdir -p "$FAKE_BIN" "$APP/Contents/MacOS" "$PENCIL_HELPER/Contents/MacOS" "$PENCIL_HELPER/Contents/Resources"
+cp /bin/echo "$PENCIL_EXECUTABLE"
+printf 'license notices\n' > "$PENCIL_HELPER/Contents/Resources/NOTICE.txt"
+cat > "$PENCIL_HELPER/Contents/Info.plist" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.traceproject.app.pencil-telemetry</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+</dict>
+</plist>
+EOF
 
 cat > "$INFO_PLIST" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -103,11 +119,31 @@ TRACE_CODE_SIGN_ENTITLEMENTS="$ENTITLEMENTS" \
 grep -Fq \
     "codesign <--force> <--sign> <Developer ID Application: Trace (TEAMID)> <--options> <runtime> <--timestamp> <--entitlements> <$ENTITLEMENTS> <$APP>" \
     "$COMMAND_LOG"
+grep -Fq \
+    "codesign <--force> <--sign> <Developer ID Application: Trace (TEAMID)> <--options> <runtime> <--timestamp> <$PENCIL_EXECUTABLE>" \
+    "$COMMAND_LOG"
+grep -Fq \
+    "codesign <--force> <--sign> <Developer ID Application: Trace (TEAMID)> <--options> <runtime> <--timestamp> <$PENCIL_HELPER>" \
+    "$COMMAND_LOG"
+if grep -F "$PENCIL_EXECUTABLE" "$COMMAND_LOG" | grep -Fq -- '--entitlements'; then
+    echo "expected bundled Pencil runtime to be signed without app entitlements" >&2
+    exit 1
+fi
+runtime_sign_line=$(grep -nF "$PENCIL_EXECUTABLE" "$COMMAND_LOG" | cut -d: -f1)
+helper_bundle_sign_line=$(grep -nF "$PENCIL_HELPER>" "$COMMAND_LOG" | head -n 1 | cut -d: -f1)
+app_sign_line=$(grep -nF "codesign <--force> <--sign> <Developer ID Application: Trace (TEAMID)> <--options> <runtime> <--timestamp> <--entitlements> <$ENTITLEMENTS> <$APP>" "$COMMAND_LOG" | cut -d: -f1)
+[[ "$runtime_sign_line" -lt "$helper_bundle_sign_line" && "$helper_bundle_sign_line" -lt "$app_sign_line" ]]
 
 : > "$COMMAND_LOG"
 "$SIGN_APP" "$APP"
 grep -Fq \
     'codesign <--force> <--sign> <-> <--requirements> <=designated => identifier "com.traceproject.app"> '"<$APP>" \
+    "$COMMAND_LOG"
+grep -Fq \
+    "codesign <--force> <--sign> <-> <$PENCIL_EXECUTABLE>" \
+    "$COMMAND_LOG"
+grep -Fq \
+    "codesign <--force> <--sign> <-> <$PENCIL_HELPER>" \
     "$COMMAND_LOG"
 if grep -Fq '<--options>' "$COMMAND_LOG"; then
     echo "expected ad-hoc signing to omit hardened runtime options" >&2

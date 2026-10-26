@@ -1,0 +1,96 @@
+#!/bin/bash
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+PROJECT="$ROOT/tools/pencil-runtime"
+BUILD_ROOT="$ROOT/.build/pencil-telemetry"
+PYINSTALLER_DIST="$BUILD_ROOT/pyinstaller-dist"
+HELPER_APP="$BUILD_ROOT/dist/PencilTelemetry.app"
+HELPER_CONTENTS="$HELPER_APP/Contents"
+HELPER="$HELPER_CONTENTS/MacOS/trace-pencil-telemetry"
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+    echo "error: the Pencil helper must be packaged on macOS." >&2
+    exit 64
+fi
+
+if [[ "$(uname -m)" != "arm64" && "$(uname -m)" != "x86_64" ]]; then
+    echo "error: unsupported Pencil helper architecture: $(uname -m)." >&2
+    exit 64
+fi
+
+if ! command -v uv >/dev/null 2>&1; then
+    echo "error: uv is required to build the bundled Pencil helper." >&2
+    exit 69
+fi
+
+uv sync --project "$PROJECT" --locked --no-dev
+PYTHON_VERSION=$("$PROJECT/.venv/bin/python" --version)
+
+BUILD_KEY=$(
+    {
+        uname -s
+        uname -m
+        printf '%s\n' "$PYTHON_VERSION"
+        cat "$PROJECT/pyproject.toml" "$PROJECT/uv.lock" "$ROOT/tools/pencil-telemetry.py"
+        cat \
+            "$ROOT/tools/build-pencil-telemetry" \
+            "$ROOT/tools/write-pencil-runtime-notices.py"
+    } | shasum -a 256 | awk '{print $1}'
+)
+if [[ -x "$HELPER" && -f "$HELPER_CONTENTS/Resources/ThirdPartyNotices.txt" &&
+    -f "$BUILD_ROOT/build-key" ]] &&
+    [[ "$(cat "$BUILD_ROOT/build-key")" == "$BUILD_KEY" ]]; then
+    printf '%s\n' "$HELPER_APP"
+    exit 0
+fi
+
+rm -rf -- "$BUILD_ROOT"
+mkdir -p "$PYINSTALLER_DIST"
+
+uv run --project "$PROJECT" --locked --no-sync pyinstaller \
+    --clean \
+    --noconfirm \
+    --windowed \
+    --onedir \
+    --name trace-pencil-telemetry \
+    --osx-bundle-identifier com.traceproject.app.pencil-telemetry \
+    --distpath "$PYINSTALLER_DIST" \
+    --workpath "$BUILD_ROOT/work" \
+    --specpath "$BUILD_ROOT/spec" \
+    --exclude-module IPython \
+    --exclude-module PIL \
+    --exclude-module chardet \
+    --paths "$ROOT/tools" \
+    "$ROOT/tools/pencil-telemetry.py"
+
+SOURCE_APP="$PYINSTALLER_DIST/trace-pencil-telemetry.app"
+if [[ ! -x "$SOURCE_APP/Contents/MacOS/trace-pencil-telemetry" ]]; then
+    echo "error: PyInstaller did not create the Pencil helper app." >&2
+    exit 1
+fi
+
+mkdir -p "$(dirname "$HELPER_APP")"
+cp -R "$SOURCE_APP" "$HELPER_APP"
+plutil -replace CFBundleDisplayName \
+    -string "Trace Pencil Telemetry" \
+    "$HELPER_CONTENTS/Info.plist"
+plutil -replace CFBundleName \
+    -string "Trace Pencil Telemetry" \
+    "$HELPER_CONTENTS/Info.plist"
+plutil -insert NSLocalNetworkUsageDescription \
+    -string "Trace reads Pencil pickup and charging state from your configured iPad to open and return your drawing board." \
+    "$HELPER_CONTENTS/Info.plist"
+/usr/libexec/PlistBuddy \
+    -c 'Add :NSBonjourServices array' \
+    "$HELPER_CONTENTS/Info.plist"
+/usr/libexec/PlistBuddy \
+    -c 'Add :NSBonjourServices:0 string _apple-mobdev2._tcp' \
+    "$HELPER_CONTENTS/Info.plist"
+"$PROJECT/.venv/bin/python" \
+    "$ROOT/tools/write-pencil-runtime-notices.py" \
+    "$PROJECT/.venv" \
+    "$HELPER_CONTENTS/Resources/ThirdPartyNotices.txt"
+
+printf '%s\n' "$BUILD_KEY" > "$BUILD_ROOT/build-key"
+printf '%s\n' "$HELPER_APP"

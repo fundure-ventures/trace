@@ -42,6 +42,21 @@ if [[ -n "${TRACE_CODE_SIGN_IDENTITY:-}" ]]; then
     if [[ -f "$HELPER" ]]; then
         codesign "${SIGN_ARGS[@]}" "$HELPER" >/dev/null
     fi
+    PENCIL_SIGN_ARGS=(
+        --force
+        --sign "$TRACE_CODE_SIGN_IDENTITY"
+        --options runtime
+        --timestamp
+    )
+    PENCIL_HELPER="$APP/Contents/Helpers/PencilTelemetry.app"
+    if [[ -d "$PENCIL_HELPER" ]]; then
+        while IFS= read -r -d '' file; do
+            if /usr/bin/file -b "$file" | grep -q 'Mach-O'; then
+                codesign "${PENCIL_SIGN_ARGS[@]}" "$file" >/dev/null
+            fi
+        done < <(find "$PENCIL_HELPER" -type f -print0)
+        codesign "${PENCIL_SIGN_ARGS[@]}" "$PENCIL_HELPER" >/dev/null
+    fi
     codesign "${SIGN_ARGS[@]}" "$APP" >/dev/null
 else
     # The default ad-hoc requirement is cdhash-based, so TCC forgets rebuilt apps.
@@ -53,6 +68,16 @@ else
             --sign - \
             --requirements "$REQUIREMENT" \
             "$HELPER" >/dev/null
+    fi
+    PENCIL_SIGN_ARGS=(--force --sign -)
+    PENCIL_HELPER="$APP/Contents/Helpers/PencilTelemetry.app"
+    if [[ -d "$PENCIL_HELPER" ]]; then
+        while IFS= read -r -d '' file; do
+            if /usr/bin/file -b "$file" | grep -q 'Mach-O'; then
+                codesign "${PENCIL_SIGN_ARGS[@]}" "$file" >/dev/null
+            fi
+        done < <(find "$PENCIL_HELPER" -type f -print0)
+        codesign "${PENCIL_SIGN_ARGS[@]}" "$PENCIL_HELPER" >/dev/null
     fi
     codesign \
         --force \
