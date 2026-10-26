@@ -10,8 +10,8 @@ Five tools in the toolbar: **Select** (`V`, or hold `⌘`), **Pen** (`D`),
 **Highlighter** (`H`), **Rectangle** (`R`), **Text** (`T`). Double-clicking
 empty space with Select also creates text. Undo/Redo live in Edit.
 On a Sidecar iPad, Pencil draws with pressure while fingers navigate the
-canvas: drag to pan and pinch to zoom. Direct one-finger navigation requires
-macOS 27 and iPadOS 27.
+canvas: drag to pan and pinch to zoom. Direct one-finger panning uses the
+macOS 27 touch path on the Mac.
 
 ## Touchpoints
 - [Board window](board-window.md) toolbar
@@ -36,7 +36,7 @@ Active text editing
 └─ Press Space → type a space
 Sidecar canvas input
 ├─ Pencil → use selected tool and pressure; one stroke per gesture; hide pointer while drawing
-├─ Finger drag (macOS 27 / iPadOS 27) → pan, never draw
+├─ Finger drag (macOS 27 Mac) → pan, never draw
 ├─ Finger tap → leave canvas content unchanged
 ├─ Pinch → zoom around the gesture, never draw
 └─ Return to Mac mouse → drawing and selection still work
