@@ -16,3 +16,6 @@ logs/
 *.provisionprofile
 /design/app-icon/trace-e.png
 /design/app-icon/layers/
+
+__pycache__/
+*.pyc
