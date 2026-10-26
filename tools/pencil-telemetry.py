@@ -26,6 +26,23 @@ def pencil_state(line):
     return None
 
 
+LAYOUT_ELEMENT = re.compile(
+    r"<SBSDisplayLayoutElement: [^;>]+; ([^;>]+);(?: bundleID: ([^;>]+);)?"
+    r"[^>]*?level: (\d+);[^>]*?role: primary>"
+)
+
+
+def app_open(message):
+    """Whether a non-system app tops the iPad's main display, from SpringBoard layout logs."""
+    if "_updateLayout" not in message or "displayIdentity: Main" not in message:
+        return None
+    primaries = LAYOUT_ELEMENT.findall(message)
+    if not primaries:
+        return None
+    _, top = max((int(level), bundle or element) for element, bundle, level in primaries)
+    return not top.startswith("com.apple.springboard.") and "sidecar" not in top.lower()
+
+
 def emit(event, **values):
     print(json.dumps({"event": event, **values}), flush=True)
 
@@ -187,6 +204,28 @@ class PencilStateTracker:
         return {"charging": charging, "baseline": baseline}
 
 
+async def watch_foreground(client, foreground):
+    """Best effort: on failure the state stays unknown so pickups keep working."""
+    from pymobiledevice3.exceptions import PyMobileDevice3Exception
+    from pymobiledevice3.services.os_trace import OsTraceService
+
+    try:
+        async with OsTraceService(client) as service:
+            processes = (await service.get_pid_list())["Payload"]
+        pid = next(
+            int(pid) for pid, info in processes.items()
+            if info.get("ProcessName") == "SpringBoard"
+        )
+        async with OsTraceService(client) as service:
+            async for entry in service.syslog(pid=pid):
+                state = app_open(entry.message)
+                if state is not None:
+                    foreground["appOpen"] = state
+    except (OSError, StopIteration, KeyError, ValueError, PyMobileDevice3Exception):
+        pass
+    foreground["appOpen"] = None
+
+
 async def watch(udid, host, retry=True):
     from pymobiledevice3.exceptions import PyMobileDevice3Exception
     from pymobiledevice3.lockdown import create_using_tcp
@@ -195,6 +234,7 @@ async def watch(udid, host, retry=True):
 
     while True:
         client = None
+        layout = None
         try:
             record = await get_usbmux_pairing_record(udid)
             if record is None:
@@ -211,6 +251,8 @@ async def watch(udid, host, retry=True):
             )
             if not client.paired or client.udid != udid:
                 raise RuntimeError("The configured iPad did not accept its existing trust pairing.")
+            foreground = {"appOpen": None}
+            layout = asyncio.create_task(watch_foreground(client, foreground))
             async with SyslogService(client) as service:
                 emit("ready", name=client.all_values["DeviceName"])
                 tracker = PencilStateTracker()
@@ -219,7 +261,7 @@ async def watch(udid, host, retry=True):
                         line = line.decode(errors="replace")
                     state = tracker.update(line)
                     if state is not None:
-                        emit("state", **state)
+                        emit("state", **state, appOpen=foreground["appOpen"])
         except (OSError, asyncio.TimeoutError, PyMobileDevice3Exception) as error:
             detail = str(error) or type(error).__name__
             if not retry:
@@ -229,6 +271,8 @@ async def watch(udid, host, retry=True):
                 ) from error
             emit("error", message=f"iPad unavailable: {detail}. Retrying in 10 seconds.")
         finally:
+            if layout is not None:
+                layout.cancel()
             if client is not None:
                 await client.close()
         await asyncio.sleep(10)

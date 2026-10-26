@@ -49,6 +49,15 @@ The helper is packaged as a private executable inside Trace.app, with its
 Python runtime and locked `pymobiledevice3==11.44.0` dependencies. It uses the
 Mac's existing pairing record and lockdown port 62078 to open the iPad's
 diagnostic log service.
+Pickup is gated on what the iPad shows, so drawing in an iPad app does not
+capture. Alongside the Pencil stream, the helper opens a second diagnostic
+stream filtered to SpringBoard and reads its main-display layout snapshots.
+The topmost primary element decides: a non-system app means `appOpen: true`;
+SpringBoard surfaces (Home or Lock Screen) and Sidecar mean `false`. The value
+is `null` until a snapshot arrives or when that stream fails; Trace then
+allows pickup, preserving the ungated behavior. Only that boolean crosses the
+pipe; app identifiers stay inside the helper.
+
 Only normalized Pencil state, setup events, names, and actionable errors
 cross the process pipe; raw logs are not saved by the app. Reconnect begins
 with a baseline and duplicate states are suppressed.

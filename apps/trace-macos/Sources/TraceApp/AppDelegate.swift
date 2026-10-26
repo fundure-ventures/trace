@@ -2362,7 +2362,7 @@ final class TraceAppDelegate:
                 self?.pencilMonitors.removeValue(forKey: udid)?.stop()
             }
         }
-        monitor.onState = { [weak self] charging, baseline in
+        monitor.onState = { [weak self] charging, baseline, appOpen in
             guard let self, let config = PencilIPadConfiguration.loadAll().first(where: { $0.udid == udid }),
                   config.isEnabled
             else { return }
@@ -2375,6 +2375,11 @@ final class TraceAppDelegate:
                 self.model.pencilPutDown()
             } else if self.model.snapshot.appSettings.captureScreenshotOnCapOff {
                 guard !self.sidecarCaptureInProgress, self.activePencilID == nil else { return }
+                guard appOpen != true else {
+                    self.updatePencilDeviceStatus(udid, message: "Picked up in an iPad app")
+                    TraceLogger.shared.record(.notice, category: .capture, "Pencil pickup ignored: iPad app open")
+                    return
+                }
                 self.activePencilID = udid
                 self.captureToSidecar(triggeredByPencil: true)
             }

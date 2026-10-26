@@ -50,7 +50,7 @@ final class PencilSetupController {
                 )
             }
         }
-        helper.onState = { [weak self] charging, _ in
+        helper.onState = { [weak self] charging, _, _ in
             guard let self else { return }
             self.lastCharging = charging
             switch (self.step, charging) {

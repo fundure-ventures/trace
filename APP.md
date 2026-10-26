@@ -36,7 +36,8 @@ Under the muted **Pencil** heading, **Pick up to capture and open** and
 Checked device rows select which pens to watch, including each configured
 iPad's **Apple Pencil**. Unticking a device stops its watcher; unticking all
 devices stops all normal pen watching. Choices persist across launches.
-Pickup captures and opens on the Pencil's Sidecar iPad; returning it brings
+Pickup from the iPad Home Screen captures and opens on the Pencil's Sidecar
+iPad; pickups while an iPad app is open are ignored. Returning it brings
 the board back to the Mac and, when enabled, triggers Copy. **Copy → Close
 window after copy** alone decides whether that copy closes the board. See
 [iPad setup](DEVELOPMENT.md#apple-pencil-automation).

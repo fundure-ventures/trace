@@ -76,6 +76,7 @@ final class PencilTelemetryMonitor {
         let name: String?
         let charging: Bool?
         let baseline: Bool?
+        let appOpen: Bool?
         let message: String?
         let devices: [PencilNearbyIPad]?
         let udid: String?
@@ -84,7 +85,8 @@ final class PencilTelemetryMonitor {
     }
 
     var onReady: ((String) -> Void)?
-    var onState: ((Bool, Bool) -> Void)?
+    /// charging, baseline, appOpen (nil when the iPad foreground is unknown).
+    var onState: ((Bool, Bool, Bool?) -> Void)?
     var onError: ((String) -> Void)?
     var onSetupEvent: ((Event) -> Void)?
     private var process: Process?
@@ -163,7 +165,7 @@ final class PencilTelemetryMonitor {
                     guard let charging = event.charging, let baseline = event.baseline else {
                         throw SidecarCaptureProbeError.failed("Pencil helper returned an invalid state.")
                     }
-                    onState?(charging, baseline)
+                    onState?(charging, baseline, event.appOpen)
                 case "error":
                     onError?(event.message ?? "Pencil telemetry failed.")
                 default:

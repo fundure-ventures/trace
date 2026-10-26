@@ -52,7 +52,10 @@ The Pencil capture workflow follows these rules:
 ```text
 Pencil capture
 ├─ Prerequisites → validated wireless iPad setup and checked device
-├─ Pickup capture enabled → capture first; then connect Sidecar to that iPad
+├─ Pickup capture enabled
+│  ├─ iPad showing an app → ignore pickup; the user is drawing on the iPad
+│  ├─ iPad on Home Screen, Lock Screen, or Sidecar → capture first; then connect Sidecar
+│  └─ iPad screen unknown → capture first; then connect Sidecar
 ├─ Initial state or repeated identical messages → no extra captures
 ├─ Close board → stop Sidecar only if Trace started the connection
 └─ Return to iPad charger
@@ -87,6 +90,11 @@ Pencil capture
   screen when pickup capture is enabled. Returning the Pencil moves the same
   board back without losing its annotations, then follows the shared
   Put down to copy and Close window after copy settings.
+- Picking up the Pencil while an iPad app is open does nothing on the Mac, so
+  drawing in iPad apps never triggers a capture. From the Home Screen, or when
+  Trace cannot tell what the iPad is showing, pickup captures as usual. Putting
+  the Pencil down and picking it up again while the board is on the iPad keeps
+  working.
 - With several watched iPads, pickup opens the board on the iPad belonging to
   that Pencil. Another device's return does not copy or move its active board.
 - Starting or reconnecting the Pencil monitor does not itself create a

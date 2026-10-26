@@ -58,5 +58,45 @@ class PencilTelemetryTests(unittest.TestCase):
         )
 
 
+def layout(*elements, display="Main"):
+    body = " ".join(
+        f"<SBSDisplayLayoutElement: 0x1; {element}; frame: {{{{0, 0}}, {{1180, 820}}}}; "
+        f"level: {level}; role: {role}>;"
+        for element, level, role in elements
+    )
+    return (
+        f"_updateLayout <FBSDisplayLayout: 0x0; displayIdentity: {display}> "
+        f"{{ backlightState = 2; elements = {{ {body} }} }} reason: systemgesture"
+    )
+
+
+HOME = ("com.apple.springboard.home-screen", 0, "primary")
+DOCK = ("com.apple.springboard.floating-dock", 25, "overlay")
+MAIL = ("sceneID:com.apple.mobilemail-639D; bundleID: com.apple.mobilemail", 1, "primary")
+
+
+class ForegroundLayoutTests(unittest.TestCase):
+    """Protect the Home Screen pickup gate in screenshot-capture.md."""
+
+    def test_home_screen_is_not_an_open_app(self):
+        self.assertIs(telemetry.app_open(layout(HOME, DOCK)), False)
+
+    def test_open_app_and_swipe_home_transition_count_as_app(self):
+        self.assertIs(telemetry.app_open(layout(MAIL)), True)
+        self.assertIs(telemetry.app_open(layout(HOME, MAIL, DOCK)), True)
+
+    def test_modal_overlays_do_not_hide_home(self):
+        modal = ("ABC-RemoteAlert; bundleID: com.apple.SafariViewService", 1057, "fullScreenModal")
+        self.assertIs(telemetry.app_open(layout(HOME, modal)), False)
+
+    def test_sidecar_on_screen_does_not_block_repeat_pickups(self):
+        sidecar = ("sceneID:com.apple.sidecar-1; bundleID: com.apple.sidecar", 1, "primary")
+        self.assertIs(telemetry.app_open(layout(HOME, sidecar)), False)
+
+    def test_unrelated_or_external_display_lines_are_unknown(self):
+        self.assertIsNone(telemetry.app_open("Root folder controller view will appear"))
+        self.assertIsNone(telemetry.app_open(layout(MAIL, display="External")))
+
+
 if __name__ == "__main__":
     unittest.main()
