@@ -35,7 +35,7 @@ Active text editing
 ├─ Change tool settings → preserve editing
 └─ Press Space → type a space
 Sidecar canvas input
-├─ Pencil → use selected tool and pressure; one stroke per gesture
+├─ Pencil → use selected tool and pressure; one stroke per gesture; hide pointer while drawing
 ├─ Finger drag (macOS 27 / iPadOS 27) → pan, never draw
 ├─ Finger tap → leave canvas content unchanged
 ├─ Pinch → zoom around the gesture, never draw
@@ -68,6 +68,7 @@ Sidecar canvas input
   without drawing or creating undo entries for shapes.
 - A Pencil stroke creates one editable mark, with pressure variation where
   supported by the brush. It participates in undo, saving, and timed
-  annotations like other canvas marks.
+  annotations like other canvas marks. The Mac pointer is hidden while the
+  Pencil is drawing and returns when the stroke ends or is cancelled.
 - After finishing or cancelling a Pencil gesture, users can draw and select
   with the Mac mouse without having to toggle a pen-only mode.

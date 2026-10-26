@@ -8,6 +8,7 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
     private let pencil = CanvasPencilRecognizer(target: nil, action: nil)
     private let pan = CanvasFingerPanRecognizer(target: nil, action: nil)
     private let pinch = NSMagnificationGestureRecognizer(target: nil, action: nil)
+    private var hidesCursorForPencil = false
 
     init(view: NSView) {
         self.view = view
@@ -33,6 +34,10 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
         pinch.allowedTouchTypes = .direct
         pinch.delaysMagnificationEvents = true
         view.addGestureRecognizer(pinch)
+    }
+
+    deinit {
+        setPencilCursorHidden(false)
     }
 
     func gestureRecognizer(
@@ -74,6 +79,7 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
     }
 
     @objc private func pencilChanged() {
+        setPencilCursorHidden(pencil.state == .began || pencil.state == .changed)
         guard let view else { return }
         var samples = pencil.samples
         pencil.samples.removeAll(keepingCapacity: true)
@@ -106,6 +112,12 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
             payload["metaKey"] = event.modifierFlags.contains(.command)
             return payload
         })
+    }
+
+    private func setPencilCursorHidden(_ hidden: Bool) {
+        guard hidesCursorForPencil != hidden else { return }
+        hidesCursorForPencil = hidden
+        hidden ? NSCursor.hide() : NSCursor.unhide()
     }
 
     @objc private func panChanged() {
