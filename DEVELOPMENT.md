@@ -112,6 +112,8 @@ WebKit can flatten their pressure; a direct-touch recognizer
 separates fingers from drawing on macOS 27 Macs. It claims the
 single-finger sequence at touch-down rather than competing with WebKit's
 drag/scroll recognizers, and forwards movement in canvas-view points.
+The gesture delegate admits direct-touch event streams for the pan recognizer
+while rejecting mouse streams.
 Taps produce no movement; adding a second finger ends the pan so pinch
 can take over. A magnification
 recognizer forwards pinch zoom. `NSIsTouchNative` disables macOS 27's

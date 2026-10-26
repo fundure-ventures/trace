@@ -51,6 +51,9 @@ final class CanvasInputController: NSObject, NSGestureRecognizerDelegate {
                 && !event.modifierFlags.contains(.command)
         }
         // Never turn ordinary mouse drags into canvas pans.
+        if gestureRecognizer === pan {
+            return event.type == .directTouch
+        }
         return gestureRecognizer === pinch
     }
 
