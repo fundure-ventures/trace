@@ -115,8 +115,12 @@ final class PencilTelemetryMonitor {
         process.standardError = FileHandle.standardError
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
+            guard !data.isEmpty else {
+                handle.readabilityHandler = nil
+                return
+            }
             DispatchQueue.main.async {
-                guard let self, self.process === process, !data.isEmpty else { return }
+                guard let self, self.process === process else { return }
                 self.buffer.append(data)
                 self.consumeEvents()
             }

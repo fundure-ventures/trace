@@ -211,6 +211,12 @@ uses standard wireless lockdown port 62078 rather than relying on usbmuxd's
 network device discovery. This remains unsupported, OS-dependent telemetry:
 charging is a pickup proxy, not a public magnetic-attachment API.
 
+The helper pipe unregisters its reader at end-of-file before dispatching to
+the main queue. A closed pipe otherwise stays readable and can repeatedly
+wake the app even when there are no events. Run
+`bash tools/tests/pencil-pipe-test` to check EOF handling and queued event
+delivery without launching Trace or connecting an iPad.
+
 ## Build
 
 ```sh

@@ -1,0 +1,20 @@
+#!/bin/bash
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+TEMP=$(mktemp -d)
+trap 'rm -rf -- "$TEMP"' EXIT
+export DEVELOPER_DIR
+DEVELOPER_DIR=$("$ROOT/tools/resolve-xcode-developer-dir")
+
+xcrun swiftc -emit-library -emit-module -module-name TraceLogging \
+    "$ROOT/packages/logging/Sources/TraceLogging/TraceLogger.swift" \
+    -emit-module-path "$TEMP/TraceLogging.swiftmodule" \
+    -o "$TEMP/libTraceLogging.dylib"
+mkdir -p "$TEMP/MonitorTest.app/Contents/MacOS"
+xcrun swiftc -I "$TEMP" -L "$TEMP" -lTraceLogging \
+    -Xlinker -rpath -Xlinker "$TEMP" \
+    "$ROOT/apps/trace-macos/Sources/TraceApp/PencilTelemetryMonitor.swift" \
+    "$ROOT/tools/tests/pencil-pipe-test.swift" \
+    -o "$TEMP/MonitorTest.app/Contents/MacOS/monitor-test"
+"$TEMP/MonitorTest.app/Contents/MacOS/monitor-test"
