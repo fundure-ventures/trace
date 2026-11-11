@@ -1,6 +1,6 @@
 # Copy available content before background Dictation
 
-**Status:** Accepted
+**Status:** Superseded by [0011](0011-wait-for-dictation-copy.md)
 
 ## Context
 [Copy trace](../features/copy-trace.md) previously waited for all pending

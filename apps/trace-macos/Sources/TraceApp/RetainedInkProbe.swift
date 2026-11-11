@@ -845,7 +845,8 @@ enum TraceRetainedInkProbe {
         )
         let finishing = board.voicePresentationForPreview
         guard !finishing.labelHidden,
-              finishing.label == "Finishing 1"
+              finishing.label == "Finishing 1",
+              finishing.loading
         else {
             throw probeError(
                 "meaningful voice processing status was hidden"
@@ -856,20 +857,28 @@ enum TraceRetainedInkProbe {
         board.updateVoiceState(
             .transcribing(completedChunks: 2, pendingChunks: 1)
         )
-        board.updateVoiceState(.ready)
-        let quietCopy = board.voicePresentationForPreview
-        guard quietCopy.labelHidden,
-              quietCopy.label.isEmpty,
-              quietCopy.toggleSymbol == "mic.circle.fill",
-              !quietCopy.toggleEnabled,
-              !quietCopy.copyEnabled
+        let pendingCopy = board.voicePresentationForPreview
+        guard pendingCopy.label == "Finishing 1",
+              pendingCopy.loading,
+              !pendingCopy.toggleEnabled,
+              !pendingCopy.copyEnabled
         else {
             throw probeError(
-                "Copy exposed transient voice finalization states"
+                "Copy hid pending Dictation or allowed duplicate actions"
+            )
+        }
+        board.updateVoiceState(.ready)
+        let copying = board.voicePresentationForPreview
+        guard copying.loading, !copying.copyEnabled else {
+            throw probeError(
+                "Copy stopped loading before the clipboard write"
             )
         }
         setCopyProgress(false)
         board.updateVoiceState(.idle)
+        guard !board.voicePresentationForPreview.loading else {
+            throw probeError("Copy left the Dictation spinner running")
+        }
     }
 
     private static func isRed(_ color: NSColor?) -> Bool {

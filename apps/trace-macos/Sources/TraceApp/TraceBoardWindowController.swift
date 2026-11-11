@@ -416,7 +416,7 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func setCopyFinalizationActive(_ active: Bool) {
-        annotationToolbar.setVoicePresentationSuppressed(active)
+        annotationToolbar.setCopyInProgress(active)
     }
 
     func showCopyStatus(_ label: String, detail: String) {
@@ -1272,6 +1272,7 @@ final class TraceBoardWindowController: NSWindowController, NSWindowDelegate {
         toggleSymbol: String,
         toggleTint: NSColor?,
         waveformColor: NSColor,
+        loading: Bool,
         toggleEnabled: Bool,
         copyEnabled: Bool
     ) {
@@ -3372,6 +3373,7 @@ private final class FloatingAnnotationToolbar:
     private let voiceWaveform = VoiceWaveformView()
     private let voiceLabel = NSTextField(labelWithString: "")
     private let voiceToggleButton = NSButton()
+    private let voiceSpinner = NSProgressIndicator()
     private let voiceActionHover = ToolbarActionHoverView()
     private let voiceGroup = NSStackView()
     private let copyButton = NSButton()
@@ -3387,7 +3389,7 @@ private final class FloatingAnnotationToolbar:
     private var currentVoiceState: TraceVoiceCaptureState?
     private var voiceErrorPopover: NSPopover?
     private var dictationConfigured = true
-    private var voicePresentationSuppressed = false
+    private var copyInProgress = false
     private var currentVoiceToggleSymbol = ""
 #if DEBUG
     private(set) var voiceStateApplyCountForTesting = 0
@@ -3622,6 +3624,23 @@ private final class FloatingAnnotationToolbar:
             .isActive = true
         voiceToggleButton.heightAnchor.constraint(equalToConstant: 24)
             .isActive = true
+        voiceSpinner.style = .spinning
+        voiceSpinner.controlSize = .small
+        voiceSpinner.isIndeterminate = true
+        voiceSpinner.isDisplayedWhenStopped = false
+        voiceSpinner.isHidden = true
+        voiceSpinner.translatesAutoresizingMaskIntoConstraints = false
+        voiceToggleButton.addSubview(voiceSpinner)
+        NSLayoutConstraint.activate([
+            voiceSpinner.centerXAnchor.constraint(
+                equalTo: voiceToggleButton.centerXAnchor
+            ),
+            voiceSpinner.centerYAnchor.constraint(
+                equalTo: voiceToggleButton.centerYAnchor
+            ),
+            voiceSpinner.widthAnchor.constraint(equalToConstant: 16),
+            voiceSpinner.heightAnchor.constraint(equalToConstant: 16),
+        ])
         voiceGroup.orientation = .horizontal
         voiceGroup.alignment = .centerY
         voiceGroup.spacing = 4
@@ -3863,29 +3882,19 @@ private final class FloatingAnnotationToolbar:
         }
         currentVoiceState = state
         self.dictationConfigured = dictationConfigured
-        guard !voicePresentationSuppressed else {
-            return
-        }
         applyVoicePresentation(state)
     }
 
-    func setVoicePresentationSuppressed(_ suppressed: Bool) {
-        guard voicePresentationSuppressed != suppressed else {
+    func setCopyInProgress(_ active: Bool) {
+        guard copyInProgress != active else {
             return
         }
-        voicePresentationSuppressed = suppressed
-        applyVoicePresentation(
-            suppressed ? .idle : currentVoiceState ?? .idle
-        )
-        if suppressed {
-            voiceToggleButton.isEnabled = false
-            setCopyControlsEnabled(false)
-            voiceActionHover.refreshHoverAppearance()
-        }
+        copyInProgress = active
+        applyVoicePresentation(currentVoiceState ?? .idle)
     }
 
     func showCopyStatus(_ label: String, detail: String) {
-        guard currentVoiceState == .idle, !voicePresentationSuppressed else {
+        guard currentVoiceState == .idle, !copyInProgress else {
             return
         }
         voiceLabel.stringValue = label
@@ -3958,11 +3967,11 @@ private final class FloatingAnnotationToolbar:
             voiceToggleButton.isEnabled = false
             setCopyControlsEnabled(false)
         case .ready:
-            voiceLabel.stringValue = "Transcript"
+            voiceLabel.stringValue = copyInProgress ? "Copying" : "Transcript"
             voiceWaveform.setMode(.ready)
             toggleSymbol = "checkmark.circle.fill"
-            toggleLabel = "Recording complete"
-            accessibilityValue = "Transcript ready"
+            toggleLabel = copyInProgress ? "Copying trace" : "Recording complete"
+            accessibilityValue = copyInProgress ? "Copying trace" : "Transcript ready"
             voiceToggleButton.contentTintColor = .systemGreen
             voiceToggleButton.isEnabled = false
             setCopyControlsEnabled(true)
@@ -3980,7 +3989,15 @@ private final class FloatingAnnotationToolbar:
             setCopyControlsEnabled(true)
         }
         currentVoiceToggleSymbol = toggleSymbol
-        voiceToggleButton.image = symbolImage(
+        let isLoading = state.isFinishing || (copyInProgress && state == .ready)
+        voiceSpinner.isHidden = !isLoading
+        if isLoading {
+            voiceSpinner.startAnimation(nil)
+        } else {
+            voiceSpinner.stopAnimation(nil)
+        }
+        voiceToggleButton.isEnabled = voiceToggleButton.isEnabled && !copyInProgress
+        voiceToggleButton.image = isLoading ? nil : symbolImage(
             named: toggleSymbol,
             fallback: toggleSymbol == "mic.circle.fill"
                 ? "mic.fill"
@@ -3991,8 +4008,8 @@ private final class FloatingAnnotationToolbar:
                 : Self.toolbarSymbolPointSize
         )
         voiceToggleButton.toolTip = toggleLabel
-        voiceToggleButton.toolTip = toggleLabel
         voiceToggleButton.setAccessibilityLabel(toggleLabel)
+        voiceSpinner.setAccessibilityLabel(toggleLabel)
         voiceGroup.setAccessibilityValue(accessibilityValue)
         voiceActionHover.refreshHoverAppearance()
         onPreferredSizeChange?()
@@ -4057,8 +4074,8 @@ private final class FloatingAnnotationToolbar:
     }
 
     private func setCopyControlsEnabled(_ enabled: Bool) {
-        copyButton.isEnabled = enabled
-        copyOptionsButton.isEnabled = enabled
+        copyButton.isEnabled = enabled && !copyInProgress
+        copyOptionsButton.isEnabled = enabled && !copyInProgress
         copyActionHover.refreshHoverAppearance()
     }
 
@@ -4708,6 +4725,7 @@ private final class FloatingAnnotationToolbar:
         toggleSymbol: String,
         toggleTint: NSColor?,
         waveformColor: NSColor,
+        loading: Bool,
         toggleEnabled: Bool,
         copyEnabled: Bool
     ) {
@@ -4717,6 +4735,7 @@ private final class FloatingAnnotationToolbar:
             toggleSymbol: currentVoiceToggleSymbol,
             toggleTint: voiceToggleButton.contentTintColor,
             waveformColor: voiceWaveform.colorForTesting,
+            loading: !voiceSpinner.isHidden,
             toggleEnabled: voiceToggleButton.isEnabled,
             copyEnabled:
                 copyButton.isEnabled && copyOptionsButton.isEnabled

@@ -230,7 +230,7 @@ source file/function/line, and safe error type/domain/code.
 Dictation request failures retain the HTTP status as the error code
 (for example, 429 for a rate or quota limit), without the provider's response
 body or message. Every failed HTTP response is logged, including recoverable
-responses before a retry and failures during background Copy. The structured
+responses before a retry and failures while Copy waits for Dictation. The structured
 `httpResponse` field records status, attempt number, parsed retry delay, and
 whether another retry will be scheduled. Provider error types and names use
 fixed allowlists; unrecognized values become `other`, and absent values stay
@@ -275,7 +275,7 @@ size, plus the native separated drawing-tool segments and their selection.
 It also checks native Copy routing for selected text, a text caret, and objects
 selected before holding Command, without writing to the system clipboard.
 
-For progressive Copy, run `TRACE_PROGRESSIVE_COPY_PROBE=1 .build/debug/trace`
+For legacy progressive-Copy helpers, run `TRACE_PROGRESSIVE_COPY_PROBE=1 .build/debug/trace`
 after `swift build`. This hardware-free diagnostic uses an isolated pasteboard
 to check initial and late image/PDF copies, clipboard ownership, and preservation
 of the frozen image. It also checks usable toolbar controls, original-document
@@ -285,6 +285,11 @@ recording with no initial text whose transcript arrives after 3 seconds.
 `swift run trace-voice-tests` covers that regression, six-second recording
 chunks, delayed success, API errors, and reported request timeouts with
 preserved audio chunks.
+The toolbar checks in the hardware-free probe cover visible Dictation progress
+and disabled duplicate actions during Copy. Manually verify the waiting Copy
+flow with slow transcription:
+the board stays open, the recording button spins, and the first paste contains
+the complete transcript after the board closes.
 
 ## Diagnostics
 

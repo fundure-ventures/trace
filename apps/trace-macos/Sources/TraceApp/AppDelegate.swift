@@ -2747,179 +2747,31 @@ final class TraceAppDelegate:
             )
             return
         }
-        beginProgressiveCopy(
-            content, documentID: documentID,
-            closesDocument: closesDocument, completion: completion
-        )
-    }
-
-    private func beginProgressiveCopy(
-        _ content: TraceCopyContent,
-        documentID: UUID,
-        closesDocument: Bool,
-        completion: ((Bool) -> Void)?
-    ) {
         let copyID = latestCopyID
-        let transcript = model.availableTranscriptForCopy
-        let pendingVoice = model.detachVoiceForCopy()
-        if content == .dictation, transcript == nil {
-            endCopyProgress(for: documentID)
-            guard let pendingVoice else {
-                failCopy(for: documentID)
+        model.finishVoiceForCopy(expectedDocumentID: documentID) { [weak self] result in
+            guard let self, self.latestCopyID == copyID else {
                 completion?(false)
                 return
             }
-            let changeCount = NSPasteboard.general.changeCount
-            model.finishBackgroundVoiceCopy(pendingVoice) { [weak self] result in
-                guard let self else { return }
-                let value: TraceBackgroundVoiceCopyResult
-                do {
-                    value = try result.get()
-                } catch {
-                    if self.latestCopyID == copyID {
-                        self.showCopyStatus(
-                            "Error", detail: error.localizedDescription,
-                            documentID: documentID
-                        )
-                    }
-                    completion?(false)
-                    return
-                }
-                guard value.isComplete, let text = value.transcript,
-                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                else {
-                    if self.latestCopyID == copyID {
-                        self.showCopyStatus(
-                            "Partial",
-                            detail: "No Dictation was copied. Available audio was retained.",
-                            documentID: documentID
-                        )
-                    }
-                    completion?(false)
-                    return
-                }
-                guard NSPasteboard.general.changeCount == changeCount,
-                      self.latestCopyID == copyID
-                else {
-                    completion?(false)
-                    return
-                }
-                guard TraceClipboardPayload.writeTranscript(text, to: .general) else {
-                    TraceLogger.shared.record(
-                        .error, category: .clipboard,
-                        "Background Dictation clipboard write failed"
-                    )
-                    self.showCopyStatus(
-                        "Error", detail: "Dictation was saved but could not be copied.",
-                        documentID: documentID
-                    )
-                    completion?(false)
-                    return
-                }
-                if self.model.snapshot.currentDocument?.manifest.id == documentID,
-                   self.model.snapshot.voiceState == .idle {
-                    self.model.copyCompleted(closeDocument: closesDocument)
-                }
-                self.showCopyStatus(
-                    "Copied", detail: "Dictation copied.", documentID: documentID
-                )
-                completion?(true)
-            }
-            return
-        }
-        let clipboardCopy = TraceProgressiveClipboardCopy()
-        let fileName = model.snapshot.currentDocument?
-            .packageURL.deletingPathExtension()
-            .appendingPathExtension("pdf").lastPathComponent
-            ?? TraceClipboardPayload.defaultDocumentFileName
-        if let pendingVoice {
-            model.finishBackgroundVoiceCopy(pendingVoice) { [weak self] result in
-                guard let self else { return }
-                switch result {
-                case let .success(value):
-                    if value.isComplete {
-                        clipboardCopy.complete(
-                            transcript: value.transcript
-                        )
-                    } else {
-                        clipboardCopy.finishWithoutUpdate()
-                    }
-                case .failure:
-                    clipboardCopy.finishWithoutUpdate(status: .failed)
-                }
-                if clipboardCopy.hasInitialCopy, self.latestCopyID == copyID {
-                    self.showCopyStatus(
-                        clipboardCopy.status.label,
-                        detail: clipboardCopy.status.detail,
-                        documentID: documentID
-                    )
-                }
-            }
-        }
-        let copyImage: (NSImage?) -> Void = { [weak self] image in
-            guard let self else { return }
-            guard self.model.snapshot.currentDocument?.manifest.id == documentID,
-                  content == .dictation || image != nil
+            guard self.model.snapshot.currentDocument?.manifest.id == documentID
             else {
+                self.endCopyProgress(for: documentID)
+                completion?(false)
+                return
+            }
+            switch result {
+            case let .success(transcript):
+                self.completeCopy(
+                    content,
+                    transcript: transcript,
+                    documentID: documentID,
+                    closesDocument: closesDocument,
+                    completion: completion
+                )
+            case .failure:
                 self.failCopy(for: documentID)
                 completion?(false)
-                return
             }
-            let copied = clipboardCopy.copyInitial(
-                transcript: transcript
-            ) { text in
-                switch content {
-                case .all:
-                    guard let image else { return false }
-                    return TraceClipboardPayload.write(
-                        image: image, transcript: text, to: .general
-                    )
-                case .document:
-                    guard let image else { return false }
-                    return TraceClipboardPayload.writeDocument(
-                        image: image, transcript: text,
-                        suggestedFileName: fileName, to: .general
-                    )
-                case .dictation:
-                    guard let text else { return false }
-                    return TraceClipboardPayload.writeTranscript(text, to: .general)
-                case .image:
-                    return false
-                }
-            }
-            self.finishCopy(
-                copied, documentID: documentID,
-                closesDocument: closesDocument, completion: completion
-            )
-            if copied {
-                let status = pendingVoice == nil
-                    ? TraceProgressiveCopyStatus.copied
-                    : clipboardCopy.status
-                self.showCopyStatus(
-                    status.label,
-                    detail: status.detail,
-                    documentID: documentID
-                )
-            }
-        }
-        if content == .dictation {
-            copyImage(nil)
-        } else {
-            compositeImageForDocument(
-                expectedDocumentID: documentID,
-                completion: copyImage
-            )
-        }
-    }
-
-    private func showCopyStatus(
-        _ label: String,
-        detail: String,
-        documentID: UUID
-    ) {
-        statusItem?.button?.toolTip = detail
-        if model.snapshot.currentDocument?.manifest.id == documentID {
-            board.showCopyStatus(label, detail: detail)
         }
     }
 

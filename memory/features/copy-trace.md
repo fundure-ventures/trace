@@ -36,16 +36,16 @@ Whole-trace copy
    ├─ Close-after-copy enabled → close board
    └─ Close-after-copy disabled → keep board open
 Dictation-containing copy
-├─ Copy current image and already completed transcript without waiting for the network
-│  └─ First clipboard write → release controls and apply close-after-copy
-├─ Remaining transcription → finish in background using a 12-second per-request timeout
-│  ├─ Rate limited with a valid retry delay → wait and retry the pending audio up to three times
-│  ├─ Complete → save to original trace; update clipboard only if Trace still owns it
-│  └─ Unrecovered API error or request timeout → cancel remaining requests; keep first copy; save available words and audio
-├─ Late update → reuse original image and numbered references, not subsequent canvas edits
-├─ Another copy, from Trace or another app → never overwrite it with the late result
-└─ Dictation-only with no completed text → release controls; copy on successful completion
-   └─ API error or request timeout → clipboard unchanged; available audio saved
+├─ Stop microphone; keep the board open until the complete transcript is ready
+├─ Waiting → spinner on the recording button; disable recording and duplicate Copy actions
+│  └─ Rate limited with a valid retry delay → keep waiting; retry pending audio up to three times
+├─ Complete → save audio and transcript; write the final clipboard payload once
+│  └─ Clipboard write succeeds → apply close-after-copy
+├─ Transcription or clipboard failure → stop loading; leave board open; do not report success
+│  └─ Transcription failure → show the reason; retain audio chunks and completed words for retry
+└─ Open trace changes while waiting → do not copy or close the replacement trace
+Image-only copy
+└─ Copy without waiting for Dictation
 Copied pixels
 ├─ Include visible images, drawings, shapes, text, and numbered annotations
 ├─ Exclude grid, selection bounds, controls, cursors, and temporary pen predictions
@@ -67,14 +67,10 @@ Whole-trace image framing
   8-unit border, not the unused canvas or the screenshot's original position.
 - **Is Dictation drawn into the image?** No. Image and dictation includes
   clipboard text and image metadata; PDF lays out the transcript separately.
-- **Can I paste immediately while Dictation finishes?** Yes. The first copy
-  contains the image and available transcript. Once Dictation finishes,
-  a second paste can include the complete transcript. Content
-  already pasted into another app is not changed.
-- **What if I close the board or open another trace?** Finishing Dictation
-  belongs to the original trace. The new board stays usable and is not closed
-  or changed by that work. Starting a replacement recording on the original
-  trace supersedes its older recording.
+- **Why is Copy waiting?** The recording button spins while the final words
+  arrive. Paste after Copy finishes to get the complete transcript in one step.
+- **What if Dictation fails?** The board stays open, the spinner stops, and
+  the failure reason appears. Copy again to retry the retained recording.
 
 ## Acceptance criteria
 - With nothing selected, pressing `⌘C` copies the trace in the chosen format
@@ -95,19 +91,19 @@ Whole-trace image framing
 - Zooming, panning, or selecting content does not change toolbar Copy framing.
   Image copy, image and dictation, PDF, and command-line export share the same
   framing and page background.
-- Copying with active Dictation does not wait for transcription before
-  writing available content, releasing controls, or honoring close-after-copy.
-- Remaining transcription is not canceled after 3 seconds. Each request uses
-  a 12-second timeout; multiple chunks and provider-directed retry waits may take
-  longer overall without blocking the board.
-  An unrecovered API failure or request timeout preserves the first copy,
-  available words, and recorded audio; status explains whether Dictation finished,
-  updated, or remained partial.
-- The late image/PDF uses the original image and annotation references.
-  A newer clipboard owner, including another Trace copy, prevents replacement.
-- Closing, reopening, editing, or switching traces while Dictation finishes
-  cannot redirect the result to another trace or overwrite later canvas edits.
-- A short recording with no completed text still updates the initial image
-  copy when transcription succeeds after more than 3 seconds.
-- Dictation-only Copy without available text never writes an empty clipboard
-  payload and cannot close a newly started recording after its delayed result.
+- Copying with active Dictation keeps the board open and shows a spinner on the
+  recording button. Recording and duplicate Copy actions stay disabled until
+  the complete transcript is saved and copied.
+- A short recording whose first words arrive after more than 3 seconds still
+  produces a single complete copy. Image and dictation, Dictation-only, and PDF
+  all wait; image-only Copy does not.
+- Each transcription request uses a 12-second timeout. A valid Retry-After delay
+  keeps the spinner visible through the wait and up to three retries.
+- Successful Copy closes the board only after writing the final clipboard
+  payload, and only when close-after-copy is enabled. Keeping the board open
+  restores its controls and stops the spinner.
+- An unrecovered API error or request timeout stops the spinner, displays the
+  Dictation error, leaves the clipboard unchanged, and keeps the board open.
+  Copy can retry without losing recorded chunks or completed words.
+- A failed clipboard write leaves the board open and ends loading.
+- Switching traces while Dictation finishes cannot copy or close the replacement.

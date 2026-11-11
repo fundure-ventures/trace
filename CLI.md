@@ -133,9 +133,10 @@ the filename. `image` writes PNG, `dictation` TXT, `pdf` PDF, and
 | `dictation` | Transcript text. | TXT. | `traceapp export out --format dictation` |
 | `pdf` | PDF with the image and transcript. | PDF. | `traceapp export out --format pdf` |
 
-**Note:** Copy uses available Dictation first, then updates the clipboard when
-transcription finishes unless something newer was copied. Dictation-only Copy
-with no text waits for that result; export waits for Dictation to finish.
+**Note:** Copy and export wait for the complete Dictation result, except for
+image-only output. During Copy, the board stays open with a spinner on the
+recording button. Close-after-copy applies only after the final clipboard write
+succeeds; transcription failures leave the board open and clipboard unchanged.
 Rate-limited transcription honors a valid Retry-After delay for up to three
 automatic retries before reporting failure; each network request still has
 a 12-second timeout.

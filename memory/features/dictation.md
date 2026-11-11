@@ -40,12 +40,12 @@ Diagnostics
 ├─ Successful retry → record recovery
 └─ Never record response bodies, provider messages, audio, transcripts, or credentials
 Finishing for Copy
-├─ Stop microphone; detach finishing work from the board
+├─ Stop microphone; keep board open with a spinner on the recording button
 ├─ Rotate recording chunks every 6 seconds for earlier transcript availability
-├─ Copy available content immediately; finish remaining transcription in background
+├─ Keep recording and duplicate Copy actions disabled while finishing
 ├─ Each request → 12-second timeout; no separate Copy deadline
-├─ Unrecovered API error or request timeout → mark partial, cancel remaining requests, save recorded audio and available words
-└─ Completion → save original trace; update clipboard only while still owned by that Copy
+├─ Unrecovered API error or request timeout → show error; stop spinner; keep board open and retain chunks/words for retry
+└─ Completion → save audio/transcript; copy once; then honor close-after-copy
 Finishing for CLI file export
 ├─ Wait for active Dictation; report API errors rather than successful export
 └─ Retry → retain recorded chunks and previously transcribed words
@@ -62,9 +62,9 @@ New blank or screenshot trace
 - **What went wrong?** Read the temporary error message or hover over Error.
   HTTP 429 means OpenRouter or its provider has hit a rate or quota limit. Trace
   retries up to three times when a valid retry delay is supplied.
-- **Does slow transcription block Copy?** No. Available content is copied
-  first and the board is released. Remaining transcription, audio merging,
-  and saving finish in the background using the existing request timeout.
+- **Why is the recording button spinning?** Copy is waiting for the complete
+  transcript. The board closes only after copying succeeds, if close-after-copy
+  is enabled. Image-only Copy does not wait for transcription.
 
 ## Acceptance criteria
 - Without a configured key, clicking "Set up Dictation" opens Setup rather
@@ -84,21 +84,24 @@ New blank or screenshot trace
   than waiting forever. A missing or invalid delay reports the error without
   automatically resending. Cancelling during a delay prevents further retries.
 - With local diagnostic persistence enabled, failed responses are available in
-  the logs even when an automatic retry recovers or the board has already closed
-  for Copy. Entries identify the status, attempt, available retry delay, and
+  the logs even when an automatic retry recovers. Entries identify the status,
+  attempt, available retry delay, and
   whether another attempt is planned. Known provider error types and names are
   retained; unknown values are masked. Recovery is recorded without saving
   response bodies, provider messages, audio, transcripts, or credentials.
 - Automatic Dictation starts for newly created blank or screenshot traces
   only when a key and Microphone permission are available.
 - Reopening a saved trace preserves its recorded audio and transcript.
-- Copy stops the microphone immediately and allows closing, drawing, or
-  starting another trace while transcription finishes independently.
+- Copy stops the microphone and keeps the board open with a spinner on its
+  recording button until the complete transcript is saved and copied.
+  Recording and duplicate Copy actions stay disabled during this wait.
 - Recording chunks rotate every 6 seconds instead of 12 seconds.
-- Background transcription may finish after 3 seconds without cancellation.
-  Each request uses a 12-second timeout.
-- An unrecovered API failure or a request timeout returns a partial result, saves
-  recorded audio and available words, and leaves the first clipboard payload
-  unchanged. Late network callbacks cannot update that result.
-- CLI file export remains a waiting operation; API errors or reported timeouts
-  leave its finishing state, report failure, and retain chunks/words for retry.
+- Transcription may finish after 3 seconds without cancellation. Each request
+  uses a 12-second timeout; the spinner stays visible during provider retry waits.
+- An unrecovered API failure or request timeout stops loading, shows the error,
+  and leaves the board open and clipboard unchanged. Retained chunks and words
+  remain available for retry.
+- Successful Copy stops loading and closes only after the final clipboard write
+  succeeds, respecting close-after-copy. No delayed partial clipboard update occurs.
+- CLI Copy and file export wait for Dictation; API errors report failure and
+  retain chunks/words for retry.

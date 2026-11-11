@@ -53,12 +53,11 @@ Open **Setup** from the menu-bar menu. See [Setup](#setup) and
 **Where:** `⌘C` with nothing selected; toolbar Copy and Copy options.
 **Note:** Whole-trace images crop around visible content with 8 canvas units
 of background on every side. Empty traces keep their page dimensions.
-Active Dictation does not delay the first image copy or closing the board. It
-finishes in the background, then updates the clipboard only if nothing else
-has been copied. The image stays frozen; already-pasted content does not
-change. Rate-limited transcription waits for the provider's retry delay and
-retries up to three times in the background. On timeout or an unrecovered API
-error, the first copy stays and recorded audio is saved.
+For formats containing Dictation, the board stays open with a spinner on the
+recording button until the full transcript is saved and copied. Only then does
+close-after-copy apply. Rate-limited transcription honors the provider's retry
+delay for up to three retries. On failure, loading stops and the board stays
+open with the error available for retry. Image-only Copy does not wait.
 
 ### Device screenshots
 **What it does:** Captures Android or paired iOS device screens directly into Trace.
