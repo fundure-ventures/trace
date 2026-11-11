@@ -1458,10 +1458,15 @@ final class TraceAppModel {
                 voiceController.pause()
             case .resume:
                 try voiceController.resume()
-            case .restart:
-                try startReplacementVoiceRecording(restarting: true)
+            case .retry:
+                guard let currentDocument else {
+                    return
+                }
+                finishVoiceForCopy(
+                    expectedDocumentID: currentDocument.manifest.id
+                ) { _ in }
             case .start:
-                try startReplacementVoiceRecording(restarting: false)
+                try startReplacementVoiceRecording()
             case .ignore:
                 return
             }
@@ -2079,14 +2084,8 @@ final class TraceAppModel {
         return true
     }
 
-    private func startReplacementVoiceRecording(
-        restarting: Bool
-    ) throws {
-        if restarting {
-            try voiceController.restart()
-        } else {
-            try voiceController.start()
-        }
+    private func startReplacementVoiceRecording() throws {
+        try voiceController.start()
         do {
             try resetVoiceAnnotationForNewRecording()
             if let currentDocument {
@@ -2112,7 +2111,7 @@ final class TraceAppModel {
             return
         }
         do {
-            try startReplacementVoiceRecording(restarting: false)
+            try startReplacementVoiceRecording()
         } catch {
             TraceLogger.shared.record(.error, category: .dictation, "Automatic dictation start failed", error: error)
         }

@@ -12,6 +12,8 @@ the trace and copied alongside the image. Failures show a temporary explanation
 beside the toolbar, with the full reason still available by hovering over Error.
 When the provider supplies a retry delay for rate limiting, the pending audio
 stays queued and retries automatically before showing a failure.
+After a failure, the toolbar's Retry action transcribes the retained recording
+without opening the microphone or clearing earlier words and annotations.
 
 ## Touchpoints
 - [Board window](board-window.md) toolbar Dictation group
@@ -29,7 +31,12 @@ Recording flow
 Recording error
 ├─ Show the failure reason beside the toolbar for 10 seconds or until dismissed
 ├─ Keep the full reason on the Error label's tooltip and accessible status
-└─ Rate or quota limit → identify HTTP 429 and suggest waiting before retrying
+├─ Rate or quota limit → identify HTTP 429 and suggest waiting before retrying
+└─ Manual Retry → finish the existing recording, never replace it
+   ├─ Keep all audio chunks, completed words, and annotation timing
+   ├─ Retry only pending chunks; show Finishing without starting the microphone
+   ├─ Failure again → keep the recording available for another retry
+   └─ Changing the API key after failure → preserve the recording for retry
 Rate limiting (HTTP 429)
 ├─ Valid Retry-After → wait for that delay; retry the same audio up to three times
 │  ├─ Keep later chunks queued in order; recording and pausing remain available
@@ -58,6 +65,9 @@ New blank or screenshot trace
 ## FAQ
 - **Which provider transcribes?** OpenRouter, with your own key.
 - **Can I pause?** Yes; Resume continues the same recording.
+- **Does Retry start over?** No. It retries pending transcription from the same
+  audio and saves the completed recording. Earlier words and annotations stay
+  intact, including when you change the API key after a failure.
 - **Where is the transcript?** Copied with the image and saved in the `.traceboard`.
 - **What went wrong?** Read the temporary error message or hover over Error.
   HTTP 429 means OpenRouter or its provider has hit a rate or quota limit. Trace
@@ -101,6 +111,12 @@ New blank or screenshot trace
 - An unrecovered API failure or request timeout stops loading, shows the error,
   and leaves the board open and clipboard unchanged. Retained chunks and words
   remain available for retry.
+- After a failure, clicking Retry on the recording control shows Finishing and
+  transcribes the original recording without starting the microphone, clearing
+  earlier words, or changing their annotation timing. Success saves the complete
+  audio and transcript to the same trace without copying or closing it. Another
+  failure, or changing the API key before retrying, does not discard the audio
+  or completed words.
 - Successful Copy stops loading and closes only after the final clipboard write
   succeeds, respecting close-after-copy. No delayed partial clipboard update occurs.
 - CLI Copy and file export wait for Dictation; API errors report failure and

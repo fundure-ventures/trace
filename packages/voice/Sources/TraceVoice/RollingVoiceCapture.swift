@@ -42,7 +42,7 @@ public enum TraceVoiceToggleIntent: Equatable, Sendable {
     case start
     case pause
     case resume
-    case restart
+    case retry
     case ignore
 }
 
@@ -114,7 +114,7 @@ public final class TraceVoiceCaptureController: @unchecked Sendable {
         case .paused:
             return .resume
         case .failed:
-            return isConfigured ? .restart : .showSetup
+            return isConfigured ? .retry : .showSetup
         case .idle:
             guard isConfigured else {
                 return .showSetup
@@ -262,7 +262,6 @@ public final class TraceVoiceCaptureController: @unchecked Sendable {
         guard state.allowsOpenRouterAPIKeyMutation else {
             throw TraceVoiceConfigurationError.captureInProgress
         }
-        cancel()
         do {
             let resolution = try configurationLoader()
             apiKeyState = resolution.state
@@ -319,10 +318,6 @@ public final class TraceVoiceCaptureController: @unchecked Sendable {
         try recorder.resume()
         paused = false
         updateActiveState()
-    }
-
-    public func restart() throws {
-        try start()
     }
 
     public func setPerformanceCritical(_ critical: Bool) {

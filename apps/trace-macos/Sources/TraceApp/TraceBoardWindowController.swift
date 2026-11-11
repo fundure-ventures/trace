@@ -3981,7 +3981,7 @@ private final class FloatingAnnotationToolbar:
             voiceWaveform.setMode(.failed)
             toggleSymbol = "arrow.counterclockwise"
             toggleLabel = dictationConfigured
-                ? "Start a new recording"
+                ? "Retry transcription"
                 : "Set up Dictation"
             accessibilityValue = "Dictation failed: \(message)"
             voiceToggleButton.contentTintColor = .systemOrange

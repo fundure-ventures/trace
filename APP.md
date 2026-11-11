@@ -70,6 +70,10 @@ Failures show a temporary message beside the toolbar. Hover over Error to read
 the reason again. For HTTP 429 with a valid Retry-After delay, audio stays queued
 and retries automatically up to three times. Recording can continue while
 waiting. Missing or invalid retry delays and exhausted retries show the error.
+Click **Retry transcription** to finish the same recording, keeping its audio,
+earlier words, and annotation timing. Retry does not start the microphone, copy,
+or close the board. If retry fails again, or you change the API key after a
+failure, the recording remains available for another attempt.
 **Diagnostics → Open Logs** opens local diagnostics. Debug builds retain safe
 response-error details automatically; release builds require **Persist Debug
 Logs**. Failed attempts and retry recovery are logged without response bodies,
