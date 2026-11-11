@@ -56,7 +56,9 @@ of background on every side. Empty traces keep their page dimensions.
 Active Dictation does not delay the first image copy or closing the board. It
 finishes in the background, then updates the clipboard only if nothing else
 has been copied. The image stays frozen; already-pasted content does not
-change. On timeout or API error, the first copy stays and recorded audio is saved.
+change. Rate-limited transcription waits for the provider's retry delay and
+retries up to three times in the background. On timeout or an unrecovered API
+error, the first copy stays and recorded audio is saved.
 
 ### Device screenshots
 **What it does:** Captures Android or paired iOS device screens directly into Trace.
@@ -66,7 +68,9 @@ change. On timeout or API error, the first copy stays and recorded audio is save
 **What it does:** Records narration while annotating.
 **Where:** Board Dictation control; requires microphone access and an OpenRouter key.
 Failures show a temporary message beside the toolbar. Hover over Error to read
-the reason again. HTTP 429 indicates a rate or quota limit; wait before retrying.
+the reason again. For HTTP 429 with a valid Retry-After delay, audio stays queued
+and retries automatically up to three times. Recording can continue while
+waiting. Missing or invalid retry delays and exhausted retries show the error.
 
 ### Drawing tools
 **What it does:** Selects, draws, highlights, creates rectangles, and adds text.

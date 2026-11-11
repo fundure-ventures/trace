@@ -136,6 +136,9 @@ the filename. `image` writes PNG, `dictation` TXT, `pdf` PDF, and
 **Note:** Copy uses available Dictation first, then updates the clipboard when
 transcription finishes unless something newer was copied. Dictation-only Copy
 with no text waits for that result; export waits for Dictation to finish.
+Rate-limited transcription honors a valid Retry-After delay for up to three
+automatic retries before reporting failure; each network request still has
+a 12-second timeout.
 Images frame visible content with 8 canvas units of padding; empty traces keep
 their page dimensions. See [Copy trace](memory/features/copy-trace.md) for details.
 

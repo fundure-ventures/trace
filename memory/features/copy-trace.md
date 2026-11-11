@@ -39,8 +39,9 @@ Dictation-containing copy
 ├─ Copy current image and already completed transcript without waiting for the network
 │  └─ First clipboard write → release controls and apply close-after-copy
 ├─ Remaining transcription → finish in background using a 12-second per-request timeout
+│  ├─ Rate limited with a valid retry delay → wait and retry the pending audio up to three times
 │  ├─ Complete → save to original trace; update clipboard only if Trace still owns it
-│  └─ API error or request timeout → cancel remaining requests; keep first copy; save available words and audio
+│  └─ Unrecovered API error or request timeout → cancel remaining requests; keep first copy; save available words and audio
 ├─ Late update → reuse original image and numbered references, not subsequent canvas edits
 ├─ Another copy, from Trace or another app → never overwrite it with the late result
 └─ Dictation-only with no completed text → release controls; copy on successful completion
@@ -97,10 +98,11 @@ Whole-trace image framing
 - Copying with active Dictation does not wait for transcription before
   writing available content, releasing controls, or honoring close-after-copy.
 - Remaining transcription is not canceled after 3 seconds. Each request uses
-  a 12-second timeout; multiple chunks may take longer overall.
-  An API failure or request timeout preserves the first copy, available words, and
-  recorded audio; status explains whether Dictation finished, updated, or
-  remained partial.
+  a 12-second timeout; multiple chunks and provider-directed retry waits may take
+  longer overall without blocking the board.
+  An unrecovered API failure or request timeout preserves the first copy,
+  available words, and recorded audio; status explains whether Dictation finished,
+  updated, or remained partial.
 - The late image/PDF uses the original image and annotation references.
   A newer clipboard owner, including another Trace copy, prevents replacement.
 - Closing, reopening, editing, or switching traces while Dictation finishes

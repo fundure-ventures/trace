@@ -466,31 +466,64 @@ public final class OpenRouterTranscriptionClient:
             audioData: audioData,
             format: format
         )
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw TraceTranscriptionError.invalidResponse
-        }
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            let message = (
-                try? decoder.decode(
-                    OpenRouterErrorResponse.self,
-                    from: data
+        var retries = 0
+        while true {
+            try Task.checkCancellation()
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw TraceTranscriptionError.invalidResponse
+            }
+            guard (200..<300).contains(httpResponse.statusCode) else {
+                if httpResponse.statusCode == 429,
+                   retries < 3,
+                   let delay = Self.retryDelay(for: httpResponse)
+                {
+                    retries += 1
+                    try await Task.sleep(for: .seconds(delay))
+                    continue
+                }
+                let message = (
+                    try? decoder.decode(
+                        OpenRouterErrorResponse.self,
+                        from: data
+                    )
+                )?.error.message ?? HTTPURLResponse.localizedString(
+                    forStatusCode: httpResponse.statusCode
                 )
-            )?.error.message ?? HTTPURLResponse.localizedString(
-                forStatusCode: httpResponse.statusCode
-            )
-            throw TraceTranscriptionError.requestFailed(
-                statusCode: httpResponse.statusCode,
-                message: message
-            )
+                throw TraceTranscriptionError.requestFailed(
+                    statusCode: httpResponse.statusCode,
+                    message: message
+                )
+            }
+            guard let result = try? decoder.decode(
+                TraceTranscriptionResult.self,
+                from: data
+            ) else {
+                throw TraceTranscriptionError.invalidResponse
+            }
+            return result
         }
-        guard let result = try? decoder.decode(
-            TraceTranscriptionResult.self,
-            from: data
-        ) else {
-            throw TraceTranscriptionError.invalidResponse
+    }
+
+    private static func retryDelay(
+        for response: HTTPURLResponse
+    ) -> TimeInterval? {
+        guard let value = response.value(
+            forHTTPHeaderField: "Retry-After"
+        )?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return nil
         }
-        return result
+        if let seconds = TimeInterval(value) {
+            return seconds.isFinite && seconds >= 0 ? seconds : nil
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        guard let date = formatter.date(from: value) else {
+            return nil
+        }
+        return max(0, date.timeIntervalSinceNow)
     }
 }
 

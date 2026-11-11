@@ -16,9 +16,15 @@ recording controller from the live board and let remaining transcription use
 a 12-second per-request timeout. Rotate recording chunks every
 6 seconds so completed text can become available earlier.
 
-Save the result and recorded audio to the original trace. On an API error or
-request timeout, cancel remaining transcription and explicitly return a partial
-result; audio merging and persistence finish independently of the live board.
+For HTTP 429 responses with a valid `Retry-After`, keep the active chunk pending
+and wait asynchronously before retrying it. Reuse the same request and existing
+per-recording queue rather than creating a second retry queue. Allow three
+automatic retries; cancellation stops the wait. Missing or invalid retry
+delays and exhausted retries follow the existing error path.
+
+Save the result and recorded audio to the original trace. On an unrecovered API
+error or request timeout, cancel remaining transcription and explicitly return
+a partial result; audio merging and persistence finish independently of the live board.
 Update the clipboard only on complete transcription and only while its
 pasteboard change count still matches the initial write. Reuse the original
 image and numbered-reference state, never subsequent canvas edits.
@@ -55,3 +61,6 @@ finalization because file export needs a single final result.
 - Detached work requires explicit document and clipboard ownership guards.
   Per-request timeouts do not impose a total limit across sequential chunks.
   They do not bound local rendering, audio merging, or disk persistence.
+- Rate-limit waits may extend background completion beyond the per-request
+  timeout, but do not delay the first clipboard write or stop active recording.
+  Three retries bound repeated requests, not the server-specified wait duration.

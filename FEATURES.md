@@ -36,7 +36,7 @@ Each file is the source of truth for
 | [Ink colors](memory/features/ink-colors.md) | `#board` | Four inks derived from the page background |
 | [Page background](memory/features/page-background.md) | `#board` | Per-document page color |
 | [Canvas grid](memory/features/canvas-grid.md) | `#board` | Adaptive reference grid, never exported |
-| [Dictation](memory/features/dictation.md) | `#voice` | Narrate while annotating, with visible failure reasons |
+| [Dictation](memory/features/dictation.md) | `#voice` | Narrate while annotating, retry rate limits, and explain failures |
 | [Timed annotations](memory/features/timed-annotations.md) | `#voice` | Numbered marks matched to spoken words |
 | [Copy trace](memory/features/copy-trace.md) | `#output` | Content-framed copy with 8-unit padding and background Dictation |
 | [Traceboard documents](memory/features/traceboard-documents.md) | `#output` | Autosaved, reopenable `.traceboard` packages |

@@ -10,6 +10,8 @@ Speak while annotating. The toolbar's Dictation button records, pauses,
 resumes, and finalizes into a transcript (via OpenRouter) that is saved with
 the trace and copied alongside the image. Failures show a temporary explanation
 beside the toolbar, with the full reason still available by hovering over Error.
+When the provider supplies a retry delay for rate limiting, the pending audio
+stays queued and retries automatically before showing a failure.
 
 ## Touchpoints
 - [Board window](board-window.md) toolbar Dictation group
@@ -28,12 +30,17 @@ Recording error
 ├─ Show the failure reason beside the toolbar for 10 seconds or until dismissed
 ├─ Keep the full reason on the Error label's tooltip and accessible status
 └─ Rate or quota limit → identify HTTP 429 and suggest waiting before retrying
+Rate limiting (HTTP 429)
+├─ Valid Retry-After → wait for that delay; retry the same audio up to three times
+│  ├─ Keep later chunks queued in order; recording and pausing remain available
+│  └─ Cancellation → stop waiting without sending another retry
+└─ Missing/invalid delay or exhausted retries → report the failure
 Finishing for Copy
 ├─ Stop microphone; detach finishing work from the board
 ├─ Rotate recording chunks every 6 seconds for earlier transcript availability
 ├─ Copy available content immediately; finish remaining transcription in background
 ├─ Each request → 12-second timeout; no separate Copy deadline
-├─ API error or request timeout → mark partial, cancel remaining requests, save recorded audio and available words
+├─ Unrecovered API error or request timeout → mark partial, cancel remaining requests, save recorded audio and available words
 └─ Completion → save original trace; update clipboard only while still owned by that Copy
 Finishing for CLI file export
 ├─ Wait for active Dictation; report API errors rather than successful export
@@ -49,7 +56,8 @@ New blank or screenshot trace
 - **Can I pause?** Yes; Resume continues the same recording.
 - **Where is the transcript?** Copied with the image and saved in the `.traceboard`.
 - **What went wrong?** Read the temporary error message or hover over Error.
-  HTTP 429 means OpenRouter or its provider has hit a rate or quota limit.
+  HTTP 429 means OpenRouter or its provider has hit a rate or quota limit. Trace
+  retries up to three times when a valid retry delay is supplied.
 - **Does slow transcription block Copy?** No. Available content is copied
   first and the board is released. Remaining transcription, audio merging,
   and saving finish in the background using the existing request timeout.
@@ -63,6 +71,14 @@ New blank or screenshot trace
   to hover first. The message dismisses after 10 seconds or when clicking
   elsewhere, and remains available through the Error tooltip and accessibility.
   A rate or quota failure identifies HTTP 429 and advises waiting before retrying.
+- A rate-limited request with a valid Retry-After delay waits for the specified
+  number of seconds or HTTP date before resending the same audio. Later chunks
+  remain queued, previously transcribed words are retained, and recording can
+  continue or pause while waiting. A successful retry resumes the queue in order
+  without duplicating words or showing a terminal error.
+- Three unsuccessful automatic retries report the provider's final error rather
+  than waiting forever. A missing or invalid delay reports the error without
+  automatically resending. Cancelling during a delay prevents further retries.
 - Automatic Dictation starts for newly created blank or screenshot traces
   only when a key and Microphone permission are available.
 - Reopening a saved trace preserves its recorded audio and transcript.
@@ -71,7 +87,7 @@ New blank or screenshot trace
 - Recording chunks rotate every 6 seconds instead of 12 seconds.
 - Background transcription may finish after 3 seconds without cancellation.
   Each request uses a 12-second timeout.
-- API failure or a request timeout returns a partial result, saves
+- An unrecovered API failure or a request timeout returns a partial result, saves
   recorded audio and available words, and leaves the first clipboard payload
   unchanged. Late network callbacks cannot update that result.
 - CLI file export remains a waiting operation; API errors or reported timeouts
