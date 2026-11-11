@@ -84,6 +84,7 @@ public final class TraceVoiceCaptureController: @unchecked Sendable {
     public var onStateChange: ((TraceVoiceCaptureState) -> Void)?
     public var onLevelChange: ((Float) -> Void)?
     public var onTranscriptChange: ((TraceVoiceTranscriptSnapshot) -> Void)?
+    public private(set) var lastFailure: Error?
 
     public private(set) var state: TraceVoiceCaptureState = .idle {
         didSet {
@@ -164,7 +165,6 @@ public final class TraceVoiceCaptureController: @unchecked Sendable {
     private var readyResult: TraceVoiceCaptureResult?
     private var finishCompletion:
         ((Result<TraceVoiceCaptureResult?, Error>) -> Void)?
-    private var lastFailure: Error?
 
     public convenience init(
         environment: [String: String] = ProcessInfo.processInfo.environment,

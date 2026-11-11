@@ -65,6 +65,8 @@ change. On timeout or API error, the first copy stays and recorded audio is save
 ### Dictation
 **What it does:** Records narration while annotating.
 **Where:** Board Dictation control; requires microphone access and an OpenRouter key.
+Failures show a temporary message beside the toolbar. Hover over Error to read
+the reason again. HTTP 429 indicates a rate or quota limit; wait before retrying.
 
 ### Drawing tools
 **What it does:** Selects, draws, highlights, creates rectangles, and adds text.

@@ -326,11 +326,26 @@ public struct TraceTranscriptionResult:
     }
 }
 
-public enum TraceTranscriptionError: LocalizedError, Equatable {
+public enum TraceTranscriptionError: LocalizedError, CustomNSError, Equatable {
     case missingAPIKey
     case emptyAudio
     case invalidResponse
     case requestFailed(statusCode: Int, message: String)
+
+    public static var errorDomain: String { "TraceVoice.Transcription" }
+
+    public var errorCode: Int {
+        switch self {
+        case .missingAPIKey: return -1
+        case .emptyAudio: return -2
+        case .invalidResponse: return -3
+        case let .requestFailed(statusCode, _): return statusCode
+        }
+    }
+
+    public var errorUserInfo: [String: Any] {
+        [NSLocalizedDescriptionKey: errorDescription ?? "Dictation failed."]
+    }
 
     public var errorDescription: String? {
         switch self {
@@ -340,6 +355,8 @@ public enum TraceTranscriptionError: LocalizedError, Equatable {
             return "Trace did not record enough audio for Dictation."
         case .invalidResponse:
             return "OpenRouter returned an unreadable Dictation response."
+        case let .requestFailed(429, message):
+            return "OpenRouter Dictation hit a rate or quota limit (HTTP 429). Wait a moment and try again. \(message)"
         case let .requestFailed(statusCode, message):
             return "OpenRouter Dictation failed (\(statusCode)): \(message)"
         }

@@ -8,7 +8,8 @@ Marks alone lose the "why". Typing an explanation afterwards breaks the flow.
 ## Solution
 Speak while annotating. The toolbar's Dictation button records, pauses,
 resumes, and finalizes into a transcript (via OpenRouter) that is saved with
-the trace and copied alongside the image.
+the trace and copied alongside the image. Failures show a temporary explanation
+beside the toolbar, with the full reason still available by hovering over Error.
 
 ## Touchpoints
 - [Board window](board-window.md) toolbar Dictation group
@@ -23,6 +24,10 @@ Dictation button
 └─ Key available → recording requires Microphone permission
 Recording flow
 └─ Start → Stop/Resume → Finishing → Transcript; one visible state at a time
+Recording error
+├─ Show the failure reason beside the toolbar for 10 seconds or until dismissed
+├─ Keep the full reason on the Error label's tooltip and accessible status
+└─ Rate or quota limit → identify HTTP 429 and suggest waiting before retrying
 Finishing for Copy
 ├─ Stop microphone; detach finishing work from the board
 ├─ Rotate recording chunks every 6 seconds for earlier transcript availability
@@ -43,6 +48,8 @@ New blank or screenshot trace
 - **Which provider transcribes?** OpenRouter, with your own key.
 - **Can I pause?** Yes; Resume continues the same recording.
 - **Where is the transcript?** Copied with the image and saved in the `.traceboard`.
+- **What went wrong?** Read the temporary error message or hover over Error.
+  HTTP 429 means OpenRouter or its provider has hit a rate or quota limit.
 - **Does slow transcription block Copy?** No. Available content is copied
   first and the board is released. Remaining transcription, audio merging,
   and saving finish in the background using the existing request timeout.
@@ -52,6 +59,10 @@ New blank or screenshot trace
   than starting a recording.
 - Users can start, pause, and resume a recording, then see it finishing and
   becoming a transcript, with one clear state shown at a time.
+- When Dictation fails on a visible board, users see the reason without having
+  to hover first. The message dismisses after 10 seconds or when clicking
+  elsewhere, and remains available through the Error tooltip and accessibility.
+  A rate or quota failure identifies HTTP 429 and advises waiting before retrying.
 - Automatic Dictation starts for newly created blank or screenshot traces
   only when a key and Microphone permission are available.
 - Reopening a saved trace preserves its recorded audio and transcript.

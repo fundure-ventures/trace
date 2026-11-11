@@ -666,7 +666,10 @@ final class TraceAppModel {
                 return
             }
             if case let .failed(message) = state {
-                TraceLogger.shared.record(.error, category: .dictation, "Dictation failed")
+                TraceLogger.shared.record(
+                    .error, category: .dictation, "Dictation failed",
+                    error: self.voiceController.lastFailure
+                )
                 self.lastError =
                     "Trace Dictation failed: \(message)"
             } else if self.lastError?.hasPrefix(

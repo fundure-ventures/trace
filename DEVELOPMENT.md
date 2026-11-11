@@ -226,10 +226,14 @@ termination. Forced termination can lose queued entries. Logs are owner-only,
 excluded from backups, and never uploaded automatically.
 
 Entries include timestamp, session ID, version/build, category, operation,
-source file/function/line, and safe error type/domain/code. Messages are static
-labels: keys, device identifiers, file paths, screenshots, strokes, transcripts,
-request/response bodies, arbitrary error descriptions, and JavaScript error
-payloads are not recorded. Unknown error domains are replaced with `custom`.
+source file/function/line, and safe error type/domain/code.
+Dictation request failures retain the HTTP status as the error code
+(for example, 429 for a rate or quota limit), without the provider's response
+body or message. Other errors retain their original safe type/domain/code.
+Messages are static labels: keys, device identifiers, file paths, screenshots,
+strokes, transcripts, request/response bodies, arbitrary error descriptions,
+and JavaScript error payloads are not recorded. Unknown error domains are
+replaced with `custom`.
 This policy applies even when verbose persistence is enabled. Input Lab,
 Neo diagnostics, and the explicitly enabled Sidecar input probe keep their
 separate existing logging behavior.

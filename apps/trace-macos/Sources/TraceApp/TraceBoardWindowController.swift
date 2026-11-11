@@ -3385,6 +3385,7 @@ private final class FloatingAnnotationToolbar:
     private var toolState = TraceToolState()
     private var temporaryCanvasTool: TraceCanvasTool?
     private var currentVoiceState: TraceVoiceCaptureState?
+    private var voiceErrorPopover: NSPopover?
     private var dictationConfigured = true
     private var voicePresentationSuppressed = false
     private var currentVoiceToggleSymbol = ""
@@ -3903,6 +3904,8 @@ private final class FloatingAnnotationToolbar:
         let toggleSymbol: String
         let toggleLabel: String
         let accessibilityValue: String
+        voiceErrorPopover?.close()
+        voiceErrorPopover = nil
         voiceLabel.toolTip = nil
         voiceLabel.isHidden = false
         switch state {
@@ -3971,9 +3974,7 @@ private final class FloatingAnnotationToolbar:
             toggleLabel = dictationConfigured
                 ? "Start a new recording"
                 : "Set up Dictation"
-            accessibilityValue = dictationConfigured
-                ? "Voice recording error"
-                : "Dictation setup required"
+            accessibilityValue = "Dictation failed: \(message)"
             voiceToggleButton.contentTintColor = .systemOrange
             voiceToggleButton.isEnabled = true
             setCopyControlsEnabled(true)
@@ -3995,6 +3996,64 @@ private final class FloatingAnnotationToolbar:
         voiceGroup.setAccessibilityValue(accessibilityValue)
         voiceActionHover.refreshHoverAppearance()
         onPreferredSizeChange?()
+        if case let .failed(message) = state {
+            showVoiceError(message)
+        }
+    }
+
+    private func showVoiceError(_ message: String) {
+        guard window?.isVisible == true else {
+            return
+        }
+        let title = NSTextField(labelWithString: "Dictation failed")
+        title.font = .boldSystemFont(ofSize: 13)
+        let detail = NSTextField(wrappingLabelWithString: message)
+        detail.preferredMaxLayoutWidth = 320
+        detail.isSelectable = true
+        let stack = NSStackView(views: [title, detail])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        let controller = NSViewController()
+        controller.view = NSView()
+        controller.view.addSubview(stack)
+        NSLayoutConstraint.activate([
+            detail.widthAnchor.constraint(equalToConstant: 320),
+            stack.leadingAnchor.constraint(
+                equalTo: controller.view.leadingAnchor, constant: 14
+            ),
+            stack.trailingAnchor.constraint(
+                equalTo: controller.view.trailingAnchor, constant: -14
+            ),
+            stack.topAnchor.constraint(
+                equalTo: controller.view.topAnchor, constant: 12
+            ),
+            stack.bottomAnchor.constraint(
+                equalTo: controller.view.bottomAnchor, constant: -12
+            ),
+        ])
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = controller
+        popover.contentSize = controller.view.fittingSize
+        voiceErrorPopover = popover
+        popover.show(
+            relativeTo: voiceGroup.bounds,
+            of: voiceGroup,
+            preferredEdge: .minY
+        )
+        NSAccessibility.post(
+            element: voiceGroup,
+            notification: .announcementRequested,
+            userInfo: [
+                .announcement: "Dictation failed: \(message)",
+                .priority: NSAccessibilityPriorityLevel.high.rawValue,
+            ]
+        )
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak popover] in
+            popover?.close()
+        }
     }
 
     private func setCopyControlsEnabled(_ enabled: Bool) {
