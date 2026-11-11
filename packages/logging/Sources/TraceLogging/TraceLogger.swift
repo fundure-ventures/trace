@@ -19,6 +19,46 @@ public enum TraceLogCategory: String, Codable {
     case lifecycle, capture, storage, canvas, dictation, input, clipboard
 }
 
+public struct TraceLogHTTPResponse: Codable, Sendable {
+    public enum ErrorType: String, Codable, Sendable {
+        case rateLimitExceeded = "rate_limit_exceeded"
+        case providerOverloaded = "provider_overloaded"
+        case providerUnavailable = "provider_unavailable"
+        case authentication
+        case permissionDenied = "permission_denied"
+        case paymentRequired = "payment_required"
+        case invalidRequest = "invalid_request"
+        case timeout, server, other
+    }
+
+    public enum Provider: String, Codable, Sendable {
+        case azure, openrouter, other
+    }
+
+    public let statusCode: Int
+    public let attempt: Int
+    public let retryAfterSeconds: TimeInterval?
+    public let willRetry: Bool
+    public let errorType: ErrorType?
+    public let provider: Provider?
+
+    public init(
+        statusCode: Int,
+        attempt: Int,
+        retryAfterSeconds: TimeInterval? = nil,
+        willRetry: Bool = false,
+        errorType: String? = nil,
+        provider: String? = nil
+    ) {
+        self.statusCode = statusCode
+        self.attempt = attempt
+        self.retryAfterSeconds = retryAfterSeconds
+        self.willRetry = willRetry
+        self.errorType = errorType.map { ErrorType(rawValue: $0) ?? .other }
+        self.provider = provider.map { Provider(rawValue: $0.lowercased()) ?? .other }
+    }
+}
+
 private struct LogError: Codable {
     let domain: String
     let code: Int
@@ -48,9 +88,10 @@ private struct LogEntry: Codable {
     let function: String
     let line: UInt
     let error: LogError?
+    let httpResponse: TraceLogHTTPResponse?
 }
 
-/// Messages are static operation labels; runtime content and error descriptions never enter the log.
+/// Messages stay static; HTTP details are numeric or allowlisted, never raw payloads.
 public final class TraceLogger: @unchecked Sendable {
     public static let debugPreferenceKey = "TracePersistDebugLogs"
     public static let shared = TraceLogger(
@@ -132,6 +173,7 @@ public final class TraceLogger: @unchecked Sendable {
         category: TraceLogCategory,
         _ message: StaticString,
         error: Error? = nil,
+        httpResponse: TraceLogHTTPResponse? = nil,
         file: StaticString = #fileID,
         function: StaticString = #function,
         line: UInt = #line
@@ -139,7 +181,19 @@ public final class TraceLogger: @unchecked Sendable {
         let label = message.description
         let diagnostic = error.map(LogError.init)
         let logger = Logger(subsystem: subsystem, category: category.rawValue)
-        if let diagnostic {
+        if let httpResponse {
+            logger.log(
+                level: level.osLogType,
+                """
+                \(label, privacy: .public) status=\(httpResponse.statusCode) \
+                attempt=\(httpResponse.attempt) \
+                retryAfterSeconds=\(httpResponse.retryAfterSeconds.map { String($0) } ?? "not_provided", privacy: .public) \
+                willRetry=\(httpResponse.willRetry) \
+                errorType=\(httpResponse.errorType?.rawValue ?? "not_provided", privacy: .public) \
+                provider=\(httpResponse.provider?.rawValue ?? "not_provided", privacy: .public)
+                """
+            )
+        } else if let diagnostic {
             logger.log(
                 level: level.osLogType,
                 "\(label, privacy: .public) type=\(diagnostic.type, privacy: .public) domain=\(diagnostic.domain, privacy: .public) code=\(diagnostic.code)"
@@ -157,7 +211,7 @@ public final class TraceLogger: @unchecked Sendable {
                 session: session, version: version, build: build, level: level,
                 category: category, message: label, file: file.description,
                 function: function.description,
-                line: line, error: diagnostic
+                line: line, error: diagnostic, httpResponse: httpResponse
             )
             do {
                 var data = try encoder.encode(entry)

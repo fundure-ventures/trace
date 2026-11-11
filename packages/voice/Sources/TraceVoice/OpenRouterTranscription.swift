@@ -1,4 +1,5 @@
 import Foundation
+import TraceLogging
 
 public enum OpenRouterAPIKeyState: Equatable, Sendable {
     case externallySupplied
@@ -474,32 +475,61 @@ public final class OpenRouterTranscriptionClient:
                 throw TraceTranscriptionError.invalidResponse
             }
             guard (200..<300).contains(httpResponse.statusCode) else {
-                if httpResponse.statusCode == 429,
-                   retries < 3,
-                   let delay = Self.retryDelay(for: httpResponse)
-                {
+                let responseError = try? decoder.decode(
+                    OpenRouterErrorResponse.self,
+                    from: data
+                ).error
+                let message = responseError?.message ?? HTTPURLResponse.localizedString(
+                    forStatusCode: httpResponse.statusCode
+                )
+                let failure = TraceTranscriptionError.requestFailed(
+                    statusCode: httpResponse.statusCode,
+                    message: message
+                )
+                let delay = Self.retryDelay(for: httpResponse)
+                let willRetry = httpResponse.statusCode == 429
+                    && retries < 3 && delay != nil
+                TraceLogger.shared.record(
+                    .error, category: .dictation, "OpenRouter Dictation response failed",
+                    error: failure,
+                    httpResponse: TraceLogHTTPResponse(
+                        statusCode: httpResponse.statusCode,
+                        attempt: retries + 1,
+                        retryAfterSeconds: delay,
+                        willRetry: willRetry,
+                        errorType: responseError?.metadata?.errorType,
+                        provider: responseError?.metadata?.providerName
+                    )
+                )
+                if willRetry, let delay {
                     retries += 1
                     try await Task.sleep(for: .seconds(delay))
                     continue
                 }
-                let message = (
-                    try? decoder.decode(
-                        OpenRouterErrorResponse.self,
-                        from: data
-                    )
-                )?.error.message ?? HTTPURLResponse.localizedString(
-                    forStatusCode: httpResponse.statusCode
-                )
-                throw TraceTranscriptionError.requestFailed(
-                    statusCode: httpResponse.statusCode,
-                    message: message
-                )
+                throw failure
             }
             guard let result = try? decoder.decode(
                 TraceTranscriptionResult.self,
                 from: data
             ) else {
+                TraceLogger.shared.record(
+                    .error, category: .dictation, "OpenRouter Dictation response unreadable",
+                    error: TraceTranscriptionError.invalidResponse,
+                    httpResponse: TraceLogHTTPResponse(
+                        statusCode: httpResponse.statusCode,
+                        attempt: retries + 1
+                    )
+                )
                 throw TraceTranscriptionError.invalidResponse
+            }
+            if retries > 0 {
+                TraceLogger.shared.record(
+                    .notice, category: .dictation, "OpenRouter Dictation retry succeeded",
+                    httpResponse: TraceLogHTTPResponse(
+                        statusCode: httpResponse.statusCode,
+                        attempt: retries + 1
+                    )
+                )
             }
             return result
         }
@@ -657,6 +687,28 @@ private struct OpenRouterTranscriptionRequest: Encodable {
 private struct OpenRouterErrorResponse: Decodable {
     struct ErrorDetail: Decodable {
         let message: String
+        let metadata: Metadata?
+
+        private enum CodingKeys: String, CodingKey {
+            case message, metadata
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            message = try container.decode(String.self, forKey: .message)
+            // Optional diagnostics must not hide the provider's error message.
+            metadata = try? container.decode(Metadata.self, forKey: .metadata)
+        }
+    }
+
+    struct Metadata: Decodable {
+        let errorType: String?
+        let providerName: String?
+
+        enum CodingKeys: String, CodingKey {
+            case errorType = "error_type"
+            case providerName = "provider_name"
+        }
     }
 
     let error: ErrorDetail

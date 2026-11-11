@@ -229,7 +229,14 @@ Entries include timestamp, session ID, version/build, category, operation,
 source file/function/line, and safe error type/domain/code.
 Dictation request failures retain the HTTP status as the error code
 (for example, 429 for a rate or quota limit), without the provider's response
-body or message. Other errors retain their original safe type/domain/code.
+body or message. Every failed HTTP response is logged, including recoverable
+responses before a retry and failures during background Copy. The structured
+`httpResponse` field records status, attempt number, parsed retry delay, and
+whether another retry will be scheduled. Provider error types and names use
+fixed allowlists; unrecognized values become `other`, and absent values stay
+absent. A successful retry also records a notice. Unreadable successful
+responses record their HTTP status without their body.
+Other errors retain their original safe type/domain/code.
 Messages are static labels: keys, device identifiers, file paths, screenshots,
 strokes, transcripts, request/response bodies, arbitrary error descriptions,
 and JavaScript error payloads are not recorded. Unknown error domains are

@@ -35,6 +35,10 @@ Rate limiting (HTTP 429)
 │  ├─ Keep later chunks queued in order; recording and pausing remain available
 │  └─ Cancellation → stop waiting without sending another retry
 └─ Missing/invalid delay or exhausted retries → report the failure
+Diagnostics
+├─ Every failed response, including automatic retries → retain safe failure and retry details
+├─ Successful retry → record recovery
+└─ Never record response bodies, provider messages, audio, transcripts, or credentials
 Finishing for Copy
 ├─ Stop microphone; detach finishing work from the board
 ├─ Rotate recording chunks every 6 seconds for earlier transcript availability
@@ -79,6 +83,12 @@ New blank or screenshot trace
 - Three unsuccessful automatic retries report the provider's final error rather
   than waiting forever. A missing or invalid delay reports the error without
   automatically resending. Cancelling during a delay prevents further retries.
+- With local diagnostic persistence enabled, failed responses are available in
+  the logs even when an automatic retry recovers or the board has already closed
+  for Copy. Entries identify the status, attempt, available retry delay, and
+  whether another attempt is planned. Known provider error types and names are
+  retained; unknown values are masked. Recovery is recorded without saving
+  response bodies, provider messages, audio, transcripts, or credentials.
 - Automatic Dictation starts for newly created blank or screenshot traces
   only when a key and Microphone permission are available.
 - Reopening a saved trace preserves its recorded audio and transcript.

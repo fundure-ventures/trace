@@ -71,6 +71,10 @@ Failures show a temporary message beside the toolbar. Hover over Error to read
 the reason again. For HTTP 429 with a valid Retry-After delay, audio stays queued
 and retries automatically up to three times. Recording can continue while
 waiting. Missing or invalid retry delays and exhausted retries show the error.
+**Diagnostics → Open Logs** opens local diagnostics. Debug builds retain safe
+response-error details automatically; release builds require **Persist Debug
+Logs**. Failed attempts and retry recovery are logged without response bodies,
+transcripts, or credentials.
 
 ### Drawing tools
 **What it does:** Selects, draws, highlights, creates rectangles, and adds text.

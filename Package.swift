@@ -121,6 +121,7 @@ let package = Package(
         ),
         .target(
             name: "TraceVoice",
+            dependencies: ["TraceLogging"],
             path: "packages/voice/Sources/TraceVoice",
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
